@@ -1,37 +1,87 @@
 /**
- * GroupDetailScreen
- * Group detail with summary stats, recent expenses, and actions
- * Uses NativeWind styling only, full i18n support
+ * GroupDetailScreen — single-scroll feed with hero header, quick actions,
+ * search + filter, mixed expense/message feed, sticky bottom "Add expense" CTA.
  */
 
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    View,
+    Text,
+    FlatList,
+    RefreshControl,
+    TouchableOpacity,
+    Alert,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
+    ExpenseCategory,
+    FeedItem,
     Group,
     GroupMember,
-    GroupSummary,
+    GroupMemberLite,
+    GroupMessage,
     UserBalance,
-    Expense,
 } from '@cost-share/shared';
-import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
+import { useLoading } from '../../hooks/useLoading';
 import {
     getGroupById,
     getGroupMembers,
-    getGroupSummary,
     getGroupBalances,
-    deleteGroup,
 } from '../../services/groups.service';
 import { fetchExpenses } from '../../services/expenses.service';
+import {
+    fetchMessages,
+    createMessage,
+    updateMessage,
+    deleteMessage,
+} from '../../services/messages.service';
+import { exportGroupCsv } from '../../services/group-share.service';
+import { buildFeed } from '../../services/feed';
+import { useGroupMessagesRealtime } from '../../hooks/useGroupMessagesRealtime';
+import { getCurrentUserId } from '../../lib/auth';
+import { supabase } from '../../lib/supabase';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
-import { ExpenseCard } from '../../components/ExpenseCard';
 import { EmptyState } from '../../components/EmptyState';
-import { Button } from '../../components/Button';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { GroupAvatar } from '../../components/GroupAvatar';
+import { GroupHero } from '../../components/GroupHero';
+import { QuickActionsRow } from '../../components/QuickActionsRow';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FeedItemRow } from '../../components/FeedItemRow';
+import { SearchExpandable } from '../../components/SearchExpandable';
+import { MessageComposerSheet } from '../../components/MessageComposerSheet';
+import {
+    DEFAULT_EXPENSE_FILTERS,
+    ExpenseFilters,
+    ExpenseFiltersSheet,
+    isAnyExpenseFilterActive,
+} from '../../components/ExpenseFiltersSheet';
+import { AppIcon } from '../../components/AppIcon';
 import { colors } from '../../theme';
+
+type ComposerState =
+    | { open: false }
+    | { open: true; mode: 'create' }
+    | { open: true; mode: 'edit'; messageId: string; initialBody: string };
+
+const CATEGORIES: ExpenseCategory[] = [
+    'food',
+    'transport',
+    'accommodation',
+    'utilities',
+    'entertainment',
+    'shopping',
+    'healthcare',
+    'other',
+];
+
+function membersToLite(members: GroupMember[], nameById: Map<string, string>, avatarById: Map<string, string | undefined>): GroupMemberLite[] {
+    return members.map(m => ({
+        userId: m.userId,
+        displayName: nameById.get(m.userId) ?? m.userId.slice(0, 8),
+        avatarUrl: avatarById.get(m.userId),
+    }));
+}
 
 export function GroupDetailScreen() {
     const { t } = useTranslation();
@@ -41,74 +91,197 @@ export function GroupDetailScreen() {
     const { isLoading, startLoading, stopLoading } = useLoading();
 
     const [group, setGroup] = useState<Group | null>(null);
-    const [members, setMembers] = useState<GroupMember[]>([]);
-    const [summary, setSummary] = useState<GroupSummary | null>(null);
+    const [memberLites, setMemberLites] = useState<GroupMemberLite[]>([]);
     const [balances, setBalances] = useState<UserBalance[]>([]);
+    const [currentUserId, setCurrentUserId] = useState<string>('');
     const [refreshing, setRefreshing] = useState(false);
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchExpanded, setSearchExpanded] = useState(false);
+    const [filters, setFilters] = useState<ExpenseFilters>(DEFAULT_EXPENSE_FILTERS);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [composer, setComposer] = useState<ComposerState>({ open: false });
 
-    const allExpenses = useAppStore((state) => state.expenses);
-    const expenses = useMemo(
-        () => allExpenses.filter((e) => e.groupId === groupId && !e.isDeleted),
-        [allExpenses, groupId]
+    const expenses = useAppStore(s => s.expenses);
+    const messagesMap = useAppStore(s => s.messagesByGroup);
+    const messages = useMemo(
+        () => messagesMap[groupId] ?? [],
+        [messagesMap, groupId],
     );
 
-    const loadGroupData = useCallback(async () => {
-        startLoading();
-        const [groupData, membersData, summaryData, balancesData] = await Promise.all([
+    useGroupMessagesRealtime(groupId);
+
+    const memberMap = useMemo(() => {
+        const map: Record<string, GroupMemberLite> = {};
+        memberLites.forEach(m => {
+            map[m.userId] = m;
+        });
+        return map;
+    }, [memberLites]);
+
+    const loadAll = useCallback(async () => {
+        const [groupData, membersData, balancesData, userId] = await Promise.all([
             getGroupById(groupId),
             getGroupMembers(groupId),
-            getGroupSummary(groupId),
             getGroupBalances(groupId),
+            getCurrentUserId(),
         ]);
-        await fetchExpenses(groupId);
 
         if (groupData) setGroup(groupData);
-        setMembers(membersData);
-        if (summaryData) setSummary(summaryData);
         setBalances(balancesData);
-        stopLoading();
-    }, [groupId, startLoading, stopLoading]);
+        if (userId) setCurrentUserId(userId);
+
+        const userIds = membersData.map(m => m.userId);
+        const nameById = new Map<string, string>();
+        const avatarById = new Map<string, string | undefined>();
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, name, avatar_url')
+                .in('id', userIds);
+            (profiles ?? []).forEach(p => {
+                nameById.set(p.id as string, (p.name as string) ?? '');
+                avatarById.set(p.id as string, (p.avatar_url as string | undefined) ?? undefined);
+            });
+        }
+        setMemberLites(membersToLite(membersData, nameById, avatarById));
+
+        await Promise.all([fetchExpenses(groupId), fetchMessages(groupId)]);
+    }, [groupId]);
 
     useEffect(() => {
-        void loadGroupData();
+        startLoading();
+        void loadAll().finally(stopLoading);
     }, []);
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadGroupData();
+        await loadAll();
         setRefreshing(false);
-    }, [loadGroupData]);
+    }, [loadAll]);
 
-    const handleAddExpense = useCallback(() => {
-        navigation.navigate('AddExpense', { groupId });
-    }, [navigation, groupId]);
+    const feed = useMemo<FeedItem[]>(
+        () => buildFeed(groupId, expenses, messages, currentUserId),
+        [groupId, expenses, messages, currentUserId],
+    );
 
-    const handleViewBalances = useCallback(() => {
-        navigation.navigate('Balances', { groupId });
-    }, [navigation, groupId]);
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+    const filterActive = isAnyExpenseFilterActive(filters);
 
-    const handleViewMembers = useCallback(() => {
-        navigation.navigate('GroupMembers', { groupId });
-    }, [navigation, groupId]);
+    const filteredFeed = useMemo(() => {
+        const dateFromMs = filters.dateFrom ? Date.parse(filters.dateFrom) : null;
+        const dateToMs = filters.dateTo ? Date.parse(filters.dateTo) + 24 * 3600 * 1000 : null;
+        return feed.filter(item => {
+            if (item.kind === 'expense') {
+                const e = item.expense;
+                if (
+                    filters.categories.length > 0 &&
+                    (!e.category || !filters.categories.includes(e.category))
+                ) {
+                    return false;
+                }
+                if (filters.memberIds.length > 0) {
+                    const participants = new Set<string>([
+                        e.paidBy,
+                        ...e.splits.map(s => s.userId),
+                    ]);
+                    if (!filters.memberIds.some(id => participants.has(id))) return false;
+                }
+                const expenseMs = new Date(e.expenseDate).getTime();
+                if (dateFromMs !== null && expenseMs < dateFromMs) return false;
+                if (dateToMs !== null && expenseMs >= dateToMs) return false;
+                if (trimmedQuery) {
+                    const payer = memberMap[e.paidBy]?.displayName ?? '';
+                    const hay = `${e.description} ${payer}`.toLowerCase();
+                    if (!hay.includes(trimmedQuery)) return false;
+                }
+                return true;
+            }
+            // message
+            if (trimmedQuery) {
+                const sender = memberMap[item.message.userId]?.displayName ?? '';
+                const hay = `${item.message.body} ${sender}`.toLowerCase();
+                if (!hay.includes(trimmedQuery)) return false;
+            }
+            return true;
+        });
+    }, [feed, filters, trimmedQuery, memberMap]);
 
-    const handleEditGroup = useCallback(() => {
-        navigation.navigate('EditGroup', { groupId });
-    }, [navigation, groupId]);
+    const settleUpDisabled = useMemo(
+        () => balances.length === 0 || balances.every(b => Math.round(b.netBalance * 100) === 0),
+        [balances],
+    );
 
-    const handleDeleteGroup = useCallback(async () => {
-        setShowDeleteDialog(false);
-        const success = await deleteGroup(groupId);
-        if (success) {
-            navigation.goBack();
-        }
-    }, [groupId, navigation]);
-
+    const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+    const handleSettings = useCallback(
+        () => navigation.navigate('EditGroup', { groupId }),
+        [navigation, groupId],
+    );
+    const handleSettleUp = useCallback(
+        () => navigation.navigate('Balances', { groupId }),
+        [navigation, groupId],
+    );
+    const handleAddExpense = useCallback(
+        () => navigation.navigate('AddExpense', { groupId }),
+        [navigation, groupId],
+    );
     const handleExpensePress = useCallback(
-        (expenseId: string) => {
-            navigation.navigate('ExpenseDetail', { expenseId, groupId });
+        (expenseId: string) =>
+            navigation.navigate('ExpenseDetail', { expenseId, groupId }),
+        [navigation, groupId],
+    );
+
+    const handleOpenComposer = useCallback(
+        () => setComposer({ open: true, mode: 'create' }),
+        [],
+    );
+
+    const handleExport = useCallback(async () => {
+        if (!group) return;
+        const filteredExpenses = filteredFeed
+            .filter((i): i is Extract<FeedItem, { kind: 'expense' }> => i.kind === 'expense')
+            .map(i => i.expense);
+        await exportGroupCsv(group, filteredExpenses, memberLites);
+    }, [group, filteredFeed, memberLites]);
+
+    const handleMessageEdit = useCallback(
+        (m: GroupMessage) =>
+            setComposer({
+                open: true,
+                mode: 'edit',
+                messageId: m.id,
+                initialBody: m.body,
+            }),
+        [],
+    );
+
+    const handleMessageDelete = useCallback(
+        (m: GroupMessage) => {
+            Alert.alert(t('groups.message.deleteConfirm'), undefined, [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('groups.message.delete'),
+                    style: 'destructive',
+                    onPress: () => {
+                        void deleteMessage(groupId, m.id);
+                    },
+                },
+            ]);
         },
-        [navigation, groupId]
+        [groupId, t],
+    );
+
+    const handleComposerSubmit = useCallback(
+        async (body: string) => {
+            if (!composer.open) return;
+            if (composer.mode === 'create') {
+                const created = await createMessage(groupId, body);
+                if (created) setComposer({ open: false });
+                return;
+            }
+            const updated = await updateMessage(composer.messageId, body);
+            if (updated) setComposer({ open: false });
+        },
+        [composer, groupId],
     );
 
     if (isLoading && !group) {
@@ -125,133 +298,154 @@ export function GroupDetailScreen() {
         );
     }
 
-    const recentExpenses = expenses
-        .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())
-        .slice(0, 5);
-
     return (
-        <ScrollView
-            className="flex-1 bg-slate-50"
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={handleRefresh}
-                    tintColor={colors.primary}
-                />
-            }
-        >
-            {/* Group Header */}
-            <View className="bg-white px-4 py-5 mb-4">
-                <View className="flex-row items-center">
-                    <View className="mr-3">
-                        <GroupAvatar
-                            imageUrl={group.imageUrl}
-                            groupType={group.groupType}
-                            size="md"
+        <View className="flex-1 bg-slate-50">
+            <FlatList
+                data={filteredFeed}
+                keyExtractor={item =>
+                    item.kind === 'expense'
+                        ? `e:${item.expense.id}`
+                        : `m:${item.message.id}`
+                }
+                renderItem={({ item }) => (
+                    <View className="px-4">
+                        <FeedItemRow
+                            item={item}
+                            currentUserId={currentUserId}
+                            memberMap={memberMap}
+                            onExpensePress={handleExpensePress}
+                            onMessageEdit={handleMessageEdit}
+                            onMessageDelete={handleMessageDelete}
+                            searchQuery={trimmedQuery || undefined}
                         />
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-2xl font-bold text-gray-900">{group.name}</Text>
-                        {group.description && (
-                            <Text className="text-sm text-gray-500 mt-1">{group.description}</Text>
-                        )}
-                    </View>
-                </View>
-            </View>
-
-            {/* Stats */}
-            <View className="flex-row px-4 mb-4 gap-3">
-                <View className="flex-1 bg-white rounded-xl p-4 items-center">
-                    <Text className="text-2xl font-bold text-primary">
-                        {summary?.memberCount || members.length}
-                    </Text>
-                    <Text className="text-xs text-gray-500 mt-1">{t('groups.members')}</Text>
-                </View>
-                <View className="flex-1 bg-white rounded-xl p-4 items-center">
-                    <Text className="text-2xl font-bold text-primary">
-                        {summary?.expenseCount || 0}
-                    </Text>
-                    <Text className="text-xs text-gray-500 mt-1">{t('groups.expenses')}</Text>
-                </View>
-                <View className="flex-1 bg-white rounded-xl p-4 items-center">
-                    <Text className="text-2xl font-bold text-primary">
-                        {group.defaultCurrency} {(summary?.totalSpent || 0).toFixed(0)}
-                    </Text>
-                    <Text className="text-xs text-gray-500 mt-1">{t('groups.totalSpent')}</Text>
-                </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View className="px-4 mb-4 gap-2">
-                <Button
-                    title={t('expenses.addExpense')}
-                    onPress={handleAddExpense}
-                />
-                <View className="flex-row gap-2">
-                    <View className="flex-1">
-                        <Button
-                            title={t('groups.balances')}
-                            onPress={handleViewBalances}
-                            variant="secondary"
-                        />
-                    </View>
-                    <View className="flex-1">
-                        <Button
-                            title={t('groups.members')}
-                            onPress={handleViewMembers}
-                            variant="outline"
-                        />
-                    </View>
-                </View>
-            </View>
-
-            {/* Recent Expenses */}
-            <View className="px-4 mb-4">
-                <Text className="text-lg font-semibold text-gray-900 mb-3">
-                    {t('expenses.recentExpenses')}
-                </Text>
-                {recentExpenses.length > 0 ? (
-                    recentExpenses.map((expense) => (
-                        <ExpenseCard
-                            key={expense.id}
-                            expense={expense}
-                            onPress={handleExpensePress}
-                        />
-                    ))
-                ) : (
-                    <View className="bg-white rounded-xl p-6 items-center">
-                        <Text className="text-gray-400">
-                            {t('expenses.noExpenses')}
-                        </Text>
                     </View>
                 )}
-            </View>
-
-            {/* Group Actions */}
-            <View className="px-4 mb-8 gap-2">
-                <Button
-                    title={t('common.edit')}
-                    onPress={handleEditGroup}
-                    variant="outline"
-                />
-                <Button
-                    title={t('common.delete')}
-                    onPress={() => setShowDeleteDialog(true)}
-                    variant="danger"
-                />
-            </View>
-
-            {/* Delete Confirmation Dialog */}
-            <ConfirmDialog
-                visible={showDeleteDialog}
-                title={t('groups.deleteGroup')}
-                message={t('groups.deleteGroupConfirm')}
-                confirmText={t('common.delete')}
-                cancelText={t('common.cancel')}
-                onConfirm={handleDeleteGroup}
-                onCancel={() => setShowDeleteDialog(false)}
-                destructive
+                ListHeaderComponent={
+                    <>
+                        <GroupHero
+                            group={group}
+                            onBack={handleBack}
+                            onSettings={handleSettings}
+                        />
+                        <QuickActionsRow
+                            onSettleUp={handleSettleUp}
+                            onBalances={handleSettleUp}
+                            onExport={handleExport}
+                            settleUpDisabled={settleUpDisabled}
+                        />
+                        <View className="px-4 mt-4 mb-2 flex-row items-center">
+                            <SearchExpandable
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                expanded={searchExpanded}
+                                onExpandedChange={setSearchExpanded}
+                                placeholder={t('groups.search.placeholder')}
+                                testID="detail-search"
+                            />
+                            {!searchExpanded && (
+                                <TouchableOpacity
+                                    onPress={() => setFiltersOpen(true)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('groups.filters.title')}
+                                    className="ml-1 h-9 w-9 items-center justify-center relative"
+                                    testID="detail-filter-btn"
+                                >
+                                    <AppIcon
+                                        name="options-outline"
+                                        size={22}
+                                        color={colors.gray500}
+                                    />
+                                    {filterActive && (
+                                        <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </>
+                }
+                ListEmptyComponent={
+                    <View className="mx-4 my-6 bg-white rounded-2xl p-6 items-center border border-gray-100">
+                        <Text className="text-base font-semibold text-gray-900 mb-1">
+                            {t('groups.emptyFeed.title')}
+                        </Text>
+                        <Text className="text-sm text-gray-500 text-center mb-4">
+                            {t('groups.emptyFeed.message')}
+                        </Text>
+                        <TouchableOpacity
+                            onPress={handleAddExpense}
+                            className="h-11 rounded-xl bg-primary px-5 items-center justify-center"
+                            testID="empty-feed-add"
+                        >
+                            <Text className="text-sm font-semibold text-white">
+                                {t('groups.emptyFeed.action')}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                }
+                contentContainerStyle={{ paddingBottom: 120 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={colors.primary}
+                    />
+                }
+                showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
+                ListFooterComponent={<View style={{ height: 4 }} />}
             />
-        </ScrollView>
+
+            <SafeAreaView
+                edges={['bottom']}
+                style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}
+                className="bg-white border-t border-gray-100"
+            >
+                <View className="flex-row px-4 pt-2.5 pb-1" style={{ gap: 8 }}>
+                    <TouchableOpacity
+                        onPress={handleOpenComposer}
+                        activeOpacity={0.85}
+                        className="h-14 rounded-2xl bg-primary-extra-light items-center justify-center flex-row"
+                        style={{ flex: 1 }}
+                        testID="detail-message-btn"
+                    >
+                        <AppIcon name="chatbubble-outline" size={20} color={colors.primary} />
+                        <Text className="text-base font-semibold text-primary-dark ml-2">
+                            {t('groups.actions.message')}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={handleAddExpense}
+                        activeOpacity={0.85}
+                        className="h-14 rounded-2xl bg-primary items-center justify-center flex-row"
+                        style={{ flex: 1 }}
+                        testID="detail-add-expense"
+                    >
+                        <AppIcon name="add" size={22} color="#fff" />
+                        <Text className="text-base font-semibold text-white ml-2">
+                            {t('expenses.addExpense')}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+
+            <ExpenseFiltersSheet
+                visible={filtersOpen}
+                filters={filters}
+                availableCategories={CATEGORIES}
+                availableMembers={memberLites}
+                onApply={setFilters}
+                onClose={() => setFiltersOpen(false)}
+            />
+
+            <MessageComposerSheet
+                visible={composer.open}
+                mode={composer.open ? composer.mode : 'create'}
+                initialBody={
+                    composer.open && composer.mode === 'edit' ? composer.initialBody : ''
+                }
+                onSubmit={handleComposerSubmit}
+                onClose={() => setComposer({ open: false })}
+            />
+        </View>
     );
 }

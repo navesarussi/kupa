@@ -52,5 +52,15 @@ jest.mock('react-native-toast-message', () => ({
     },
 }));
 
+// Provide safe-area insets without needing a SafeAreaProvider wrapper.
+jest.mock('react-native-safe-area-context', () => {
+    const actual = jest.requireActual('react-native-safe-area-context');
+    return {
+        ...actual,
+        useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+        useSafeAreaFrame: () => ({ x: 0, y: 0, width: 320, height: 640 }),
+    };
+});
+
 // Silence the React Native logging during tests.
 jest.spyOn(console, 'warn').mockImplementation(() => { });

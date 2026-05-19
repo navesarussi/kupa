@@ -2,6 +2,7 @@
  * Supabase Storage helpers for mobile uploads
  */
 
+import { File } from 'expo-file-system';
 import { supabase } from '../lib/supabase';
 
 const GROUP_IMAGES_BUCKET = 'group-images';
@@ -24,6 +25,17 @@ function contentTypeFromExtension(ext: string): string {
     }
 }
 
+// fetch(localUri).blob() is unreliable in React Native; read via expo-file-system
+// and hand Supabase a Uint8Array, which it accepts directly.
+function base64ToBytes(base64: string): Uint8Array {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
 export async function uploadGroupImage(
     groupId: string,
     localUri: string
@@ -32,12 +44,12 @@ export async function uploadGroupImage(
     const path = `${groupId}/avatar.${ext}`;
     const contentType = contentTypeFromExtension(ext);
 
-    const response = await fetch(localUri);
-    const blob = await response.blob();
+    const base64 = await new File(localUri).base64();
+    const bytes = base64ToBytes(base64);
 
     const { error } = await supabase.storage
         .from(GROUP_IMAGES_BUCKET)
-        .upload(path, blob, { contentType, upsert: true });
+        .upload(path, bytes, { contentType, upsert: true });
 
     if (error) {
         console.error('Failed to upload group image:', error.message);

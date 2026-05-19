@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { Session } from '@supabase/supabase-js';
-import { User, Group, Expense, DEFAULT_CURRENCY } from '@cost-share/shared';
+import {
+    User,
+    ExpenseWithSplits,
+    DEFAULT_CURRENCY,
+    GroupWithMembers,
+    GroupMessage,
+    BalanceSummaryRow,
+    GroupBalance,
+    BalanceSummaryResponse,
+} from '@cost-share/shared';
 
 interface AppState {
     // Auth state
@@ -12,18 +21,29 @@ interface AppState {
     setCurrentUser: (user: User | null) => void;
 
     // Groups state
-    groups: Group[];
-    setGroups: (groups: Group[]) => void;
-    addGroup: (group: Group) => void;
-    updateGroup: (group: Group) => void;
+    groups: GroupWithMembers[];
+    setGroups: (groups: GroupWithMembers[]) => void;
+    addGroup: (group: GroupWithMembers) => void;
+    updateGroup: (group: GroupWithMembers) => void;
     removeGroup: (groupId: string) => void;
 
+    // Balance summary state
+    balanceSummary: BalanceSummaryRow[];
+    groupBalances: Record<string, GroupBalance>;
+    setBalanceSummary: (payload: BalanceSummaryResponse) => void;
+
     // Expenses state
-    expenses: Expense[];
-    setExpenses: (expenses: Expense[]) => void;
-    addExpense: (expense: Expense) => void;
-    updateExpense: (expense: Expense) => void;
+    expenses: ExpenseWithSplits[];
+    setExpenses: (expenses: ExpenseWithSplits[]) => void;
+    addExpense: (expense: ExpenseWithSplits) => void;
+    updateExpense: (expense: ExpenseWithSplits) => void;
     removeExpense: (expenseId: string) => void;
+
+    // Group messages state, keyed by groupId
+    messagesByGroup: Record<string, GroupMessage[]>;
+    setGroupMessages: (groupId: string, messages: GroupMessage[]) => void;
+    upsertGroupMessage: (message: GroupMessage) => void;
+    removeGroupMessage: (groupId: string, messageId: string) => void;
 
     // Language state
     language: 'en' | 'he';
@@ -65,6 +85,21 @@ export const useAppStore = create<AppState>((set) => ({
         groups: state.groups.filter((g) => g.id !== groupId),
     })),
 
+    // Balance summary state
+    balanceSummary: [],
+    groupBalances: {},
+    setBalanceSummary: (payload) =>
+        set({
+            balanceSummary: payload.summary,
+            groupBalances: payload.byGroup.reduce<Record<string, GroupBalance>>(
+                (acc, row) => {
+                    acc[row.groupId] = row;
+                    return acc;
+                },
+                {},
+            ),
+        }),
+
     // Expenses state
     expenses: [],
     setExpenses: (expenses) => set({ expenses }),
@@ -75,6 +110,37 @@ export const useAppStore = create<AppState>((set) => ({
     removeExpense: (expenseId) => set((state) => ({
         expenses: state.expenses.filter((e) => e.id !== expenseId),
     })),
+
+    // Group messages state
+    messagesByGroup: {},
+    setGroupMessages: (groupId, messages) =>
+        set((state) => ({
+            messagesByGroup: { ...state.messagesByGroup, [groupId]: messages },
+        })),
+    upsertGroupMessage: (message) =>
+        set((state) => {
+            const existing = state.messagesByGroup[message.groupId] ?? [];
+            const idx = existing.findIndex((m) => m.id === message.id);
+            const next =
+                idx >= 0
+                    ? existing.map((m) => (m.id === message.id ? message : m))
+                    : [message, ...existing];
+            return {
+                messagesByGroup: {
+                    ...state.messagesByGroup,
+                    [message.groupId]: next,
+                },
+            };
+        }),
+    removeGroupMessage: (groupId, messageId) =>
+        set((state) => ({
+            messagesByGroup: {
+                ...state.messagesByGroup,
+                [groupId]: (state.messagesByGroup[groupId] ?? []).filter(
+                    (m) => m.id !== messageId,
+                ),
+            },
+        })),
 
     // Language state
     language: 'en',

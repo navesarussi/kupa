@@ -2,6 +2,9 @@ import {
     User,
     Group,
     GroupMember,
+    GroupMemberLite,
+    GroupWithMembers,
+    GroupMessage,
     Expense,
     ExpenseSplit,
     Settlement,
@@ -46,6 +49,27 @@ export const groupMemberFromRow = (r: Row): GroupMember => ({
     isActive: r.is_active as boolean,
 });
 
+type MemberJoinRow = {
+    user_id: unknown;
+    is_active?: unknown;
+    profiles?: { id?: unknown; name?: unknown; avatar_url?: unknown } | null;
+};
+
+export const groupWithMembersFromRow = (
+    r: Row & { group_members?: MemberJoinRow[] | null },
+): GroupWithMembers => {
+    const memberRows = Array.isArray(r.group_members) ? r.group_members : [];
+    const members: GroupMemberLite[] = memberRows
+        .filter(m => m.is_active === undefined || m.is_active === true)
+        .map(m => ({
+            userId: String(m.user_id ?? m.profiles?.id ?? ''),
+            displayName: String(m.profiles?.name ?? ''),
+            avatarUrl: (m.profiles?.avatar_url as string | undefined) ?? undefined,
+        }))
+        .filter(m => m.userId.length > 0);
+    return { ...groupFromRow(r), members };
+};
+
 export const expenseFromRow = (r: Row): Expense => ({
     id: r.id as string,
     groupId: r.group_id as string,
@@ -68,6 +92,17 @@ export const expenseSplitFromRow = (r: Row): ExpenseSplit => ({
     userId: r.user_id as string,
     amount: Number(r.amount),
     createdAt: toDate(r.created_at),
+});
+
+export const groupMessageFromRow = (r: Row): GroupMessage => ({
+    id: r.id as string,
+    groupId: r.group_id as string,
+    userId: r.user_id as string,
+    body: r.body as string,
+    editedAt: r.edited_at ? toDate(r.edited_at) : null,
+    isDeleted: (r.is_deleted as boolean) ?? false,
+    createdAt: toDate(r.created_at),
+    updatedAt: toDate(r.updated_at),
 });
 
 export const settlementFromRow = (r: Row): Settlement => ({

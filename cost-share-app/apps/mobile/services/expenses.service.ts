@@ -5,6 +5,7 @@
 import {
     Expense,
     ExpenseSplit,
+    ExpenseWithSplits,
     CreateExpenseDto,
     UpdateExpenseDto,
 } from '@cost-share/shared';
@@ -20,13 +21,13 @@ import { useAppStore } from '../store';
 import Toast from 'react-native-toast-message';
 import i18n from '../i18n';
 
-export async function fetchExpenses(groupId?: string): Promise<Expense[]> {
+export async function fetchExpenses(groupId?: string): Promise<ExpenseWithSplits[]> {
     try {
         let query = supabase
             .from('expenses')
-            .select('*')
+            .select('*, expense_splits(*)')
             .eq('is_deleted', false)
-            .order('expense_date', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (groupId) {
             query = query.eq('group_id', groupId);
@@ -35,7 +36,12 @@ export async function fetchExpenses(groupId?: string): Promise<Expense[]> {
         const { data, error } = await query;
         if (error) throw error;
 
-        const expenses = (data ?? []).map(expenseFromRow);
+        const expenses: ExpenseWithSplits[] = (data ?? []).map(row => {
+            const expense = expenseFromRow(row);
+            const splitRows = Array.isArray(row.expense_splits) ? row.expense_splits : [];
+            const splits = splitRows.map(expenseSplitFromRow);
+            return { ...expense, splits };
+        });
         useAppStore.getState().setExpenses(expenses);
         return expenses;
     } catch (error) {
@@ -48,6 +54,8 @@ export async function fetchExpenses(groupId?: string): Promise<Expense[]> {
         return [];
     }
 }
+
+export { computeMyDelta, decorateExpense } from './expense-delta';
 
 export async function getExpenseById(id: string): Promise<Expense | null> {
     const { data, error } = await supabase
@@ -111,7 +119,14 @@ export async function createExpense(dto: CreateExpenseDto): Promise<Expense | nu
         if (splitsErr) throw splitsErr;
 
         const expense = expenseFromRow(expenseRow);
-        useAppStore.getState().addExpense(expense);
+        const splitsForStore: ExpenseSplit[] = splits.map(s => ({
+            id: '',
+            expenseId: expense.id,
+            userId: s.userId,
+            amount: s.amount,
+            createdAt: expense.createdAt,
+        }));
+        useAppStore.getState().addExpense({ ...expense, splits: splitsForStore });
         Toast.show({
             type: 'success',
             text1: i18n.t('common.success'),
@@ -187,14 +202,16 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             .maybeSingle();
         if (error || !data) throw error ?? new Error('Update failed');
 
-        const expense = expenseFromRow(data);
-        useAppStore.getState().updateExpense(expense);
+        const baseExpense = expenseFromRow(data);
+        const existingSplits =
+            useAppStore.getState().expenses.find(e => e.id === id)?.splits ?? [];
+        useAppStore.getState().updateExpense({ ...baseExpense, splits: existingSplits });
         Toast.show({
             type: 'success',
             text1: i18n.t('common.success'),
             text2: 'Expense updated',
         });
-        return expense;
+        return baseExpense;
     } catch (error) {
         console.error('Failed to update expense:', error);
         Toast.show({

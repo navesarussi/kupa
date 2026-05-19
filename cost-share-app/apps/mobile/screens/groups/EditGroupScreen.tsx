@@ -10,13 +10,20 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { GroupType, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
-import { getGroupById, updateGroup } from '../../services/groups.service';
+import {
+    getGroupById,
+    updateGroup,
+    deleteGroup,
+    removeGroupMember,
+} from '../../services/groups.service';
 import { uploadGroupImage } from '../../services/storage.service';
+import { getCurrentUserId } from '../../lib/auth';
 import { GroupImagePicker } from '../../components/GroupImagePicker';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 const groupTypes: { key: GroupType; emoji: string }[] = [
     { key: 'trip', emoji: '✈️' },
@@ -41,6 +48,8 @@ export function EditGroupScreen() {
     const [imageUrl, setImageUrl] = useState<string | undefined>();
     const [localImageUri, setLocalImageUri] = useState<string | null>(null);
     const [imageRemoved, setImageRemoved] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
     useEffect(() => {
         const loadGroup = async () => {
@@ -100,6 +109,20 @@ export function EditGroupScreen() {
         } else {
             setImageRemoved(false);
         }
+    };
+
+    const handleDelete = async () => {
+        setShowDeleteDialog(false);
+        const ok = await deleteGroup(groupId);
+        if (ok) navigation.popToTop?.() ?? navigation.goBack();
+    };
+
+    const handleLeave = async () => {
+        setShowLeaveDialog(false);
+        const userId = await getCurrentUserId();
+        if (!userId) return;
+        const ok = await removeGroupMember(groupId, userId);
+        if (ok) navigation.popToTop?.() ?? navigation.goBack();
     };
 
     if (loading) {
@@ -187,7 +210,47 @@ export function EditGroupScreen() {
                         variant="outline"
                     />
                 </View>
+
+                {/* Danger zone */}
+                <View className="mt-8 mb-4">
+                    <Text className="text-xs font-semibold uppercase text-gray-500 mb-2">
+                        {t('groups.dangerZone')}
+                    </Text>
+                    <View className="gap-2">
+                        <Button
+                            title={t('groups.leaveGroup')}
+                            onPress={() => setShowLeaveDialog(true)}
+                            variant="outline"
+                        />
+                        <Button
+                            title={t('groups.deleteGroup')}
+                            onPress={() => setShowDeleteDialog(true)}
+                            variant="danger"
+                        />
+                    </View>
+                </View>
             </View>
+
+            <ConfirmDialog
+                visible={showDeleteDialog}
+                title={t('groups.deleteGroup')}
+                message={t('groups.deleteGroupConfirm')}
+                confirmText={t('common.delete')}
+                cancelText={t('common.cancel')}
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteDialog(false)}
+                destructive
+            />
+            <ConfirmDialog
+                visible={showLeaveDialog}
+                title={t('groups.leaveGroup')}
+                message={t('groups.leaveGroupConfirm')}
+                confirmText={t('groups.leaveGroup')}
+                cancelText={t('common.cancel')}
+                onConfirm={handleLeave}
+                onCancel={() => setShowLeaveDialog(false)}
+                destructive
+            />
         </ScrollView>
     );
 }

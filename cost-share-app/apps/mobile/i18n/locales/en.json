@@ -78,7 +78,89 @@
             "trip": "Trip",
             "home": "Home",
             "couple": "Couple",
-            "general": "General"
+            "general": "General",
+            "other": "Other"
+        },
+        "search": {
+            "placeholder": "Search groups or members",
+            "cancel": "Cancel"
+        },
+        "filters": {
+            "title": "Filters",
+            "apply": "Apply",
+            "clearAll": "Clear all",
+            "balance": {
+                "label": "Balance",
+                "all": "All",
+                "owe": "I owe",
+                "owed": "I'm owed",
+                "settled": "Settled"
+            },
+            "type": {
+                "label": "Group type"
+            },
+            "status": {
+                "label": "Status",
+                "includeArchived": "Show archived"
+            },
+            "currency": {
+                "label": "Currency"
+            },
+            "category": {
+                "label": "Category"
+            },
+            "member": {
+                "label": "Member"
+            },
+            "dateRange": {
+                "label": "Date range",
+                "from": "From",
+                "to": "To"
+            }
+        },
+        "summary": {
+            "youAreOwed": "You are owed {{amount}}",
+            "youOwe": "You owe {{amount}}"
+        },
+        "card": {
+            "matchedMembers": "incl. {{names}}",
+            "settled": "Settled"
+        },
+        "bigCreateCta": "Create a group",
+        "settings": "Group settings",
+        "dangerZone": "Danger zone",
+        "leaveGroup": "Leave group",
+        "leaveGroupConfirm": "Leave this group? You'll lose access to its expenses and messages.",
+        "actions": {
+            "settleUp": "Settle up",
+            "balances": "Balances",
+            "message": "Message",
+            "export": "Export"
+        },
+        "share": {
+            "exportTitle": "Export expenses",
+            "exportError": "Couldn't generate the file"
+        },
+        "expense": {
+            "youLent": "You lent {{amount}}",
+            "youBorrowed": "You borrowed {{amount}}",
+            "settled": "Settled"
+        },
+        "message": {
+            "composerPlaceholder": "Write a message…",
+            "send": "Send",
+            "edit": "Edit",
+            "delete": "Delete",
+            "editTitle": "Edit message",
+            "edited": "edited",
+            "deleteConfirm": "Delete this message?",
+            "sendError": "Couldn't send the message",
+            "tooLong": "Message is too long"
+        },
+        "emptyFeed": {
+            "title": "Nothing here yet",
+            "message": "Add the first expense or send the first message.",
+            "action": "Add the first expense"
         }
     },
     "expenses": {
@@ -122,7 +204,8 @@
             "shopping": "Shopping",
             "healthcare": "Healthcare",
             "other": "Other"
-        }
+        },
+        "paidBySub": "{{amount}} · paid by {{name}}"
     },
     "balances": {
         "title": "Balances",

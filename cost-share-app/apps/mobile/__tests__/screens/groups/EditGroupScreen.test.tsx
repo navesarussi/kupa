@@ -18,10 +18,16 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('../../../services/groups.service', () => ({
     getGroupById: jest.fn(),
     updateGroup: jest.fn(),
+    deleteGroup: jest.fn().mockResolvedValue(true),
+    removeGroupMember: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../../services/storage.service', () => ({
     uploadGroupImage: jest.fn(),
+}));
+
+jest.mock('../../../lib/auth', () => ({
+    getCurrentUserId: jest.fn().mockResolvedValue('me'),
 }));
 
 jest.mock('expo-image-picker', () => ({

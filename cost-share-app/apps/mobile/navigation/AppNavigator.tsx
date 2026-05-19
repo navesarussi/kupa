@@ -4,11 +4,30 @@
  */
 
 import React from 'react';
+import { TouchableOpacity, I18nManager } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { AppIcon, AppIconName } from '../components/AppIcon';
 import { APP_BRAND_TITLE, colors } from '../theme';
+
+function HeaderBackButton({ onPress }: { onPress: () => void }) {
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={{ paddingHorizontal: 4, paddingVertical: 4 }}
+        >
+            <AppIcon
+                name={I18nManager.isRTL ? 'chevron-forward' : 'chevron-back'}
+                size={26}
+                color={colors.primary}
+            />
+        </TouchableOpacity>
+    );
+}
 
 function tabBarIcon(
     focusedName: AppIconName,
@@ -42,13 +61,22 @@ const stackScreenOptions = {
     animation: 'slide_from_right' as const,
     animationDuration: 250,
     headerTintColor: colors.primary,
+    headerBackTitle: '',
+    headerBackTitleVisible: false,
 };
 
 function GroupsStack() {
     const { t } = useTranslation();
 
     return (
-        <Stack.Navigator screenOptions={stackScreenOptions}>
+        <Stack.Navigator
+            screenOptions={({ navigation }) => ({
+                ...stackScreenOptions,
+                headerLeft: navigation.canGoBack()
+                    ? () => <HeaderBackButton onPress={() => navigation.goBack()} />
+                    : undefined,
+            })}
+        >
             <Stack.Screen
                 name="GroupsList"
                 component={GroupsListScreen}
@@ -57,7 +85,7 @@ function GroupsStack() {
             <Stack.Screen
                 name="GroupDetail"
                 component={GroupDetailScreen}
-                options={{ title: t('groups.title') }}
+                options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="CreateGroup"
@@ -117,7 +145,14 @@ function ActivityStack() {
     const { t } = useTranslation();
 
     return (
-        <Stack.Navigator screenOptions={stackScreenOptions}>
+        <Stack.Navigator
+            screenOptions={({ navigation }) => ({
+                ...stackScreenOptions,
+                headerLeft: navigation.canGoBack()
+                    ? () => <HeaderBackButton onPress={() => navigation.goBack()} />
+                    : undefined,
+            })}
+        >
             <Stack.Screen
                 name="ActivityFeed"
                 component={ActivityFeedScreen}
@@ -136,7 +171,14 @@ function ProfileStack() {
     const { t } = useTranslation();
 
     return (
-        <Stack.Navigator screenOptions={stackScreenOptions}>
+        <Stack.Navigator
+            screenOptions={({ navigation }) => ({
+                ...stackScreenOptions,
+                headerLeft: navigation.canGoBack()
+                    ? () => <HeaderBackButton onPress={() => navigation.goBack()} />
+                    : undefined,
+            })}
+        >
             <Stack.Screen
                 name="ProfileMain"
                 component={ProfileScreen}

@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { GroupCard } from '../../components/GroupCard';
-import type { Group } from '@cost-share/shared';
+import type { GroupWithMembers, GroupBalance } from '@cost-share/shared';
 
-const baseGroup: Group = {
+const baseGroup: GroupWithMembers = {
     id: 'g1',
     name: 'Trip to Paris',
     description: 'Summer trip',
@@ -13,36 +13,67 @@ const baseGroup: Group = {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+    members: [
+        { userId: 'u1', displayName: 'Alice' },
+        { userId: 'u2', displayName: 'Bob' },
+    ],
 };
 
 describe('GroupCard', () => {
-    it('renders group name and description', () => {
+    it('renders group name', () => {
         const { getByText } = render(
-            <GroupCard group={baseGroup} onPress={() => { }} />
+            <GroupCard group={baseGroup} onPress={() => {}} />,
         );
         expect(getByText('Trip to Paris')).toBeTruthy();
-        expect(getByText('Summer trip')).toBeTruthy();
     });
 
-    it('renders group type label via i18n key', () => {
+    it('renders group type label via i18n key and member count', () => {
         const { getByText } = render(
-            <GroupCard group={baseGroup} onPress={() => { }} />
+            <GroupCard group={baseGroup} onPress={() => {}} />,
         );
-        expect(getByText('groups.types.trip')).toBeTruthy();
+        expect(getByText(/groups\.types\.trip/)).toBeTruthy();
+        expect(getByText(/2/)).toBeTruthy();
     });
 
-    it('renders member count when provided', () => {
+    it('renders a settled chip when no balance is provided', () => {
         const { getByText } = render(
-            <GroupCard group={baseGroup} memberCount={4} onPress={() => { }} />
+            <GroupCard group={baseGroup} onPress={() => {}} />,
         );
-        // Member count is rendered next to a bullet (e.g., "• 4 groups.members")
-        expect(getByText(/4/)).toBeTruthy();
+        expect(getByText('groups.card.settled')).toBeTruthy();
+    });
+
+    it('renders an "owed" chip when balance.net > 0', () => {
+        const balance: GroupBalance = { groupId: 'g1', currency: 'EUR', net: 42.5 };
+        const { getByText } = render(
+            <GroupCard group={baseGroup} balance={balance} onPress={() => {}} />,
+        );
+        expect(getByText(/\+EUR\s*42\.50/)).toBeTruthy();
+    });
+
+    it('renders an "owe" chip when balance.net < 0', () => {
+        const balance: GroupBalance = { groupId: 'g1', currency: 'EUR', net: -10 };
+        const { getByText } = render(
+            <GroupCard group={baseGroup} balance={balance} onPress={() => {}} />,
+        );
+        expect(getByText(/EUR\s*10\.00/)).toBeTruthy();
+    });
+
+    it('shows "incl. {names}" subtitle when matchedMemberNames is set', () => {
+        const { getByText } = render(
+            <GroupCard
+                group={baseGroup}
+                searchQuery="ali"
+                matchedMemberNames={['Alice']}
+                onPress={() => {}}
+            />,
+        );
+        expect(getByText(/groups\.card\.matchedMembers/)).toBeTruthy();
     });
 
     it('calls onPress with the group id', () => {
         const onPress = jest.fn();
         const { getByText } = render(
-            <GroupCard group={baseGroup} onPress={onPress} />
+            <GroupCard group={baseGroup} onPress={onPress} />,
         );
         fireEvent.press(getByText('Trip to Paris'));
         expect(onPress).toHaveBeenCalledWith('g1');
@@ -53,7 +84,7 @@ describe('GroupCard', () => {
             <GroupCard
                 group={{ ...baseGroup, imageUrl: 'https://example.com/group.jpg' }}
                 onPress={() => {}}
-            />
+            />,
         );
         expect(getByTestId('group-avatar-image')).toBeTruthy();
     });

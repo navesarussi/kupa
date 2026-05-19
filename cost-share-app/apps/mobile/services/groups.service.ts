@@ -5,6 +5,7 @@
 import {
     Group,
     GroupMember,
+    GroupWithMembers,
     UserBalance,
     DebtSummary,
     GroupSummary,
@@ -14,6 +15,7 @@ import {
 } from '@cost-share/shared';
 import {
     groupFromRow,
+    groupWithMembersFromRow,
     groupMemberFromRow,
     calculateUserBalancesFromData,
     simplifyDebts,
@@ -72,7 +74,7 @@ async function loadBalanceData(groupId: string, userId?: string) {
     return { defaultCurrency, expenses, splits, settlements, userIds };
 }
 
-export async function fetchGroups(): Promise<Group[]> {
+export async function fetchGroups(): Promise<GroupWithMembers[]> {
     const userId = await getCurrentUserId();
     if (!userId) return [];
 
@@ -92,13 +94,16 @@ export async function fetchGroups(): Promise<Group[]> {
 
         const { data, error } = await supabase
             .from('groups')
-            .select('*')
+            .select(
+                '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url))',
+            )
             .in('id', groupIds)
             .eq('is_active', true)
+            .eq('group_members.is_active', true)
             .order('created_at', { ascending: false });
         if (error) throw error;
 
-        const groups = (data ?? []).map(groupFromRow);
+        const groups = (data ?? []).map(groupWithMembersFromRow);
         useAppStore.getState().setGroups(groups);
         return groups;
     } catch (error) {
@@ -150,7 +155,8 @@ export async function createGroup(dto: CreateGroupDto): Promise<Group | null> {
         const { error: membersErr } = await supabase.from('group_members').insert(rows);
         if (membersErr) throw membersErr;
 
-        const group = groupFromRow(groupRow);
+        const base = groupFromRow(groupRow);
+        const group: GroupWithMembers = { ...base, members: [] };
         useAppStore.getState().addGroup(group);
         Toast.show({
             type: 'success',
@@ -194,7 +200,9 @@ export async function updateGroup(id: string, dto: UpdateGroupDto): Promise<Grou
         return null;
     }
 
-    const group = groupFromRow(data);
+    const base = groupFromRow(data);
+    const existing = useAppStore.getState().groups.find(g => g.id === id);
+    const group: GroupWithMembers = { ...base, members: existing?.members ?? [] };
     useAppStore.getState().updateGroup(group);
     Toast.show({ type: 'success', text1: i18n.t('common.success'), text2: 'Group updated' });
     return group;

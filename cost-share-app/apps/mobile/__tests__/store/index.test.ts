@@ -1,7 +1,7 @@
 import { useAppStore } from '../../store';
-import type { Group, Expense } from '@cost-share/shared';
+import type { GroupWithMembers, ExpenseWithSplits } from '@cost-share/shared';
 
-const makeGroup = (id: string, name = `Group ${id}`): Group => ({
+const makeGroup = (id: string, name = `Group ${id}`): GroupWithMembers => ({
     id,
     name,
     description: '',
@@ -11,9 +11,10 @@ const makeGroup = (id: string, name = `Group ${id}`): Group => ({
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+    members: [],
 });
 
-const makeExpense = (id: string, amount = 10): Expense => ({
+const makeExpense = (id: string, amount = 10): ExpenseWithSplits => ({
     id,
     groupId: 'g1',
     description: `expense ${id}`,
@@ -26,6 +27,7 @@ const makeExpense = (id: string, amount = 10): Expense => ({
     isDeleted: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+    splits: [],
 });
 
 beforeEach(() => {

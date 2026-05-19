@@ -37,6 +37,7 @@ const expense = {
     isDeleted: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+    splits: [],
 };
 
 beforeEach(() => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -15,89 +15,140 @@ jest.mock('@react-navigation/native', () => {
     };
 });
 
+jest.mock('expo-linear-gradient', () => {
+    const { View } = require('react-native');
+    return { LinearGradient: View };
+});
+
 jest.mock('../../../services/groups.service', () => ({
     getGroupById: jest.fn(),
-    getGroupMembers: jest.fn(),
-    getGroupSummary: jest.fn(),
-    getGroupBalances: jest.fn(),
-    deleteGroup: jest.fn(),
+    getGroupMembers: jest.fn().mockResolvedValue([]),
+    getGroupBalances: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../../../services/expenses.service', () => ({
     fetchExpenses: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('../../../services/messages.service', () => ({
+    fetchMessages: jest.fn().mockResolvedValue([]),
+    createMessage: jest.fn(),
+    updateMessage: jest.fn(),
+    deleteMessage: jest.fn(),
+}));
+
+jest.mock('../../../services/group-share.service', () => ({
+    exportGroupCsv: jest.fn().mockResolvedValue(true),
+}));
+
+jest.mock('../../../hooks/useGroupMessagesRealtime', () => ({
+    useGroupMessagesRealtime: jest.fn(),
+}));
+
+jest.mock('../../../lib/auth', () => ({
+    getCurrentUserId: jest.fn().mockResolvedValue('me'),
+}));
+
+jest.mock('../../../lib/supabase', () => ({
+    supabase: {
+        from: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+                in: jest.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+        }),
+    },
+}));
+
 import { GroupDetailScreen } from '../../../screens/groups/GroupDetailScreen';
-import {
-    getGroupById,
-    getGroupMembers,
-    getGroupSummary,
-    getGroupBalances,
-} from '../../../services/groups.service';
+import { getGroupById } from '../../../services/groups.service';
+import { fetchMessages, createMessage } from '../../../services/messages.service';
+import { exportGroupCsv } from '../../../services/group-share.service';
 import { useAppStore } from '../../../store';
 
 const mockGetGroup = getGroupById as jest.MockedFunction<typeof getGroupById>;
-const mockGetMembers = getGroupMembers as jest.MockedFunction<typeof getGroupMembers>;
-const mockGetSummary = getGroupSummary as jest.MockedFunction<typeof getGroupSummary>;
-const mockGetBalances = getGroupBalances as jest.MockedFunction<typeof getGroupBalances>;
+const mockFetchMessages = fetchMessages as jest.MockedFunction<typeof fetchMessages>;
+const mockCreateMessage = createMessage as jest.MockedFunction<typeof createMessage>;
+const mockExport = exportGroupCsv as jest.MockedFunction<typeof exportGroupCsv>;
 
 const group = {
     id: 'g1',
     name: 'Trip',
-    description: 'Group desc',
     groupType: 'trip' as const,
     defaultCurrency: 'USD',
-    createdBy: 'u1',
+    createdBy: 'me',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
 };
 
 beforeEach(() => {
-    mockNavigate.mockClear();
-    mockGoBack.mockClear();
-    mockGetGroup.mockReset();
-    mockGetMembers.mockReset();
-    mockGetSummary.mockReset();
-    mockGetBalances.mockReset();
-    useAppStore.setState({ expenses: [] });
+    jest.clearAllMocks();
+    mockGetGroup.mockResolvedValue(group);
+    mockFetchMessages.mockResolvedValue([]);
+    useAppStore.setState({
+        expenses: [],
+        messagesByGroup: {},
+    });
 });
 
 describe('GroupDetailScreen', () => {
-    it('renders the group name and description', async () => {
-        mockGetGroup.mockResolvedValueOnce(group);
-        mockGetMembers.mockResolvedValueOnce([]);
-        mockGetSummary.mockResolvedValueOnce({
-            groupId: 'g1',
-            groupName: 'Trip',
-            memberCount: 2,
-            expenseCount: 3,
-            totalSpent: 150,
-        } as any);
-        mockGetBalances.mockResolvedValueOnce([]);
+    it('renders the hero with the group name', async () => {
         const { findByText } = render(<GroupDetailScreen />);
         expect(await findByText('Trip')).toBeTruthy();
-        expect(await findByText('Group desc')).toBeTruthy();
     });
 
-    it('navigates to AddExpense when add expense is pressed', async () => {
-        mockGetGroup.mockResolvedValueOnce(group);
-        mockGetMembers.mockResolvedValueOnce([]);
-        mockGetSummary.mockResolvedValueOnce(null);
-        mockGetBalances.mockResolvedValueOnce([]);
-        const { findByText } = render(<GroupDetailScreen />);
-        fireEvent.press(await findByText('expenses.addExpense'));
-        expect(mockNavigate).toHaveBeenCalledWith('AddExpense', { groupId: 'g1' });
+    it('navigates back when the hero back button is tapped', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        fireEvent.press(await findByTestId('hero-back-btn'));
+        expect(mockGoBack).toHaveBeenCalled();
     });
 
-    it('navigates to Balances on balances button press', async () => {
-        mockGetGroup.mockResolvedValueOnce(group);
-        mockGetMembers.mockResolvedValueOnce([]);
-        mockGetSummary.mockResolvedValueOnce(null);
-        mockGetBalances.mockResolvedValueOnce([]);
-        const { findAllByText } = render(<GroupDetailScreen />);
-        const balanceButtons = await findAllByText('groups.balances');
-        fireEvent.press(balanceButtons[balanceButtons.length - 1]);
-        expect(mockNavigate).toHaveBeenCalledWith('Balances', { groupId: 'g1' });
+    it('navigates to EditGroup when the settings gear is tapped', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        fireEvent.press(await findByTestId('hero-settings-btn'));
+        expect(mockNavigate).toHaveBeenCalledWith('EditGroup', { groupId: 'g1' });
+    });
+
+    it('renders the sticky Add expense footer', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        expect(await findByTestId('detail-add-expense')).toBeTruthy();
+    });
+
+    it('shows the empty feed card when there is no feed content', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        expect(await findByTestId('empty-feed-add')).toBeTruthy();
+    });
+
+    it('invokes exportGroupCsv when the Export quick action is tapped', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        fireEvent.press(await findByTestId('qa-export'));
+        await waitFor(() => expect(mockExport).toHaveBeenCalled());
+    });
+
+    it('opens the composer when the Message quick action is tapped', async () => {
+        const { findByTestId } = render(<GroupDetailScreen />);
+        fireEvent.press(await findByTestId('detail-message-btn'));
+        await waitFor(async () => {
+            expect(await findByTestId('composer-input')).toBeTruthy();
+        });
+    });
+
+    it('sends a new message via createMessage when composer submits', async () => {
+        mockCreateMessage.mockResolvedValue({
+            id: 'm1',
+            groupId: 'g1',
+            userId: 'me',
+            body: 'hello',
+            editedAt: null,
+            isDeleted: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+        const { findByTestId } = render(<GroupDetailScreen />);
+        fireEvent.press(await findByTestId('detail-message-btn'));
+        const input = await findByTestId('composer-input');
+        fireEvent.changeText(input, 'hello');
+        fireEvent.press(await findByTestId('composer-send'));
+        await waitFor(() => expect(mockCreateMessage).toHaveBeenCalledWith('g1', 'hello'));
     });
 });

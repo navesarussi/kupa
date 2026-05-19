@@ -389,7 +389,76 @@ export interface UserPreferences {
 }
 
 // ============================================
-// 6. PROFILE DASHBOARD (RPC payloads)
+// 6. GROUPS LIST + BALANCE SUMMARY
+// ============================================
+
+/** Minimal member shape for rendering inside a group card. */
+export interface GroupMemberLite {
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+}
+
+/** Group enriched with its active members. */
+export interface GroupWithMembers extends Group {
+    members: GroupMemberLite[];
+}
+
+/** One row of the per-currency balance summary for the current user. */
+export interface BalanceSummaryRow {
+    currency: string;
+    owed: number; // amount others owe me (>= 0)
+    owe: number;  // amount I owe others (>= 0)
+    net: number;  // owed - owe
+}
+
+/** Per-group net balance for the current user. Positive = I'm owed; negative = I owe. */
+export interface GroupBalance {
+    groupId: string;
+    currency: string;
+    net: number;
+}
+
+/** Payload returned by supabase.rpc('get_user_balance_summary'). */
+export interface BalanceSummaryResponse {
+    summary: BalanceSummaryRow[];
+    byGroup: GroupBalance[];
+}
+
+// ============================================
+// 6b. GROUP MESSAGES + UNIFIED FEED
+// ============================================
+
+/** Standalone text message posted into a group's feed. */
+export interface GroupMessage {
+    id: string;
+    groupId: string;
+    userId: string;
+    body: string;
+    editedAt: Date | null;
+    isDeleted: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/** Expense with its splits embedded for one-round-trip rendering. */
+export interface ExpenseWithSplits extends Expense {
+    splits: ExpenseSplit[];
+}
+
+/** Client-derived: expense + current user's delta (lent / borrowed / settled). */
+export interface ExpenseWithDelta extends ExpenseWithSplits {
+    myDelta: number;
+    myDeltaState: 'lent' | 'borrowed' | 'settled';
+}
+
+/** A single item in the GroupDetailScreen feed — either an expense or a message. */
+export type FeedItem =
+    | { kind: 'expense'; sortAt: Date; expense: ExpenseWithDelta }
+    | { kind: 'message'; sortAt: Date; message: GroupMessage };
+
+// ============================================
+// 7. PROFILE DASHBOARD (RPC payloads)
 // ============================================
 
 /**
