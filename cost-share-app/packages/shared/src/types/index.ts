@@ -388,6 +388,41 @@ export interface UserPreferences {
     notifications: boolean;
 }
 
+/**
+ * Profile dashboard payload — supabase.rpc('get_user_dashboard')
+ * Headlines (totalOwed / totalOwedToUser) are null when balances span multiple currencies.
+ */
+export interface BalanceSummary {
+    totalOwed: number | null;
+    totalOwedToUser: number | null;
+    defaultCurrency: string;
+    byCurrency: {
+        currency: string;
+        owed: number;
+        owedToUser: number;
+    }[];
+}
+
+export interface FriendBalance {
+    userId: string;
+    name: string;
+    avatarUrl?: string;
+    netBalance: number;          // Positive = friend owes you
+    currency: string;            // Always equals user's defaultCurrency
+    sharedGroupIds: string[];
+}
+
+export interface DashboardStats {
+    closedGroupsCount: number;
+    activeGroupsCount: number;
+}
+
+export interface UserDashboard {
+    balanceSummary: BalanceSummary;
+    stats: DashboardStats;
+    friends: FriendBalance[];
+}
+
 // ============================================
 // LEGACY TYPES (for backward compatibility)
 // ============================================
