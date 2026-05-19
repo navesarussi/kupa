@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   return (
     <main style={styles.container}>
-      <h1 style={styles.appName}>Kupa</h1>
+      <h1 style={styles.appName}>kupa</h1>
       <p style={styles.subtitle}>Split expenses with friends</p>
 
       <button

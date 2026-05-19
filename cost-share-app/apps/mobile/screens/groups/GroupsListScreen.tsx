@@ -17,7 +17,7 @@ import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { GroupCard } from '../../components/GroupCard';
-import { colors } from '../../theme';
+import { APP_BRAND_TITLE, colors } from '../../theme';
 
 export function GroupsListScreen() {
     const { t } = useTranslation();
@@ -64,7 +64,7 @@ export function GroupsListScreen() {
     return (
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
             <ScreenHeader
-                title={t('groups.title')}
+                title={APP_BRAND_TITLE}
                 rightLabel={t('groups.createGroup')}
                 onRightPress={handleCreateGroup}
             />

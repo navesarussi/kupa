@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
-import { GroupType } from '@cost-share/shared';
+import { GroupType, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
 import { createGroup, updateGroup } from '../../services/groups.service';
@@ -37,7 +37,7 @@ export function CreateGroupScreen() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [groupType, setGroupType] = useState<GroupType>('general');
-    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || 'USD');
+    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || DEFAULT_CURRENCY);
     const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
     const [availableUsers, setAvailableUsers] = useState<User[]>([]);
     const [nameError, setNameError] = useState('');

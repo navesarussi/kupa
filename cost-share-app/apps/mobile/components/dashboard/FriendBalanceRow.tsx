@@ -3,38 +3,76 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { FriendBalance } from '@cost-share/shared';
 import { MemberAvatar } from '../MemberAvatar';
+import { AppIcon } from '../AppIcon';
+import { colors } from '../../theme';
+import { useRtlLayout, rtlRowStyle, rtlTextAlign, rtlTrailingAlign } from '../../hooks/useRtlLayout';
 
 interface Props {
     friend: FriendBalance;
     onPress: (friend: FriendBalance) => void;
     testID?: string;
+    isLast?: boolean;
 }
 
-export function FriendBalanceRow({ friend, onPress, testID }: Props) {
+function formatAmount(amount: number, currency: string): string {
+    const symbol = currency === 'ILS' ? '₪' : currency;
+    if (symbol === '₪') return `${symbol}${amount.toFixed(2)}`;
+    return `${amount.toFixed(2)} ${symbol}`;
+}
+
+export function FriendBalanceRow({ friend, onPress, testID, isLast = false }: Props) {
     const { t } = useTranslation();
+    const isRtl = useRtlLayout();
     const isSettled = Math.abs(friend.netBalance) < 0.01;
     const owesYou = friend.netBalance > 0;
+
     const amountText = isSettled
         ? t('dashboard.settled')
-        : `${Math.abs(friend.netBalance).toFixed(2)} ${friend.currency}`;
-    const amountClass = isSettled ? 'text-gray-400' : owesYou ? 'text-green-600' : 'text-red-600';
+        : formatAmount(Math.abs(friend.netBalance), friend.currency);
+    const amountClass = isSettled ? 'text-slate-400' : owesYou ? 'text-emerald-600' : 'text-red-600';
+    const subtitle = isSettled
+        ? null
+        : owesYou
+            ? t('dashboard.owesYou')
+            : t('dashboard.youOweFriend');
 
     return (
         <TouchableOpacity
             onPress={() => onPress(friend)}
             testID={testID}
-            className="flex-row items-center bg-white rounded-2xl px-4 py-3 mx-4 mb-2 border border-gray-100"
+            style={rtlRowStyle(isRtl)}
+            className={`items-center px-4 py-3.5 ${isLast ? '' : 'border-b border-slate-100'}`}
+            accessibilityRole="button"
         >
-            <MemberAvatar name={friend.name} avatarUrl={friend.avatarUrl} size="sm" />
-            <View className="flex-1 ms-3">
-                <Text className="text-base font-medium text-gray-900">{friend.name}</Text>
-                {!isSettled ? (
-                    <Text className="text-xs text-gray-500 mt-0.5">
-                        {owesYou ? t('dashboard.owesYou') : t('dashboard.youOweFriend')}
-                    </Text>
-                ) : null}
+            <MemberAvatar
+                name={friend.name}
+                avatarUrl={friend.avatarUrl}
+                size="md"
+                testID={`${testID}-avatar`}
+            />
+
+            <View style={{ flex: 1, marginHorizontal: 12, minWidth: 0 }}>
+                <Text
+                    className="text-base font-medium text-slate-900"
+                    style={{ textAlign: rtlTextAlign(isRtl) }}
+                    numberOfLines={1}
+                >
+                    {friend.name}
+                </Text>
             </View>
-            <Text className={`text-base font-semibold ${amountClass}`}>{amountText}</Text>
+
+            <View style={{ alignItems: rtlTrailingAlign(isRtl), flexShrink: 0, marginHorizontal: 4 }}>
+                {subtitle ? (
+                    <Text className="text-xs text-slate-500 mt-0.5">{subtitle}</Text>
+                ) : null}
+                <Text className={`text-sm font-semibold ${amountClass}`}>{amountText}</Text>
+            </View>
+
+            <AppIcon
+                name={isRtl ? 'chevron-back' : 'chevron-forward'}
+                size={16}
+                color={colors.gray400}
+            />
         </TouchableOpacity>
     );
 }

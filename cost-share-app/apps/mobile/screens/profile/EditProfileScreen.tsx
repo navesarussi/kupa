@@ -14,6 +14,7 @@ import { updateUser } from '../../services/users.service';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
+import { DEFAULT_CURRENCY } from '@cost-share/shared';
 import Toast from 'react-native-toast-message';
 
 export function EditProfileScreen() {
@@ -24,7 +25,7 @@ export function EditProfileScreen() {
 
     const [name, setName] = useState(currentUser?.name || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
-    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || 'USD');
+    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || DEFAULT_CURRENCY);
     const [nameError, setNameError] = useState('');
 
     const validateForm = (): boolean => {

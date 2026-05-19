@@ -33,9 +33,11 @@ jest.mock('../../../services/users.service', () => ({
 
 import { AddExpenseScreen } from '../../../screens/expenses/AddExpenseScreen';
 import { createExpense } from '../../../services/expenses.service';
+import { getGroupMembers } from '../../../services/groups.service';
 import { useAppStore } from '../../../store';
 
 const mockCreateExpense = createExpense as jest.MockedFunction<typeof createExpense>;
+const mockGetGroupMembers = getGroupMembers as jest.MockedFunction<typeof getGroupMembers>;
 
 beforeEach(() => {
     mockNavigate.mockClear();
@@ -57,6 +59,7 @@ beforeEach(() => {
 describe('AddExpenseScreen', () => {
     it('renders the description and amount inputs', async () => {
         const { findByText } = render(<AddExpenseScreen />);
+        await waitFor(() => expect(mockGetGroupMembers).toHaveBeenCalled());
         expect(await findByText('expenses.description')).toBeTruthy();
         expect(await findByText('expenses.amount')).toBeTruthy();
     });

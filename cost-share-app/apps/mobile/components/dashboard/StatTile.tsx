@@ -1,27 +1,43 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
-import { AppIcon, AppIconName } from '../AppIcon';
-import { colors } from '../../theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { shadows } from '../../theme';
 
 interface Props {
-    iconName: AppIconName;
     label: string;
     value: number;
     onPress: () => void;
     testID?: string;
 }
 
-export function StatTile({ iconName, label, value, onPress, testID }: Props) {
+export function StatTile({ label, value, onPress, testID }: Props) {
     return (
         <TouchableOpacity
             onPress={onPress}
             testID={testID}
-            className="flex-1 bg-white rounded-2xl px-3 py-4 border border-gray-100 items-center"
-            style={{ minHeight: 88 }}
+            className="flex-1 px-4 py-4 items-center justify-center"
+            accessibilityRole="button"
         >
-            <AppIcon name={iconName} size={24} color={colors.primary} />
-            <Text className="text-xl font-bold text-gray-900 mt-2">{value}</Text>
-            <Text className="text-xs text-gray-500 mt-0.5 text-center">{label}</Text>
+            <Text className="text-2xl font-semibold text-slate-900 tracking-tight">{value}</Text>
+            <Text className="text-xs font-medium text-slate-500 mt-1 text-center">{label}</Text>
         </TouchableOpacity>
     );
+}
+
+interface StatGroupProps {
+    children: React.ReactNode;
+}
+
+export function StatGroup({ children }: StatGroupProps) {
+    return (
+        <View
+            className="flex-row mx-4 mb-5 rounded-xl bg-white border border-slate-200/80 overflow-hidden"
+            style={shadows.sm}
+        >
+            {children}
+        </View>
+    );
+}
+
+export function StatDivider() {
+    return <View className="w-px bg-slate-100 self-stretch my-3" />;
 }

@@ -8,7 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { AppIcon, AppIconName } from '../components/AppIcon';
-import { colors } from '../theme';
+import { APP_BRAND_TITLE, colors } from '../theme';
 
 function tabBarIcon(
     focusedName: AppIconName,
@@ -140,7 +140,7 @@ function ProfileStack() {
             <Stack.Screen
                 name="ProfileMain"
                 component={ProfileScreen}
-                options={{ title: t('dashboard.appTitle'), headerTitleAlign: 'center' }}
+                options={{ title: APP_BRAND_TITLE, headerTitleAlign: 'center' }}
             />
             <Stack.Screen
                 name="EditProfile"

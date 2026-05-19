@@ -10,6 +10,7 @@ import { I18nManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from './locales/en.json';
 import he from './locales/he.json';
+import { useAppStore } from '../store';
 
 const resources = {
     en: { translation: en },
@@ -48,6 +49,8 @@ export const initializeLanguage = async (): Promise<void> => {
             if (I18nManager.isRTL !== isRTL) {
                 I18nManager.forceRTL(isRTL);
             }
+
+            useAppStore.getState().setLanguage(savedLanguage);
 
             console.log(`Language loaded from storage: ${savedLanguage}`);
         } else {

@@ -5,21 +5,44 @@ jest.mock('../../../services/auth.service', () => ({
     signInWithGoogle: jest.fn(),
 }));
 
+jest.mock('../../../i18n', () => ({
+    changeLanguage: jest.fn().mockResolvedValue(false),
+}));
+
 import { LoginScreen } from '../../../screens/auth/LoginScreen';
 import { signInWithGoogle } from '../../../services/auth.service';
+import { changeLanguage } from '../../../i18n';
+import { useAppStore } from '../../../store';
 import Toast from 'react-native-toast-message';
 
 const mockSignIn = signInWithGoogle as jest.MockedFunction<typeof signInWithGoogle>;
+const mockChangeLanguage = changeLanguage as jest.MockedFunction<typeof changeLanguage>;
 
 describe('LoginScreen', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        useAppStore.setState({ language: 'en' });
     });
 
     it('renders the app name and subtitle', () => {
         const { getByText } = render(<LoginScreen />);
-        expect(getByText('auth.appName')).toBeTruthy();
+        expect(getByText('kupa')).toBeTruthy();
         expect(getByText('auth.subtitle')).toBeTruthy();
+    });
+
+    it('opens language picker modal when language icon is pressed', () => {
+        const { getByTestId, queryByTestId } = render(<LoginScreen />);
+        expect(queryByTestId('login-language-picker')).toBeNull();
+        fireEvent.press(getByTestId('login-language-button'));
+        expect(getByTestId('login-language-picker')).toBeTruthy();
+        expect(getByTestId('login-language-picker')).toHaveTextContent('settings.language');
+    });
+
+    it('changes language when Hebrew is selected from picker', () => {
+        const { getByTestId, getByText } = render(<LoginScreen />);
+        fireEvent.press(getByTestId('login-language-button'));
+        fireEvent.press(getByText('profile.hebrew'));
+        expect(mockChangeLanguage).toHaveBeenCalledWith('he');
     });
 
     it('renders the Google sign-in button', () => {

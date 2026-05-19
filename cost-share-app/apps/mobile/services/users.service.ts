@@ -1,54 +1,56 @@
 /**
- * Users Service
- * Business logic for user operations
- * ALL user mutations must go through this service
+ * Users Service — Supabase direct (profiles table)
  */
 
-import { User, UpdateProfileDto, ApiResponse } from '@cost-share/shared';
-import { apiGet, apiPut } from './api';
+import { User, UpdateProfileDto } from '@cost-share/shared';
+import { profileFromRow } from '@cost-share/shared';
+import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store';
 
-/**
- * Fetch all users from API
- */
 export async function fetchUsers(): Promise<User[]> {
-    const response = await apiGet<User[]>('/users');
-
-    if (response.success && response.data) {
-        return response.data;
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+    if (error) {
+        console.error('Failed to fetch users:', error);
+        return [];
     }
-
-    return [];
+    return (data ?? []).map(profileFromRow);
 }
 
-/**
- * Get user by ID
- */
 export async function getUserById(id: string): Promise<User | null> {
-    const response = await apiGet<User>(`/users/${id}`);
-
-    if (response.success && response.data) {
-        return response.data;
-    }
-
-    return null;
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+    if (error || !data) return null;
+    return profileFromRow(data);
 }
 
-/**
- * Update user
- * This is the ONLY way to update a user from the UI
- */
 export async function updateUser(id: string, dto: UpdateProfileDto): Promise<User | null> {
-    const response = await apiPut<User>(`/users/${id}`, dto);
+    const patch: Record<string, unknown> = {};
+    if (dto.name !== undefined) patch.name = dto.name;
+    if (dto.email !== undefined) patch.email = dto.email;
+    if (dto.phone !== undefined) patch.phone = dto.phone;
+    if (dto.avatarUrl !== undefined) patch.avatar_url = dto.avatarUrl;
+    if (dto.defaultCurrency !== undefined) patch.default_currency = dto.defaultCurrency;
+    if (dto.language !== undefined) patch.language = dto.language;
 
-    if (response.success && response.data) {
-        // Update current user in store if it's the same user
-        const currentUser = useAppStore.getState().currentUser;
-        if (currentUser && currentUser.id === id) {
-            useAppStore.getState().setCurrentUser(response.data);
-        }
-        return response.data;
+    const { data, error } = await supabase
+        .from('profiles')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+
+    if (error || !data) return null;
+
+    const user = profileFromRow(data);
+    const currentUser = useAppStore.getState().currentUser;
+    if (currentUser && currentUser.id === id) {
+        useAppStore.getState().setCurrentUser(user);
     }
-
-    return null;
+    return user;
 }

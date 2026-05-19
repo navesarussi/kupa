@@ -10,24 +10,30 @@ This is a production-grade monorepo following strict architectural patterns.
 cost-share-app/
 ├── apps/
 │   ├── mobile/     # React Native (Expo) frontend
-│   ├── server/     # NestJS backend
+│   ├── web/        # Next.js (Supabase auth)
 ├── packages/
-│   ├── shared/     # Shared TypeScript types
+│   ├── shared/     # Types, mappers, calculations
+└── supabase/
+    └── schema.sql  # Postgres + RLS
 ```
 
 ### Data Flow Architecture
 
-**CRITICAL RULE: ALL DATA MUTATIONS MUST GO THROUGH SERVICES LAYER**
+**CRITICAL RULE: ALL DATA ACCESS MUST GO THROUGH THE SERVICES LAYER**
 
 ```
-UI → services/ → API → backend
+UI → services/ → Supabase (anon key + user JWT, RLS enforced)
 ```
+
+There is no custom backend server. The NestJS API was removed on 2026-05-19;
+business logic lives in `apps/mobile/services/` and pure math in `packages/shared/src/calculations/`.
 
 #### Forbidden Patterns
 
-- ❌ Direct API calls from screens/components
+- ❌ `supabase.from()` inside a screen or component
+- ❌ `fetch()` to any backend URL (no such backend exists)
 - ❌ Business logic in UI components
-- ❌ Data mutations outside services/
+- ❌ Data mutations outside `services/`
 
 #### Correct Pattern
 
@@ -54,28 +60,24 @@ function MyScreen() {
 #### Frontend (apps/mobile/)
 
 - **screens/**: Thin UI composition, NO business logic
-- **services/**: ALL API calls and data mutations
+- **services/**: ALL Supabase reads/writes (mobile feature logic)
+- **lib/**: `supabase.ts` (single client) and `auth.ts` (session helpers)
 - **store/**: Global state (Zustand)
 - **components/**: Reusable UI only
 - **navigation/**: React Navigation setup
 - **i18n/**: Internationalization
 
-#### Backend (apps/server/)
-
-- **controllers/**: Thin HTTP layer
-- **services/**: Business logic
-- **data/**: Mock in-memory data
-
 #### Shared (packages/shared/)
 
 - **types/**: TypeScript interfaces
+- **mappers/**: snake_case DB row → camelCase domain type
+- **calculations/**: Pure money/balance math (no I/O)
 - **schemas/**: Zod validation (future)
 - **utils/**: Shared utilities
 
 ### Scalability
 
 This architecture enables:
-- Easy migration to real database (Supabase)
-- Offline support without UI refactoring
+- Offline support without UI refactoring (future)
 - Consistent AI code generation
 - Clean separation of concerns

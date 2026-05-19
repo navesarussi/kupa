@@ -2,6 +2,8 @@
 
 A complete mobile + backend cost-sharing application (like Splitwise) built with modern technologies and scalable architecture patterns.
 
+> **SSOT (agents & contributors):** [docs/SSOT/README.md](../docs/SSOT/README.md) → [SRS](../docs/SSOT/SRS.md) · [CODE QUALITY](../docs/SSOT/CODE%20QUALITY.md)
+
 ## 🏗️ Architecture
 
 This is a **production-grade monorepo** using Turborepo with strict architectural patterns:
@@ -9,13 +11,13 @@ This is a **production-grade monorepo** using Turborepo with strict architectura
 ```
 cost-share-app/
 ├── apps/
-│   ├── mobile/     # React Native (Expo) frontend
-│   ├── web/        # Next.js web app (Supabase auth)
-│   ├── server/     # NestJS backend with mock data
+│   ├── mobile/     # React Native (Expo) → Supabase
+│   ├── web/        # Next.js (Supabase auth)
 ├── packages/
-│   ├── shared/     # Shared TypeScript types
-├── .cursor/
-│   └── rules/      # AI-friendly architecture documentation
+│   └── shared/     # Types, mappers, calculations
+├── supabase/
+│   └── schema.sql  # Postgres + RLS
+└── .cursor/rules/  # AI-friendly patterns
 ```
 
 ## 🚀 Tech Stack
@@ -28,10 +30,9 @@ cost-share-app/
 - **Zustand** (state management)
 - **i18next** (internationalization: EN/HE with RTL support)
 
-### Backend (Server)
-- **NestJS** (enterprise-grade Node.js framework)
-- **TypeScript** (strict mode)
-- **Supabase Postgres** via NestJS API (service role + JWT auth on requests)
+### Backend
+- **Supabase** — Postgres, Auth, Storage, Row Level Security
+- Mobile/web use the **anon key** + user session (no custom API server)
 
 ### Shared
 - **TypeScript** types shared between frontend and backend
@@ -52,11 +53,13 @@ cost-share-app/
 
 ## 🧱 Critical Architecture Rule
 
-**ALL DATA MUTATIONS MUST GO THROUGH SERVICES LAYER**
+**ALL DATA ACCESS MUST GO THROUGH THE SERVICES LAYER**
 
 ```
-UI → services/ → API → backend
+UI → services/ → Supabase (anon key + user JWT, RLS enforced)
 ```
+
+There is no custom API server. Mobile/web talk to Supabase directly via `@supabase/supabase-js`.
 
 ### ✅ Correct Pattern
 ```typescript
@@ -67,11 +70,13 @@ const handleCreate = async () => {
 };
 ```
 
-### ❌ Wrong Pattern
+### ❌ Wrong Patterns
 ```typescript
-const handleCreate = async () => {
-  await fetch('/api/groups', { method: 'POST', body: data });
-};
+// ❌ fetch to a non-existent backend
+await fetch('/api/groups', { method: 'POST', body: data });
+
+// ❌ supabase.from() inside a screen — must live in a service
+await supabase.from('groups').insert(data);
 ```
 
 ## 🚦 Getting Started
@@ -96,25 +101,14 @@ cp apps/web/.env.example apps/web/.env.local
 # Enable Google provider + redirect URLs (documented in .env.example files)
 ```
 
-3. **Apply database schema and seed (one-time):**
-   - Paste `apps/server/db/schema.sql` into Supabase SQL Editor → Run
-   - `cd apps/server && npm run seed` (optional dev data)
-   - Verify: `bash scripts/verify-supabase-schema.sh`
-
-4. **Mobile API URL (physical device / Expo Go):**
-   - Set `EXPO_PUBLIC_API_URL=http://<YOUR_MAC_LAN_IP>:3000/api` in `apps/mobile/.env`
-   - `dev-start.sh` prints the suggested value on boot
+3. **Apply database schema (one-time):**
+   - Paste `supabase/schema.sql` into Supabase SQL Editor → Run
+   - Or on an existing project: `cd cost-share-app && npm run supabase:fix` (CLI; applies RLS + grant patches)
+   - Copy `supabase/.env.example` → `supabase/.env` (service role for dev scripts only)
+   - `npm run seed` (optional sample data)
+   - Verify: `npm run supabase:verify`
 
 ### Running the Project
-
-#### Start Backend Server
-```bash
-npm run server
-# or
-cd apps/server && npm run dev
-```
-
-Server runs on: `http://localhost:3000/api`
 
 #### Start Mobile App
 ```bash
@@ -156,14 +150,23 @@ npm run clean
 ```
 apps/mobile/
 ├── screens/          # UI screens (thin composition layer)
+│   ├── activity/
+│   ├── auth/
+│   ├── balances/
+│   ├── expenses/
 │   ├── groups/
-│   ├── history/
 │   └── profile/
-├── services/         # ALL API calls and data mutations
-│   ├── api.ts
-│   ├── groups.service.ts
+├── services/         # ALL Supabase reads/writes
+│   ├── activity.service.ts
+│   ├── auth.service.ts
 │   ├── expenses.service.ts
+│   ├── groups.service.ts
+│   ├── settlements.service.ts
+│   ├── storage.service.ts
 │   └── users.service.ts
+├── lib/              # supabase client + auth helpers
+│   ├── auth.ts
+│   └── supabase.ts
 ├── store/            # Zustand global state
 ├── navigation/       # React Navigation setup
 ├── i18n/             # Internationalization
@@ -172,16 +175,6 @@ apps/mobile/
 │       └── he.json
 ├── components/       # Reusable UI components
 └── theme/            # Theme configuration
-```
-
-### Backend Structure
-```
-apps/server/src/
-├── controllers/      # Thin HTTP layer
-├── services/         # Business logic
-├── data/             # Mock in-memory data
-├── app.module.ts
-└── main.ts
 ```
 
 ### Shared Package
@@ -206,38 +199,25 @@ const { t } = useTranslation();
 
 Language change in Profile screen may require app restart for full RTL effect.
 
-## 🔌 API Endpoints
-
-Base URL: `http://localhost:3000/api`
-
-### Users
-- `GET /users` - Get all users
-- `GET /users/:id` - Get user by ID
-- `PUT /users/:id` - Update user
-
-### Groups
-- `GET /groups` - Get all groups
-- `GET /groups/:id` - Get group by ID
-- `POST /groups` - Create group
-
-### Expenses
-- `GET /expenses` - Get all expenses
-- `GET /expenses?groupId=:id` - Get expenses by group
-- `GET /expenses/:id` - Get expense by ID
-- `POST /expenses` - Create expense
-
 ## 📋 Architecture Documentation
 
-Comprehensive AI-friendly rules in `.cursor/rules/`:
+Authority order (see [docs/SSOT/README.md](../docs/SSOT/README.md)):
 
+1. [SRS.md](../docs/SSOT/SRS.md) — product requirements (`REQ-*`)
+2. [CODE QUALITY.md](../docs/SSOT/CODE%20QUALITY.md) — Supabase-only architecture
+3. `cost-share-app/supabase/schema.sql` — canonical DB + RLS
+
+Pattern guides in `.cursor/rules/`:
+
+- `ssot.mdc` - Pointer to SSOT (always-on)
 - `architecture.mdc` - Core architectural patterns
 - `frontend.mdc` - Frontend rules and patterns
-- `backend.mdc` - Backend rules and patterns
 - `shared.mdc` - Shared package rules
 - `coding-style.mdc` - Code style guidelines
-- `api-contract.mdc` - API contract documentation
 - `i18n.mdc` - Internationalization rules
 - `rtl.mdc` - RTL support rules
+
+`backend.mdc` and `api-contract.mdc` are deprecated (NestJS removed 2026-05-19).
 
 ## 🎯 Why This Architecture?
 
@@ -251,8 +231,9 @@ This project follows production-grade patterns even though it uses mock data:
 
 ## 🔄 Future Enhancements
 
-- [x] Migrate to Supabase database
-- [x] Add authentication (Google via Supabase — mobile + web)
+- [x] Supabase database + RLS
+- [x] Authentication (Google via Supabase — mobile + web)
+- [x] Remove NestJS API (direct Supabase from mobile)
 - [ ] Implement offline support
 - [ ] Add expense splitting logic
 - [ ] Add push notifications
@@ -266,21 +247,20 @@ This project follows production-grade patterns even though it uses mock data:
 ### Adding a New Feature
 
 1. **Define types** in `packages/shared/src/types/`
-2. **Create backend service** in `apps/server/src/services/`
-3. **Create backend controller** in `apps/server/src/controllers/`
-4. **Create frontend service** in `apps/mobile/services/`
-5. **Create UI screen** in `apps/mobile/screens/`
-6. **Add translations** in `apps/mobile/i18n/locales/`
+2. **Update RLS** in `supabase/schema.sql` if needed
+3. **Create mobile service** in `apps/mobile/services/`
+4. **Create UI screen** in `apps/mobile/screens/`
+5. **Add translations** in `apps/mobile/i18n/locales/`
 
 ### Rules to Follow
 
-- ❌ NO direct API calls from screens
+- ❌ NO `supabase.from()` / `fetch()` calls from screens or components
 - ❌ NO business logic in UI components
 - ❌ NO "any" types in TypeScript
 - ❌ NO hardcoded strings (use i18n)
-- ✅ ALL mutations through services layer
+- ✅ ALL data access through `apps/mobile/services/*.service.ts`
 - ✅ Use NativeWind for styling
-- ✅ Keep controllers thin
+- ✅ Pure math goes in `packages/shared/src/calculations/`
 - ✅ Document with comments
 
 ## 🤝 Contributing

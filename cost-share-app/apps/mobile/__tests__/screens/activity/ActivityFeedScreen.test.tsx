@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => {
     const actual = jest.requireActual('@react-navigation/native');
@@ -12,51 +12,88 @@ jest.mock('@react-navigation/native', () => {
     };
 });
 
-jest.mock('../../../services/api', () => ({
-    apiGet: jest.fn(),
+jest.mock('../../../services/activity.service', () => ({
+    fetchRecentActivity: jest.fn(),
 }));
 
 import { ActivityFeedScreen } from '../../../screens/activity/ActivityFeedScreen';
-import { apiGet } from '../../../services/api';
+import { fetchRecentActivity } from '../../../services/activity.service';
 
-const mockApiGet = apiGet as jest.MockedFunction<typeof apiGet>;
+const mockFetchRecentActivity = fetchRecentActivity as jest.MockedFunction<
+    typeof fetchRecentActivity
+>;
 
 beforeEach(() => {
-    mockApiGet.mockReset();
+    mockFetchRecentActivity.mockReset();
 });
 
 describe('ActivityFeedScreen', () => {
-    it('renders the title', async () => {
-        mockApiGet.mockResolvedValueOnce({ success: true, data: [] } as any);
+    it('renders the Kupa header', async () => {
+        mockFetchRecentActivity.mockResolvedValue([]);
         const { findByText } = render(<ActivityFeedScreen />);
-        expect(await findByText('activity.title')).toBeTruthy();
+        expect(await findByText('Kupa')).toBeTruthy();
     });
 
     it('shows empty state when no activities', async () => {
-        mockApiGet.mockResolvedValueOnce({ success: true, data: [] } as any);
+        mockFetchRecentActivity.mockResolvedValue([]);
         const { findByText } = render(<ActivityFeedScreen />);
         expect(await findByText('activity.noActivity')).toBeTruthy();
     });
 
     it('renders activities when present', async () => {
-        mockApiGet.mockResolvedValueOnce({
-            success: true,
-            data: [
-                {
-                    id: 'a1',
-                    activityType: 'expense',
-                    groupId: 'g1',
-                    description: 'Lunch',
-                    amount: 12,
-                    currency: 'USD',
-                    userId: 'u1',
-                    userName: 'Alice',
-                    activityDate: new Date('2026-05-01'),
-                    createdAt: new Date(),
-                },
-            ],
-        } as any);
+        mockFetchRecentActivity.mockResolvedValue([
+            {
+                id: 'a1',
+                activityType: 'expense',
+                groupId: 'g1',
+                description: 'Lunch',
+                amount: 12,
+                currency: 'USD',
+                userId: 'u1',
+                userName: 'Alice',
+                activityDate: new Date('2026-05-01'),
+                createdAt: new Date(),
+            },
+        ]);
         const { findByText } = render(<ActivityFeedScreen />);
         expect(await findByText('Lunch')).toBeTruthy();
+    });
+
+    it('filters activities by search query', async () => {
+        mockFetchRecentActivity.mockResolvedValue([
+            {
+                id: 'a1',
+                activityType: 'expense',
+                groupId: 'g1',
+                description: 'Lunch',
+                amount: 12,
+                currency: 'USD',
+                userId: 'u1',
+                userName: 'Alice',
+                activityDate: new Date('2026-05-01'),
+                createdAt: new Date(),
+            },
+            {
+                id: 'a2',
+                activityType: 'expense',
+                groupId: 'g1',
+                description: 'Dinner',
+                amount: 20,
+                currency: 'USD',
+                userId: 'u2',
+                userName: 'Bob',
+                activityDate: new Date('2026-05-02'),
+                createdAt: new Date(),
+            },
+        ]);
+
+        const { findByText, findByTestId, queryByText } = render(<ActivityFeedScreen />);
+        expect(await findByText('Lunch')).toBeTruthy();
+
+        fireEvent.press(await findByText('activity.search'));
+        fireEvent.changeText(await findByTestId('activity-search-input'), 'Dinner');
+
+        expect(await findByText('Dinner')).toBeTruthy();
+        expect(queryByText('Lunch')).toBeNull();
     });
 });

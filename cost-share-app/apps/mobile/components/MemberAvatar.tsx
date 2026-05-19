@@ -13,12 +13,13 @@ interface MemberAvatarProps {
     name: string;
     avatarUrl?: string;
     size?: AvatarSize;
+    testID?: string;
 }
 
-const sizeClasses: Record<AvatarSize, { container: string; text: string; imageSize: number }> = {
-    sm: { container: 'w-8 h-8', text: 'text-xs', imageSize: 32 },
-    md: { container: 'w-10 h-10', text: 'text-sm', imageSize: 40 },
-    lg: { container: 'w-14 h-14', text: 'text-lg', imageSize: 56 },
+const sizeStyles: Record<AvatarSize, { imageSize: number; text: string }> = {
+    sm: { imageSize: 36, text: 'text-xs' },
+    md: { imageSize: 44, text: 'text-sm' },
+    lg: { imageSize: 56, text: 'text-lg' },
 };
 
 function getInitials(name: string): string {
@@ -34,22 +35,36 @@ export function MemberAvatar({
     name,
     avatarUrl,
     size = 'md',
+    testID = 'member-avatar',
 }: MemberAvatarProps) {
-    const styles = sizeClasses[size];
+    const { imageSize, text } = sizeStyles[size];
+    const frameStyle = {
+        width: imageSize,
+        height: imageSize,
+        borderRadius: imageSize / 2,
+    };
 
     if (avatarUrl) {
         return (
-            <Image
-                source={{ uri: avatarUrl }}
-                className={`${styles.container} rounded-full`}
-                style={{ width: styles.imageSize, height: styles.imageSize, borderRadius: styles.imageSize / 2 }}
-            />
+            <View style={frameStyle} className="overflow-hidden shrink-0 bg-slate-100" testID={testID}>
+                <Image
+                    source={{ uri: avatarUrl }}
+                    style={{ width: imageSize, height: imageSize }}
+                    resizeMode="cover"
+                    accessibilityLabel={name}
+                    testID={`${testID}-image`}
+                />
+            </View>
         );
     }
 
     return (
-        <View className={`${styles.container} rounded-full bg-primary-extra-light justify-center items-center`}>
-            <Text className={`${styles.text} font-semibold text-primary-dark`}>
+        <View
+            style={frameStyle}
+            className="shrink-0 bg-slate-100 justify-center items-center border border-slate-200/80"
+            testID={testID}
+        >
+            <Text className={`${text} font-semibold text-slate-600`}>
                 {getInitials(name)}
             </Text>
         </View>

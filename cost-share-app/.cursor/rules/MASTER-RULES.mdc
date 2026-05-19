@@ -31,17 +31,18 @@
 ## 🏗️ ARCHITECTURE RULES
 
 ### ❌ NEVER:
-- Make API calls directly from screens/components
+- Call `supabase.from()` directly from screens/components
+- Use `fetch()` to a backend URL — there is no backend API (Supabase-only)
 - Put business logic in UI components
 - Mutate data outside the services layer
-- Use `fetch()` directly in screens
 
 ### ✅ ALWAYS:
-- Follow data flow: `UI → services/ → API → backend`
+- Follow data flow: `UI → services/ → Supabase (anon key + user JWT, RLS)`
 - Import and use service functions: `import { fetchGroups } from '../../services/groups.service'`
 - Keep screens thin (UI composition only)
-- Put ALL API calls in `services/` directory
-- Put business logic in services (frontend) or services (backend)
+- Put ALL Supabase reads/writes in `apps/mobile/services/*.service.ts`
+- Put pure math in `packages/shared/src/calculations/`
+- Re-apply RLS / schema changes in Supabase SQL Editor (code change alone won't update the deployed DB)
 
 ### Example:
 ```typescript
@@ -324,14 +325,21 @@ Before completing any task, verify:
 
 ## 📚 REFERENCE
 
-For detailed rules, see:
+SSOT (truth) lives in `docs/SSOT/`:
+- `docs/SSOT/SRS.md` - Requirements (`REQ-*`)
+- `docs/SSOT/CODE QUALITY.md` - Supabase-only architecture
+- `cost-share-app/supabase/schema.sql` - Canonical DB + RLS
+
+Pattern guides in `.cursor/rules/`:
+- `cost-share-app/.cursor/rules/ssot.mdc` - Pointer to SSOT (always-on)
 - `cost-share-app/.cursor/rules/architecture.mdc` - Architecture patterns
 - `cost-share-app/.cursor/rules/frontend.mdc` - Frontend rules
-- `cost-share-app/.cursor/rules/backend.mdc` - Backend rules
+- `cost-share-app/.cursor/rules/shared.mdc` - Shared package rules
 - `cost-share-app/.cursor/rules/coding-style.mdc` - Code style
 - `cost-share-app/.cursor/rules/i18n.mdc` - Internationalization
 - `cost-share-app/.cursor/rules/rtl.mdc` - RTL support
-- `cost-share-app/.cursor/rules/api-contract.mdc` - API contracts
+
+`backend.mdc` and `api-contract.mdc` are **deprecated** (NestJS server removed 2026-05-19).
 
 ---
 

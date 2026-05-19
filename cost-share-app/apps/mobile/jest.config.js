@@ -10,6 +10,8 @@ module.exports = {
         '^@cost-share/shared$': '<rootDir>/../../packages/shared/src',
         '^@cost-share/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
     },
+    // Preflight runs tsc + shared build first; cold screen imports can exceed 5s on first test per file.
+    testTimeout: 15000,
     testPathIgnorePatterns: ['/node_modules/', '/.expo/'],
     collectCoverageFrom: [
         'components/**/*.{ts,tsx}',

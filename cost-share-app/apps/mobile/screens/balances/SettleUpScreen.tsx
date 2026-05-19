@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { PaymentMethod } from '@cost-share/shared';
+import { PaymentMethod, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
 import { createSettlement } from '../../services/settlements.service';
@@ -56,7 +56,7 @@ export function SettleUpScreen() {
             fromUserId,
             toUserId,
             amount: parseFloat(amount),
-            currency: currency || 'USD',
+            currency: currency || DEFAULT_CURRENCY,
             paymentMethod,
         });
         stopLoading();

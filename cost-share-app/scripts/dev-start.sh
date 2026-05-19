@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Kupa dev launcher — preflight (non-interactive), then API + web in background + Expo in foreground.
+# Kupa dev launcher — preflight, then web (+ shared watch) in background, Expo in foreground.
 #
-# Usage (bash or npm run dev:start — safe from any cwd; not `sh`):
-#   /path/to/cost-share-app/scripts/dev-start.sh
-#   /path/to/cost-share-app/scripts/dev-start.sh --web-only
-#   /path/to/cost-share-app/scripts/dev-start.sh --skip-tests
-#   /path/to/cost-share-app/scripts/dev-start.sh --check-only
+# Usage (bash or npm run dev:start):
+#   scripts/dev-start.sh
+#   scripts/dev-start.sh --web-only      # web + shared only (no Expo)
+#   scripts/dev-start.sh --mobile-only   # Expo only (no Next.js)
+#   scripts/dev-start.sh --skip-tests
+#   scripts/dev-start.sh --skip-schema   # skip Supabase HTTP probe
+#   scripts/dev-start.sh --check-only
 #
-# Env: WEB_PORT=3001  API_PORT=3000
+# Env: WEB_PORT=3001 (Next.js). Data: Supabase via apps/mobile/.env
 
 if [ -z "${BASH_VERSION:-}" ]; then
   exec bash "$0" "$@"
@@ -23,25 +25,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-SERVER_DIR="$ROOT_DIR/apps/server"
 WEB_DIR="$ROOT_DIR/apps/web"
 MOBILE_DIR="$ROOT_DIR/apps/mobile"
 SHARED_DIR="$ROOT_DIR/packages/shared"
 SCRIPTS_DIR="$ROOT_DIR/scripts"
 
-SERVER_ENV="$SERVER_DIR/.env"
+SUPABASE_ENV="$ROOT_DIR/supabase/.env"
 WEB_ENV="$WEB_DIR/.env.local"
 MOBILE_ENV="$MOBILE_DIR/.env"
 VERIFY_SCHEMA_SH="$SCRIPTS_DIR/verify-supabase-schema.sh"
-SCHEMA_SQL="$SERVER_DIR/db/schema.sql"
 
 WEB_PORT="${WEB_PORT:-3001}"
-API_PORT="${API_PORT:-3000}"
 LOG_DIR="${LOG_DIR:-$ROOT_DIR/.dev-logs}"
 
 SKIP_CHECKS=false
 SKIP_TESTS=false
+SKIP_SCHEMA=false
 WEB_ONLY=false
+MOBILE_ONLY=false
 CHECK_ONLY=false
 FORCE_INSTALL=false
 
@@ -54,7 +55,7 @@ NC='\033[0m'
 PIDS=()
 
 usage() {
-  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 log()  { printf '%b▶%b %s\n' "$BLUE" "$NC" "$*"; }
@@ -66,28 +67,30 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-checks)   SKIP_CHECKS=true ;;
     --skip-tests)    SKIP_TESTS=true ;;
+    --skip-schema)   SKIP_SCHEMA=true ;;
     --web-only)      WEB_ONLY=true ;;
-    --with-mobile)   WEB_ONLY=false ;; # legacy alias
+    --mobile-only)   MOBILE_ONLY=true ;;
     --check-only)    CHECK_ONLY=true ;;
-    --install)       FORCE_INSTALL=true ;;
+    --with-mobile)   WEB_ONLY=false ;; # legacy alias
     -h|--help)       usage; exit 0 ;;
+    --install)       FORCE_INSTALL=true ;;
     *)               fail "Unknown option: $1 (try --help)" ;;
   esac
   shift
 done
 
+if [[ "$WEB_ONLY" == true && "$MOBILE_ONLY" == true ]]; then
+  fail "Use either --web-only or --mobile-only, not both"
+fi
+
 WITH_MOBILE=true
+WITH_WEB=true
 if [[ "$WEB_ONLY" == true ]]; then
   WITH_MOBILE=false
 fi
-
-load_api_port() {
-  if [[ -f "$SERVER_ENV" ]]; then
-    local p
-    p="$(grep -E '^PORT=' "$SERVER_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d ' "' || true)"
-    [[ -n "$p" ]] && API_PORT="$p"
-  fi
-}
+if [[ "$MOBILE_ONLY" == true ]]; then
+  WITH_WEB=false
+fi
 
 cleanup() {
   if [[ ${#PIDS[@]} -eq 0 ]]; then
@@ -115,7 +118,6 @@ port_in_use() {
   lsof -i ":$1" -sTCP:LISTEN -t >/dev/null 2>&1
 }
 
-# Stale Metro on 8081 forces Expo to 8082/8083; iOS simulator then keeps the wrong URL.
 free_port() {
   local port="$1"
   local pids
@@ -134,17 +136,19 @@ free_metro_ports() {
   done
 }
 
-# Free API/web/metro from a previous dev-start (Ctrl+C does not always stop background PIDs).
 free_dev_stack_ports() {
-  free_port "$API_PORT"
-  free_port "$WEB_PORT"
-  free_metro_ports
+  if [[ "$WITH_WEB" == true ]]; then
+    free_port "$WEB_PORT"
+  fi
+  if [[ "$WITH_MOBILE" == true ]]; then
+    free_metro_ports
+  fi
 }
 
 require_free_port() {
   local port="$1" label="$2"
   if port_in_use "$port"; then
-    fail "$label port $port is still in use after cleanup. Stop the other process or change the port."
+    fail "$label port $port is still in use after cleanup. Stop the other process or change WEB_PORT."
   fi
 }
 
@@ -208,11 +212,18 @@ check_env_file() {
 }
 
 check_env() {
-  load_api_port
-  check_env_file "Server" "$SERVER_ENV" \
-    SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
-  check_env_file "Web" "$WEB_ENV" \
-    NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if [[ -f "$SUPABASE_ENV" ]]; then
+    check_env_file "Supabase (seed/verify)" "$SUPABASE_ENV" \
+      SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
+  else
+    warn "Optional: supabase/.env (service role) — only needed for npm run seed"
+  fi
+
+  if [[ "$WITH_WEB" == true ]]; then
+    check_env_file "Web" "$WEB_ENV" \
+      NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  fi
+
   if [[ "$WITH_MOBILE" == true ]]; then
     check_env_file "Mobile" "$MOBILE_ENV" \
       EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
@@ -228,8 +239,12 @@ run_tsc() {
 
 check_typescript() {
   run_tsc "shared" "$SHARED_DIR"
-  run_tsc "server" "$SERVER_DIR"
-  run_tsc "web" "$WEB_DIR"
+  if [[ "$WITH_MOBILE" == true ]]; then
+    run_tsc "mobile" "$MOBILE_DIR"
+  fi
+  if [[ "$WITH_WEB" == true ]]; then
+    run_tsc "web" "$WEB_DIR"
+  fi
 }
 
 check_shared_build() {
@@ -239,9 +254,23 @@ check_shared_build() {
 }
 
 check_tests() {
+  if [[ "$WITH_MOBILE" != true ]]; then
+    warn "Skipping mobile tests (mobile not in this dev profile)"
+    return
+  fi
   log "Running mobile unit tests (Jest)..."
   (cd "$ROOT_DIR" && npm test -w @cost-share/mobile -- --ci --passWithNoTests --silent)
   ok "Mobile tests passed"
+}
+
+check_supabase_schema() {
+  if [[ "$SKIP_SCHEMA" == true ]]; then
+    warn "Skipping Supabase schema probe (--skip-schema)"
+    return
+  fi
+  log "Checking Supabase schema..."
+  bash "$VERIFY_SCHEMA_SH"
+  ok "Supabase schema"
 }
 
 run_checks() {
@@ -254,9 +283,7 @@ run_checks() {
   check_node
   check_dependencies
   check_env
-  log "Checking Supabase schema..."
-  bash "$VERIFY_SCHEMA_SH"
-  ok "Supabase schema"
+  check_supabase_schema
   check_typescript
   check_shared_build
   if [[ "$SKIP_TESTS" != true ]]; then
@@ -274,6 +301,7 @@ start_bg() {
   local name="$1"
   shift
   mkdir -p "$LOG_DIR"
+  rm -f "$LOG_DIR/server.log" # legacy Nest API (removed)
   (cd "$ROOT_DIR" && "$@") >"$LOG_DIR/${name}.log" 2>&1 &
   local pid=$!
   PIDS+=("$pid")
@@ -297,21 +325,17 @@ wait_for_port() {
 
 start_background_stack() {
   free_dev_stack_ports
-  require_free_port "$API_PORT" "API"
-  require_free_port "$WEB_PORT" "Web"
 
   log "Starting shared package (watch)..."
   start_bg "shared" npm run dev -w @cost-share/shared --silent
 
-  log "Starting API server..."
-  start_bg "server" npm run dev -w @cost-share/server --silent
-
-  log "Starting web app on port ${WEB_PORT}..."
-  start_bg "web" npm run dev -w @cost-share/web -- -p "$WEB_PORT"
-
-  log "Waiting for API and web..."
-  wait_for_port "$API_PORT" "API" "$LOG_DIR/server.log" || true
-  wait_for_port "$WEB_PORT" "Web" "$LOG_DIR/web.log" || true
+  if [[ "$WITH_WEB" == true ]]; then
+    require_free_port "$WEB_PORT" "Web"
+    log "Starting web app on port ${WEB_PORT}..."
+    start_bg "web" npm run dev -w @cost-share/web -- -p "$WEB_PORT"
+    log "Waiting for web..."
+    wait_for_port "$WEB_PORT" "Web" "$LOG_DIR/web.log" || true
+  fi
 }
 
 start_expo_foreground() {
@@ -320,13 +344,15 @@ start_expo_foreground() {
   echo "  Expo — interactive (this terminal)"
   echo "══════════════════════════════════════════"
   echo "  w → web  |  a → Android  |  i → iOS simulator"
-  echo "  iOS blank after i? → auto-reload runs; manual: npm run ios:open -w @cost-share/mobile"
+  echo "  iOS blank after i? → npm run ios:open -w @cost-share/mobile"
   echo "  Metro: exp://127.0.0.1:8081"
-  echo "  API: http://localhost:${API_PORT}/api  |  Web: http://localhost:${WEB_PORT}"
+  if [[ "$WITH_WEB" == true ]]; then
+    echo "  Next.js: http://localhost:${WEB_PORT}"
+  fi
+  echo "  Data: Supabase (apps/mobile/.env)"
   echo "  Ctrl+C stops Expo and background services"
   echo ""
 
-  # Foreground + TTY so w/a/i work; CI=1 only for preflight, not Expo UI.
   unset CI
   export EXPO_METRO_PORT=8081
   cd "$MOBILE_DIR"
@@ -338,17 +364,15 @@ start_services() {
   echo "  Kupa — starting dev stack"
   echo "══════════════════════════════════════════"
   echo ""
-  echo "  API:  http://localhost:${API_PORT}/api"
-  echo "  Web:  http://localhost:${WEB_PORT}"
-  LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')"
-  if [[ -n "$LAN_IP" ]]; then
-    echo "  Mobile API (set EXPO_PUBLIC_API_URL): http://${LAN_IP}:${API_PORT}/api"
+  if [[ "$WITH_WEB" == true ]]; then
+    echo "  Web:  http://localhost:${WEB_PORT}"
   fi
   if [[ "$WITH_MOBILE" == true ]]; then
     echo "  Expo: interactive below (Metro ~8081)"
   else
     echo "  Logs: $LOG_DIR/"
   fi
+  echo "  Data: Supabase"
   echo ""
 
   start_background_stack
@@ -358,7 +382,9 @@ start_services() {
   else
     echo ""
     log "Tailing logs (Ctrl+C to stop)..."
-    tail -f "$LOG_DIR"/*.log
+    local -a logs=("$LOG_DIR/shared.log")
+    [[ "$WITH_WEB" == true ]] && logs+=("$LOG_DIR/web.log")
+    tail -f "${logs[@]}"
   fi
 }
 
@@ -368,7 +394,6 @@ if [[ "$SKIP_CHECKS" != true ]]; then
   run_checks
 else
   warn "Skipping preflight checks (--skip-checks)"
-  load_api_port
 fi
 
 if [[ "$CHECK_ONLY" == true ]]; then

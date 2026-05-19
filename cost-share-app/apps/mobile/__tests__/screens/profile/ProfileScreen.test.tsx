@@ -42,9 +42,9 @@ beforeEach(() => {
 
 describe('ProfileScreen (dashboard)', () => {
     it('renders profile row, hero, tiles, friends list', async () => {
-        const { getByText, findByText } = render(<ProfileScreen />);
+        const { getByText, findByText, queryByText } = render(<ProfileScreen />);
         expect(await findByText('Alice')).toBeTruthy();
-        expect(getByText('a@x.com')).toBeTruthy();
+        expect(queryByText('a@x.com')).toBeNull();
         await waitFor(() => expect(mockedFetch).toHaveBeenCalled());
         expect(await findByText('Bob')).toBeTruthy();
         expect(getByText('dashboard.youAreOwed')).toBeTruthy();

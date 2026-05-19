@@ -5,10 +5,14 @@ import { FriendBalanceRow } from '../../../components/dashboard/FriendBalanceRow
 const base = { userId: 'u2', name: 'Bob', avatarUrl: undefined, currency: 'USD', sharedGroupIds: ['g1'] };
 
 describe('FriendBalanceRow', () => {
-    it('renders amount when friend owes you', () => {
-        const { getByText } = render(<FriendBalanceRow friend={{ ...base, netBalance: 25 }} onPress={() => {}} />);
+    it('renders avatar and amount when friend owes you', () => {
+        const { getByText, getByTestId } = render(
+            <FriendBalanceRow friend={{ ...base, netBalance: 25 }} onPress={() => {}} testID="friend-u2" />,
+        );
         expect(getByText('Bob')).toBeTruthy();
+        expect(getByTestId('friend-u2-avatar')).toBeTruthy();
         expect(getByText(/25\.00/)).toBeTruthy();
+        expect(getByText('dashboard.owesYou')).toBeTruthy();
     });
 
     it('shows settled state at zero', () => {

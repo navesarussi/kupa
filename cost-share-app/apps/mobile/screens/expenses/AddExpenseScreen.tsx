@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ExpenseCategory, GroupMember, User, ExpenseSplitInput } from '@cost-share/shared';
+import { ExpenseCategory, GroupMember, User, ExpenseSplitInput, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
 import { createExpense } from '../../services/expenses.service';
@@ -99,7 +99,7 @@ export function AddExpenseScreen() {
             groupId,
             description: description.trim(),
             amount: parsedAmount,
-            currency: 'USD', // TODO: use group currency
+            currency: DEFAULT_CURRENCY, // TODO: use group currency
             category,
             paidBy: currentUser.id,
             splits,

@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { GroupType } from '@cost-share/shared';
+import { GroupType, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import { getGroupById, updateGroup } from '../../services/groups.service';
 import { uploadGroupImage } from '../../services/storage.service';
@@ -35,7 +35,7 @@ export function EditGroupScreen() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [groupType, setGroupType] = useState<GroupType>('general');
-    const [currency, setCurrency] = useState('USD');
+    const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
     const [nameError, setNameError] = useState('');
     const [loading, setLoading] = useState(true);
     const [imageUrl, setImageUrl] = useState<string | undefined>();

@@ -36,6 +36,7 @@ jest.mock('../../../services/users.service', () => ({
 
 import { CreateGroupScreen } from '../../../screens/groups/CreateGroupScreen';
 import { createGroup } from '../../../services/groups.service';
+import { useAppStore } from '../../../store';
 
 const mockCreateGroup = createGroup as jest.MockedFunction<typeof createGroup>;
 
@@ -43,6 +44,17 @@ beforeEach(() => {
     mockNavigate.mockClear();
     mockGoBack.mockClear();
     mockCreateGroup.mockClear();
+    useAppStore.setState({
+        currentUser: {
+            id: 'u1',
+            email: 'a@x.com',
+            name: 'Alice',
+            defaultCurrency: 'USD',
+            language: 'en',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        },
+    });
 });
 
 describe('CreateGroupScreen', () => {

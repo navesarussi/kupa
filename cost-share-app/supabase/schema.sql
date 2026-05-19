@@ -23,7 +23,7 @@ CREATE TABLE profiles (
     email VARCHAR(255),
     avatar_url TEXT,
     phone VARCHAR(20),
-    default_currency VARCHAR(3) DEFAULT 'USD',
+    default_currency VARCHAR(3) DEFAULT 'ILS',
     language VARCHAR(5) DEFAULT 'en',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -35,7 +35,7 @@ CREATE TABLE groups (
     description TEXT,
     image_url TEXT,
     group_type VARCHAR(50) DEFAULT 'general',
-    default_currency VARCHAR(3) DEFAULT 'USD',
+    default_currency VARCHAR(3) DEFAULT 'ILS',
     created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -62,7 +62,7 @@ CREATE TABLE expenses (
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     description VARCHAR(255) NOT NULL,
     amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(3) NOT NULL DEFAULT 'ILS',
     category VARCHAR(50),
     expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
     receipt_url TEXT,
@@ -96,7 +96,7 @@ CREATE TABLE settlements (
     from_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
     to_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
     amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(3) NOT NULL DEFAULT 'ILS',
     settlement_date DATE NOT NULL DEFAULT CURRENT_DATE,
     payment_method VARCHAR(50),
     created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
@@ -190,10 +190,11 @@ AS $$
     );
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.is_group_member(uuid) FROM PUBLIC, anon;
-REVOKE EXECUTE ON FUNCTION public.is_group_creator(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_group_member(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_group_creator(uuid) TO authenticated;
+-- anon needs EXECUTE so RLS policies can evaluate (returns false when auth.uid() is null).
+REVOKE EXECUTE ON FUNCTION public.is_group_member(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.is_group_creator(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_group_member(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_group_creator(uuid) TO anon, authenticated;
 
 -- ============================================
 -- ROW LEVEL SECURITY (mobile + web clients)
@@ -284,8 +285,8 @@ DECLARE
     v_stats JSONB;
     v_currency_count INT;
 BEGIN
-    SELECT COALESCE(default_currency, 'USD') INTO v_default_currency FROM profiles WHERE id = p_user_id;
-    IF v_default_currency IS NULL THEN v_default_currency := 'USD'; END IF;
+    SELECT COALESCE(default_currency, 'ILS') INTO v_default_currency FROM profiles WHERE id = p_user_id;
+    IF v_default_currency IS NULL THEN v_default_currency := 'ILS'; END IF;
 
     -- Per-currency totals for the user across their active groups
     WITH user_groups AS (

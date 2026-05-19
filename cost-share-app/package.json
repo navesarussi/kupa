@@ -11,16 +11,24 @@
         "dev:start": "bash scripts/dev-start.sh",
         "dev:check": "bash scripts/dev-start.sh --check-only",
         "dev:web": "bash scripts/dev-start.sh --web-only",
+        "dev:mobile": "bash scripts/dev-start.sh --mobile-only",
         "build": "turbo run build",
         "lint": "turbo run lint",
         "clean": "turbo run clean",
         "mobile": "cd apps/mobile && npm start",
-        "server": "cd apps/server && npm run dev",
-        "web": "cd apps/web && npm run dev"
+        "web": "cd apps/web && npm run dev",
+        "seed": "DOTENV_CONFIG_PATH=./supabase/.env ts-node -r dotenv/config scripts/seed.ts",
+        "supabase:fix": "bash scripts/supabase-apply-patches.sh",
+        "supabase:verify": "bash scripts/verify-supabase-schema.sh"
     },
     "devDependencies": {
+        "@supabase/supabase-js": "^2.45.0",
+        "@types/ws": "^8.18.1",
+        "dotenv": "^16.4.5",
+        "ts-node": "^10.9.2",
         "turbo": "^1.13.0",
-        "typescript": "^5.3.3"
+        "typescript": "^5.3.3",
+        "ws": "^8.20.1"
     },
     "engines": {
         "node": ">=18.0.0",

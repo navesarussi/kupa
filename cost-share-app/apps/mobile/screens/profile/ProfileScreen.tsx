@@ -10,9 +10,10 @@ import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
 import { ProfileHeaderRow } from '../../components/dashboard/ProfileHeaderRow';
 import { BalanceHeroCard } from '../../components/dashboard/BalanceHeroCard';
-import { StatTile } from '../../components/dashboard/StatTile';
+import { StatTile, StatGroup, StatDivider } from '../../components/dashboard/StatTile';
 import { FriendBalanceRow } from '../../components/dashboard/FriendBalanceRow';
-import { colors } from '../../theme';
+import { APP_BRAND_TITLE, colors, shadows } from '../../theme';
+import { useRtlLayout, rtlRowStyle } from '../../hooks/useRtlLayout';
 
 export function ProfileScreen() {
     const { t } = useTranslation();
@@ -39,7 +40,7 @@ export function ProfileScreen() {
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            title: t('dashboard.appTitle'),
+            title: APP_BRAND_TITLE,
             headerTitleAlign: 'center',
             headerRight: () => (
                 <TouchableOpacity
@@ -48,7 +49,7 @@ export function ProfileScreen() {
                     testID="profile-settings-button"
                     className="mr-2"
                 >
-                    <AppIcon name="settings-outline" size={24} color={colors.primary} />
+                    <AppIcon name="settings-outline" size={22} color={colors.gray600} />
                 </TouchableOpacity>
             ),
         });
@@ -60,16 +61,18 @@ export function ProfileScreen() {
         navigation.navigate('Groups', { screen: 'GroupDetail', params: { groupId: firstGroup } });
     }, [navigation]);
 
+    const isRtl = useRtlLayout();
+
     if (loading && !dashboard) return <LoadingIndicator />;
 
     return (
         <ScrollView
-            className="flex-1 bg-slate-50"
+            className="flex-1 bg-slate-100"
+            contentContainerClassName="pb-10"
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         >
             <ProfileHeaderRow
                 name={currentUser?.name || t('common.unknown')}
-                email={currentUser?.email}
                 avatarUrl={currentUser?.avatarUrl}
                 onEditPress={handleEditProfile}
             />
@@ -86,29 +89,47 @@ export function ProfileScreen() {
                 <>
                     <BalanceHeroCard summary={dashboard.balanceSummary} />
 
-                    <View className="flex-row gap-3 mx-4 mb-4">
+                    <Text className="px-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        {t('dashboard.yourGroups')}
+                    </Text>
+                    <StatGroup>
                         <StatTile
-                            iconName="checkmark-circle-outline"
-                            label={t('dashboard.closedGroups')}
-                            value={dashboard.stats.closedGroupsCount}
-                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
-                            testID="stat-closed"
-                        />
-                        <StatTile
-                            iconName="people-outline"
                             label={t('dashboard.activeGroups')}
                             value={dashboard.stats.activeGroupsCount}
                             onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
                             testID="stat-active"
                         />
-                    </View>
+                        <StatDivider />
+                        <StatTile
+                            label={t('dashboard.closedGroups')}
+                            value={dashboard.stats.closedGroupsCount}
+                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+                            testID="stat-closed"
+                        />
+                    </StatGroup>
 
                     {dashboard.friends.length > 0 ? (
-                        <View className="mb-8">
-                            <Text className="px-5 mb-2 text-sm font-semibold text-gray-500">{t('dashboard.friends')}</Text>
-                            {dashboard.friends.map(f => (
-                                <FriendBalanceRow key={f.userId} friend={f} onPress={handleFriendPress} testID={`friend-${f.userId}`} />
-                            ))}
+                        <View className="mx-4 mb-8">
+                            <View style={rtlRowStyle(isRtl)} className="items-baseline justify-between px-1 mb-2">
+                                <Text className="text-xs text-slate-400">{dashboard.friends.length}</Text>
+                                <Text className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                                    {t('dashboard.friends')}
+                                </Text>
+                            </View>
+                            <View
+                                className="rounded-xl bg-white border border-slate-200/80 overflow-hidden"
+                                style={shadows.sm}
+                            >
+                                {dashboard.friends.map((f, index) => (
+                                    <FriendBalanceRow
+                                        key={f.userId}
+                                        friend={f}
+                                        onPress={handleFriendPress}
+                                        testID={`friend-${f.userId}`}
+                                        isLast={index === dashboard.friends.length - 1}
+                                    />
+                                ))}
+                            </View>
                         </View>
                     ) : null}
                 </>

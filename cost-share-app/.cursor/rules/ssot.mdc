@@ -1,0 +1,16 @@
+---
+description: Points agents to the project SSOT before implementing features or architecture changes.
+alwaysApply: true
+---
+
+# SSOT (read before feature work)
+
+**Authority:** Repository root `docs/SSOT/`
+
+1. [docs/SSOT/README.md](../../../docs/SSOT/README.md) — which file to read for your task (save tokens)
+2. [docs/SSOT/SRS.md](../../../docs/SSOT/SRS.md) — requirements `REQ-*` and business rules
+3. [docs/SSOT/CODE QUALITY.md](../../../docs/SSOT/CODE%20QUALITY.md) — layers, data flow, debt log
+
+Map changes to `REQ-*` IDs. Do not duplicate SSOT content in chat — cite IDs and paths.
+
+Schema + RLS: [supabase/schema.sql](../../supabase/schema.sql). DB reference: [DATABASE_ARCHITECTURE.md](../../../DATABASE_ARCHITECTURE.md).

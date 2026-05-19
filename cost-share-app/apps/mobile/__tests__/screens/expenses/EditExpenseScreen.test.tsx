@@ -50,18 +50,17 @@ beforeEach(() => {
     mockGoBack.mockClear();
     mockGet.mockReset();
     mockUpdate.mockReset();
+    mockGet.mockResolvedValue(expense);
 });
 
 describe('EditExpenseScreen', () => {
     it('loads existing expense data into form', async () => {
-        mockGet.mockResolvedValueOnce(expense);
         const { findByDisplayValue } = render(<EditExpenseScreen />);
         expect(await findByDisplayValue('Coffee')).toBeTruthy();
         expect(await findByDisplayValue('5')).toBeTruthy();
     });
 
     it('calls updateExpense with new values', async () => {
-        mockGet.mockResolvedValueOnce(expense);
         mockUpdate.mockResolvedValueOnce({ ...expense, description: 'Tea' });
         const { findByDisplayValue, findByText } = render(<EditExpenseScreen />);
         const descInput = await findByDisplayValue('Coffee');
@@ -76,7 +75,6 @@ describe('EditExpenseScreen', () => {
     });
 
     it('cancel button navigates back', async () => {
-        mockGet.mockResolvedValueOnce(expense);
         const { findByText } = render(<EditExpenseScreen />);
         fireEvent.press(await findByText('common.cancel'));
         expect(mockGoBack).toHaveBeenCalled();

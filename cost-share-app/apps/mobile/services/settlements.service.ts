@@ -1,107 +1,133 @@
 /**
- * Settlements Service
- * Business logic for settlement operations (debt payments)
- * ALL settlement mutations must go through this service
+ * Settlements Service — Supabase direct
  */
 
-import {
-    Settlement,
-    CreateSettlementDto,
-    ApiResponse
-} from '@cost-share/shared';
-import { apiGet, apiPost } from './api';
+import { Settlement, CreateSettlementDto } from '@cost-share/shared';
+import { settlementFromRow, validateSettlementAmount } from '@cost-share/shared';
+import { supabase } from '../lib/supabase';
+import { getCurrentUserId } from '../lib/auth';
+import { getGroupBalances } from './groups.service';
 import Toast from 'react-native-toast-message';
 import i18n from '../i18n';
 
-/**
- * Fetch settlements for a group
- */
 export async function fetchSettlements(groupId?: string): Promise<Settlement[]> {
-    const endpoint = groupId ? `/settlements?groupId=${groupId}` : '/settlements';
-    const response = await apiGet<Settlement[]>(endpoint);
-
-    if (response.success && response.data) {
-        return response.data;
+    try {
+        let query = supabase
+            .from('settlements')
+            .select('*')
+            .order('settlement_date', { ascending: false });
+        if (groupId) {
+            query = query.eq('group_id', groupId);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data ?? []).map(settlementFromRow);
+    } catch (error) {
+        console.error('Failed to fetch settlements:', error);
+        Toast.show({
+            type: 'error',
+            text1: 'Failed to load settlements',
+            text2: i18n.t('common.networkError'),
+        });
+        return [];
     }
-
-    console.error('Failed to fetch settlements:', response.error);
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to load settlements',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-
-    return [];
 }
 
-/**
- * Get settlement by ID
- */
 export async function getSettlementById(id: string): Promise<Settlement | null> {
-    const response = await apiGet<Settlement>(`/settlements/${id}`);
-
-    if (response.success && response.data) {
-        return response.data;
-    }
-
-    return null;
+    const { data, error } = await supabase
+        .from('settlements')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+    if (error || !data) return null;
+    return settlementFromRow(data);
 }
 
-/**
- * Create a new settlement (record debt payment)
- */
 export async function createSettlement(dto: CreateSettlementDto): Promise<Settlement | null> {
-    const response = await apiPost<Settlement>('/settlements', dto);
+    const createdBy = await getCurrentUserId();
+    if (!createdBy) return null;
 
-    if (response.success && response.data) {
+    const balances = await getGroupBalances(dto.groupId);
+    const validation = validateSettlementAmount(
+        balances,
+        dto.fromUserId,
+        dto.toUserId,
+        dto.amount,
+    );
+    if (!validation.valid) {
+        Toast.show({
+            type: 'error',
+            text1: 'Failed to record payment',
+            text2: validation.message ?? i18n.t('common.networkError'),
+        });
+        return null;
+    }
+
+    const settlementDate = (dto.settlementDate ?? new Date()).toISOString().slice(0, 10);
+
+    try {
+        const { data, error } = await supabase
+            .from('settlements')
+            .insert({
+                group_id: dto.groupId,
+                from_user_id: dto.fromUserId,
+                to_user_id: dto.toUserId,
+                amount: dto.amount,
+                currency: dto.currency,
+                settlement_date: settlementDate,
+                payment_method: dto.paymentMethod,
+                created_by: createdBy,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+
         Toast.show({
             type: 'success',
             text1: i18n.t('common.success'),
             text2: 'Payment recorded',
         });
-        return response.data;
+        return settlementFromRow(data);
+    } catch (error) {
+        console.error('Failed to create settlement:', error);
+        Toast.show({
+            type: 'error',
+            text1: 'Failed to record payment',
+            text2: i18n.t('common.networkError'),
+        });
+        return null;
     }
-
-    console.error('Failed to create settlement:', response.error);
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to record payment',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-
-    return null;
 }
 
-/**
- * Get settlements for a specific user
- */
 export async function getUserSettlements(userId: string): Promise<Settlement[]> {
-    const response = await apiGet<Settlement[]>(`/settlements/user/${userId}`);
-
-    if (response.success && response.data) {
-        return response.data;
+    const { data, error } = await supabase
+        .from('settlements')
+        .select('*')
+        .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+        .order('settlement_date', { ascending: false });
+    if (error) {
+        console.error('Failed to fetch user settlements:', error);
+        return [];
     }
-
-    console.error('Failed to fetch user settlements:', response.error);
-    return [];
+    return (data ?? []).map(settlementFromRow);
 }
 
-/**
- * Get settlement history between two users in a group
- */
 export async function getSettlementHistory(
     groupId: string,
     userId1: string,
-    userId2: string
+    userId2: string,
 ): Promise<Settlement[]> {
-    const response = await apiGet<Settlement[]>(
-        `/settlements/history/${groupId}/${userId1}/${userId2}`
-    );
-
-    if (response.success && response.data) {
-        return response.data;
+    const { data, error } = await supabase
+        .from('settlements')
+        .select('*')
+        .eq('group_id', groupId)
+        .or(
+            `and(from_user_id.eq.${userId1},to_user_id.eq.${userId2}),and(from_user_id.eq.${userId2},to_user_id.eq.${userId1})`,
+        )
+        .order('settlement_date', { ascending: false });
+    if (error) {
+        console.error('Failed to fetch settlement history:', error);
+        return [];
     }
-
-    console.error('Failed to fetch settlement history:', response.error);
-    return [];
+    return (data ?? []).map(settlementFromRow);
 }

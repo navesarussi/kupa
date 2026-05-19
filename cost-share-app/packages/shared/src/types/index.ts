@@ -301,7 +301,7 @@ export interface CreateGroupDto {
     name: string;
     description?: string;
     groupType?: GroupType;  // Defaults to 'general'
-    defaultCurrency?: string;  // Defaults to 'USD'
+    defaultCurrency?: string;  // Defaults to 'ILS'
     memberIds: string[];  // Initial members (creator auto-included)
     imageUrl?: string;
 }

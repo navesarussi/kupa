@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Session } from '@supabase/supabase-js';
-import { User, Group, Expense } from '@cost-share/shared';
+import { User, Group, Expense, DEFAULT_CURRENCY } from '@cost-share/shared';
 
 interface AppState {
     // Auth state
@@ -42,7 +42,7 @@ export const useAppStore = create<AppState>((set) => ({
                     email: session.user.email ?? '',
                     name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
                     avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
-                    defaultCurrency: 'USD',
+                    defaultCurrency: DEFAULT_CURRENCY,
                     language: 'en' as const,
                     createdAt: new Date(session.user.created_at),
                     updatedAt: new Date(session.user.updated_at ?? session.user.created_at),

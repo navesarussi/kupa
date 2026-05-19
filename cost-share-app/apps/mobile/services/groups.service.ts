@@ -1,7 +1,5 @@
 /**
- * Groups Service
- * Business logic for group operations
- * ALL group mutations must go through this service
+ * Groups Service — Supabase direct (no NestJS API)
  */
 
 import {
@@ -12,228 +10,356 @@ import {
     GroupSummary,
     CreateGroupDto,
     UpdateGroupDto,
-    ApiResponse
+    DEFAULT_CURRENCY,
 } from '@cost-share/shared';
-import { apiGet, apiPost, apiPut, apiDelete } from './api';
+import {
+    groupFromRow,
+    groupMemberFromRow,
+    calculateUserBalancesFromData,
+    simplifyDebts,
+} from '@cost-share/shared';
+import { supabase } from '../lib/supabase';
+import { getCurrentUserId } from '../lib/auth';
 import { useAppStore } from '../store';
 import Toast from 'react-native-toast-message';
 import i18n from '../i18n';
 
-/**
- * Fetch all groups from API
- */
+async function loadBalanceData(groupId: string, userId?: string) {
+    const [groupRes, membersRes, expensesRes, settlementsRes] = await Promise.all([
+        supabase.from('groups').select('default_currency').eq('id', groupId).maybeSingle(),
+        supabase.from('group_members').select('user_id').eq('group_id', groupId).eq('is_active', true),
+        supabase.from('expenses').select('id, paid_by, amount').eq('group_id', groupId).eq('is_deleted', false),
+        supabase.from('settlements').select('from_user_id, to_user_id, amount').eq('group_id', groupId),
+    ]);
+
+    if (groupRes.error) throw groupRes.error;
+    if (membersRes.error) throw membersRes.error;
+    if (expensesRes.error) throw expensesRes.error;
+    if (settlementsRes.error) throw settlementsRes.error;
+
+    const defaultCurrency = (groupRes.data?.default_currency as string) ?? DEFAULT_CURRENCY;
+    const expenses = (expensesRes.data ?? []).map(e => ({
+        id: e.id as string,
+        paidBy: e.paid_by as string,
+        amount: Number(e.amount),
+    }));
+
+    const expenseIds = expenses.map(e => e.id);
+    let splits: { expenseId: string; userId: string; amount: number }[] = [];
+    if (expenseIds.length > 0) {
+        const { data: splitsData, error: splitsErr } = await supabase
+            .from('expense_splits')
+            .select('expense_id, user_id, amount')
+            .in('expense_id', expenseIds);
+        if (splitsErr) throw splitsErr;
+        splits = (splitsData ?? []).map(s => ({
+            expenseId: s.expense_id as string,
+            userId: s.user_id as string,
+            amount: Number(s.amount),
+        }));
+    }
+
+    const settlements = (settlementsRes.data ?? []).map(s => ({
+        fromUserId: s.from_user_id as string,
+        toUserId: s.to_user_id as string,
+        amount: Number(s.amount),
+    }));
+
+    const userIds = userId
+        ? [userId]
+        : Array.from(new Set((membersRes.data ?? []).map(m => m.user_id as string)));
+
+    return { defaultCurrency, expenses, splits, settlements, userIds };
+}
+
 export async function fetchGroups(): Promise<Group[]> {
-    const response = await apiGet<Group[]>('/groups');
+    const userId = await getCurrentUserId();
+    if (!userId) return [];
 
-    if (response.success && response.data) {
-        // Update store
-        useAppStore.getState().setGroups(response.data);
-        return response.data;
+    try {
+        const { data: memberships, error: memberErr } = await supabase
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', userId)
+            .eq('is_active', true);
+        if (memberErr) throw memberErr;
+
+        const groupIds = (memberships ?? []).map(m => m.group_id as string);
+        if (groupIds.length === 0) {
+            useAppStore.getState().setGroups([]);
+            return [];
+        }
+
+        const { data, error } = await supabase
+            .from('groups')
+            .select('*')
+            .in('id', groupIds)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        const groups = (data ?? []).map(groupFromRow);
+        useAppStore.getState().setGroups(groups);
+        return groups;
+    } catch (error) {
+        console.error('Failed to fetch groups:', error);
+        Toast.show({
+            type: 'error',
+            text1: i18n.t('groups.loadError'),
+            text2: i18n.t('common.networkError'),
+        });
+        return [];
     }
-
-    // Show error toast
-    console.error('Failed to fetch groups:', response.error);
-    Toast.show({
-        type: 'error',
-        text1: i18n.t('groups.loadError'),
-        text2: response.error || i18n.t('common.networkError'),
-    });
-
-    return [];
 }
 
-/**
- * Get group by ID
- */
 export async function getGroupById(id: string): Promise<Group | null> {
-    const response = await apiGet<Group>(`/groups/${id}`);
-
-    if (response.success && response.data) {
-        return response.data;
-    }
-
-    return null;
+    const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', id)
+        .eq('is_active', true)
+        .maybeSingle();
+    if (error || !data) return null;
+    return groupFromRow(data);
 }
 
-/**
- * Create a new group
- * This is the ONLY way to create a group from the UI
- */
 export async function createGroup(dto: CreateGroupDto): Promise<Group | null> {
-    const response = await apiPost<Group>('/groups', dto);
+    const createdBy = await getCurrentUserId();
+    if (!createdBy) return null;
 
-    if (response.success && response.data) {
-        // Update store
-        useAppStore.getState().addGroup(response.data);
+    try {
+        const { data: groupRow, error: groupErr } = await supabase
+            .from('groups')
+            .insert({
+                name: dto.name,
+                description: dto.description,
+                image_url: dto.imageUrl,
+                group_type: dto.groupType ?? 'general',
+                default_currency: dto.defaultCurrency ?? DEFAULT_CURRENCY,
+                created_by: createdBy,
+            })
+            .select()
+            .single();
+        if (groupErr) throw groupErr;
 
-        // Show success toast
+        const memberIds = new Set<string>([createdBy, ...dto.memberIds]);
+        const rows = Array.from(memberIds).map(userId => ({
+            group_id: groupRow.id,
+            user_id: userId,
+        }));
+        const { error: membersErr } = await supabase.from('group_members').insert(rows);
+        if (membersErr) throw membersErr;
+
+        const group = groupFromRow(groupRow);
+        useAppStore.getState().addGroup(group);
         Toast.show({
             type: 'success',
             text1: i18n.t('common.success'),
             text2: i18n.t('groups.createGroup'),
         });
-
-        return response.data;
+        return group;
+    } catch (error) {
+        console.error('Failed to create group:', error);
+        Toast.show({
+            type: 'error',
+            text1: i18n.t('groups.createError'),
+            text2: i18n.t('common.networkError'),
+        });
+        return null;
     }
-
-    // Show error toast
-    console.error('Failed to create group:', response.error);
-    Toast.show({
-        type: 'error',
-        text1: i18n.t('groups.createError'),
-        text2: response.error || i18n.t('common.networkError'),
-    });
-
-    return null;
 }
 
-/**
- * Update group
- */
 export async function updateGroup(id: string, dto: UpdateGroupDto): Promise<Group | null> {
-    const response = await apiPut<Group>(`/groups/${id}`, dto);
+    const patch: Record<string, unknown> = {};
+    if (dto.name !== undefined) patch.name = dto.name;
+    if (dto.description !== undefined) patch.description = dto.description;
+    if (dto.imageUrl !== undefined) patch.image_url = dto.imageUrl;
+    if (dto.groupType !== undefined) patch.group_type = dto.groupType;
+    if (dto.defaultCurrency !== undefined) patch.default_currency = dto.defaultCurrency;
 
-    if (response.success && response.data) {
-        useAppStore.getState().updateGroup(response.data);
+    const { data, error } = await supabase
+        .from('groups')
+        .update(patch)
+        .eq('id', id)
+        .eq('is_active', true)
+        .select()
+        .maybeSingle();
+
+    if (error || !data) {
         Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: 'Group updated',
+            type: 'error',
+            text1: 'Failed to update group',
+            text2: i18n.t('common.networkError'),
         });
-        return response.data;
+        return null;
     }
 
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to update group',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-    return null;
+    const group = groupFromRow(data);
+    useAppStore.getState().updateGroup(group);
+    Toast.show({ type: 'success', text1: i18n.t('common.success'), text2: 'Group updated' });
+    return group;
 }
 
-/**
- * Delete group (soft delete)
- */
 export async function deleteGroup(id: string): Promise<boolean> {
-    const response = await apiDelete(`/groups/${id}`);
+    const { data, error } = await supabase
+        .from('groups')
+        .update({ is_active: false })
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
 
-    if (response.success) {
-        useAppStore.getState().removeGroup(id);
+    if (error || !data) {
         Toast.show({
-            type: 'success',
-            text1: 'Group deleted',
+            type: 'error',
+            text1: 'Failed to delete group',
+            text2: i18n.t('common.networkError'),
         });
-        return true;
+        return false;
     }
 
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to delete group',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-    return false;
+    useAppStore.getState().removeGroup(id);
+    Toast.show({ type: 'success', text1: 'Group deleted' });
+    return true;
 }
 
-/**
- * Get group members
- */
 export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
-    const response = await apiGet<GroupMember[]>(`/groups/${groupId}/members`);
-
-    if (response.success && response.data) {
-        return response.data;
+    const { data, error } = await supabase
+        .from('group_members')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('is_active', true);
+    if (error) {
+        console.error('Failed to fetch group members:', error);
+        return [];
     }
-
-    console.error('Failed to fetch group members:', response.error);
-    return [];
+    return (data ?? []).map(groupMemberFromRow);
 }
 
-/**
- * Add member to group
- */
 export async function addGroupMember(groupId: string, userId: string): Promise<GroupMember | null> {
-    const response = await apiPost<GroupMember>(`/groups/${groupId}/members`, { userId });
+    const { data, error } = await supabase
+        .from('group_members')
+        .insert({ group_id: groupId, user_id: userId })
+        .select()
+        .single();
 
-    if (response.success && response.data) {
+    if (error || !data) {
         Toast.show({
-            type: 'success',
-            text1: 'Member added',
+            type: 'error',
+            text1: 'Failed to add member',
+            text2: i18n.t('common.networkError'),
         });
-        return response.data;
+        return null;
     }
 
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to add member',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-    return null;
+    Toast.show({ type: 'success', text1: 'Member added' });
+    return groupMemberFromRow(data);
 }
 
-/**
- * Remove member from group
- */
 export async function removeGroupMember(groupId: string, userId: string): Promise<boolean> {
-    const response = await apiDelete(`/groups/${groupId}/members/${userId}`);
+    const { data, error } = await supabase
+        .from('group_members')
+        .update({ is_active: false, left_at: new Date().toISOString() })
+        .eq('group_id', groupId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .select('id')
+        .maybeSingle();
 
-    if (response.success) {
+    if (error || !data) {
         Toast.show({
-            type: 'success',
-            text1: 'Member removed',
+            type: 'error',
+            text1: 'Failed to remove member',
+            text2: i18n.t('common.networkError'),
         });
-        return true;
+        return false;
     }
 
-    Toast.show({
-        type: 'error',
-        text1: 'Failed to remove member',
-        text2: response.error || i18n.t('common.networkError'),
-    });
-    return false;
+    Toast.show({ type: 'success', text1: 'Member removed' });
+    return true;
 }
 
-/**
- * Get user balances in group
- */
 export async function getGroupBalances(groupId: string, userId?: string): Promise<UserBalance[]> {
-    const endpoint = userId
-        ? `/groups/${groupId}/balances?userId=${userId}`
-        : `/groups/${groupId}/balances`;
-
-    const response = await apiGet<UserBalance[]>(endpoint);
-
-    if (response.success && response.data) {
-        return response.data;
+    try {
+        const { defaultCurrency, expenses, splits, settlements, userIds } =
+            await loadBalanceData(groupId, userId);
+        return calculateUserBalancesFromData(
+            groupId,
+            defaultCurrency,
+            userIds,
+            expenses,
+            splits,
+            settlements,
+        );
+    } catch (error) {
+        console.error('Failed to fetch balances:', error);
+        return [];
     }
-
-    console.error('Failed to fetch balances:', response.error);
-    return [];
 }
 
-/**
- * Get simplified debts (who owes whom)
- */
 export async function getGroupDebts(groupId: string): Promise<DebtSummary[]> {
-    const response = await apiGet<DebtSummary[]>(`/groups/${groupId}/debts`);
+    try {
+        const balances = await getGroupBalances(groupId);
+        const userIds = Array.from(new Set(balances.map(b => b.userId)));
+        const nameById = new Map<string, string>();
 
-    if (response.success && response.data) {
-        return response.data;
+        if (userIds.length > 0) {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, name')
+                .in('id', userIds);
+            if (error) throw error;
+            (data ?? []).forEach(p => nameById.set(p.id as string, p.name as string));
+        }
+
+        return simplifyDebts(balances, nameById);
+    } catch (error) {
+        console.error('Failed to fetch debts:', error);
+        return [];
     }
-
-    console.error('Failed to fetch debts:', response.error);
-    return [];
 }
 
-/**
- * Get group summary statistics
- */
 export async function getGroupSummary(groupId: string): Promise<GroupSummary | null> {
-    const response = await apiGet<GroupSummary>(`/groups/${groupId}/summary`);
+    const { data: group, error: groupErr } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', groupId)
+        .eq('is_active', true)
+        .maybeSingle();
+    if (groupErr || !group) return null;
 
-    if (response.success && response.data) {
-        return response.data;
-    }
+    const [{ count: memberCount, error: mErr }, expensesRes] = await Promise.all([
+        supabase
+            .from('group_members')
+            .select('id', { count: 'exact', head: true })
+            .eq('group_id', groupId)
+            .eq('is_active', true),
+        supabase
+            .from('expenses')
+            .select('amount, expense_date')
+            .eq('group_id', groupId)
+            .eq('is_deleted', false),
+    ]);
+    if (mErr || expensesRes.error) return null;
 
-    console.error('Failed to fetch group summary:', response.error);
-    return null;
+    const expenses = expensesRes.data ?? [];
+    const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const lastExpenseDate =
+        expenses.length > 0
+            ? new Date(
+                  Math.max(...expenses.map(e => new Date(e.expense_date as string).getTime())),
+              )
+            : undefined;
+
+    return {
+        groupId: group.id as string,
+        name: group.name as string,
+        groupType: group.group_type as GroupSummary['groupType'],
+        defaultCurrency: group.default_currency as string,
+        memberCount: memberCount ?? 0,
+        expenseCount: expenses.length,
+        totalSpent: Number(totalSpent.toFixed(2)),
+        lastExpenseDate,
+        createdAt: new Date(group.created_at as string),
+        updatedAt: new Date(group.updated_at as string),
+    };
 }

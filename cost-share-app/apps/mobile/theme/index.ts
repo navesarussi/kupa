@@ -17,3 +17,5 @@ export type { Shadows } from './shadows';
 
 export { borderRadius } from './borderRadius';
 export type { BorderRadius } from './borderRadius';
+
+export { APP_BRAND_TITLE } from './brand';

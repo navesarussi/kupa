@@ -37,13 +37,14 @@ Use this checklist to verify your work before marking a task as complete.
 
 ## 🏗️ ARCHITECTURE VERIFICATION
 
-- [ ] **No direct API calls** from screens/components
-- [ ] **No fetch() used** in screens
-- [ ] **All API calls in services/** directory
+- [ ] **No `supabase.from()`** in screens/components
+- [ ] **No `fetch()` used** in screens (there is no backend API)
+- [ ] **All Supabase reads/writes** live in `apps/mobile/services/*.service.ts`
 - [ ] **Service functions imported** and used correctly
 - [ ] **Screens are thin** (UI composition only, no business logic)
-- [ ] **Business logic in services** (frontend) or services (backend)
-- [ ] **Data flow followed:** UI → services/ → API → backend
+- [ ] **Business logic in services** (mobile) or `packages/shared/src/calculations/` (pure math)
+- [ ] **Data flow followed:** UI → services/ → Supabase (anon key + user JWT, RLS)
+- [ ] **RLS changes re-applied** to Supabase (`schema.sql` or targeted patch in SQL Editor)
 
 ---
 
@@ -182,12 +183,18 @@ Use this checklist to verify your work before marking a task as complete.
 
 ---
 
-## 📚 DOCUMENTATION CHECKS
+## 📚 DOCUMENTATION CHECKS (SSOT VERIFICATION — MANDATORY)
 
-- [ ] **README updated** if new feature added
-- [ ] **MASTER-RULES.mdc updated** if new pattern added
-- [ ] **Translation keys documented** if new keys added
-- [ ] **API endpoints documented** if new endpoints added
+Per project rule (2026-05-19): **every task must reconcile against the truth docs.**
+
+- [ ] **`docs/SSOT/SRS.md`** mapped — change tied to a `REQ-*` ID (or new `REQ-*` added)
+- [ ] **`docs/SSOT/CODE QUALITY.md`** matches the change (architecture / data flow unchanged or updated)
+- [ ] **`cost-share-app/supabase/schema.sql`** matches deployed DB (re-applied in SQL Editor if RLS/tables changed)
+- [ ] **`DATABASE_ARCHITECTURE.md`** updated if data model changed
+- [ ] **README** updated if new feature / new structure
+- [ ] **`MASTER-RULES.mdc`** updated if new pattern added
+- [ ] **`.cursor/rules/*.mdc`** swept for stale references (e.g., "API", "backend", "NestJS", deleted files)
+- [ ] **Translation keys** added to both `en.json` and `he.json`
 
 ---
 
@@ -237,10 +244,11 @@ Before marking task as complete:
 
 If unsure about any pattern or rule:
 
-1. **Check MASTER-RULES.mdc** first
-2. **Check existing code** for similar patterns
-3. **Check .cursor/rules/** for detailed documentation
-4. **Ask for clarification** before proceeding
+1. **Check docs/SSOT/** ([README](../../../docs/SSOT/README.md)) for product + architecture truth
+2. **Check MASTER-RULES.mdc** for mobile implementation patterns
+3. **Check existing code** for similar patterns
+4. **Check .cursor/rules/** for detailed documentation
+5. **Ask for clarification** before proceeding
 
 ---
 
