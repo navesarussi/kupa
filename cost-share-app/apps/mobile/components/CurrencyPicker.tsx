@@ -13,9 +13,10 @@ interface CurrencyPickerProps {
     value: string;
     onChange: (currency: string) => void;
     label?: string;
+    compact?: boolean;
 }
 
-export function CurrencyPicker({ value, onChange, label = 'Currency' }: CurrencyPickerProps) {
+export function CurrencyPicker({ value, onChange, label = 'Currency', compact = false }: CurrencyPickerProps) {
     const isRtl = useRtlLayout();
     const [modalVisible, setModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -45,17 +46,28 @@ export function CurrencyPicker({ value, onChange, label = 'Currency' }: Currency
     };
 
     return (
-        <View className="mb-4">
-            {label && <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>}
+        <View className={compact ? '' : 'mb-4'}>
+            {!compact && label && (
+                <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>
+            )}
 
             <TouchableOpacity
                 onPress={() => setModalVisible(true)}
-                className="bg-white border border-gray-300 rounded-lg p-4 flex-row justify-between items-center"
+                style={compact ? { height: 64 } : undefined}
+                className={
+                    compact
+                        ? 'bg-white border border-gray-300 rounded-xl px-3 flex-row items-center justify-center'
+                        : 'bg-white border border-gray-300 rounded-lg p-4 flex-row justify-between items-center'
+                }
             >
-                <Text className="text-base">
-                    {selectedCurrency ? `${selectedCurrency.code} - ${selectedCurrency.currency}` : 'Select currency'}
+                <Text className={compact ? 'text-base font-semibold text-gray-900' : 'text-base'}>
+                    {compact
+                        ? (selectedCurrency?.code ?? value ?? '—')
+                        : selectedCurrency
+                            ? `${selectedCurrency.code} - ${selectedCurrency.currency}`
+                            : 'Select currency'}
                 </Text>
-                <Text className="text-gray-400">▼</Text>
+                <Text className={compact ? 'text-gray-400 ml-1 text-xs' : 'text-gray-400'}>▼</Text>
             </TouchableOpacity>
 
             <Modal
