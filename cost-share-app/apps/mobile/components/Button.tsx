@@ -19,6 +19,7 @@ interface ButtonProps {
     disabled?: boolean;
     fullWidth?: boolean;
     className?: string;
+    testID?: string;
 }
 
 const variantClasses: Record<ButtonVariant, { container: string; text: string }> = {
@@ -48,6 +49,7 @@ export function Button({
     disabled = false,
     fullWidth = true,
     className = '',
+    testID,
 }: ButtonProps) {
     const styles = variantClasses[variant];
     const isDisabled = disabled || loading;
@@ -57,6 +59,7 @@ export function Button({
             onPress={onPress}
             activeOpacity={0.7}
             disabled={isDisabled}
+            testID={testID}
             className={`${styles.container} ${fullWidth ? 'w-full' : ''} ${isDisabled ? 'opacity-50' : ''} ${className}`}
         >
             {loading ? (

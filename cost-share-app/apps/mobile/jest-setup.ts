@@ -1,5 +1,25 @@
 import '@testing-library/jest-native/extend-expect';
 
+jest.mock('./lib/supabase', () => ({
+    supabase: {
+        from: jest.fn(() => ({
+            select: jest.fn().mockReturnThis(),
+            insert: jest.fn().mockReturnThis(),
+            update: jest.fn().mockReturnThis(),
+            delete: jest.fn().mockReturnThis(),
+            eq: jest.fn().mockReturnThis(),
+            in: jest.fn().mockResolvedValue({ data: [], error: null }),
+            single: jest.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+        rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+        auth: {
+            getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+            getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+            signOut: jest.fn().mockResolvedValue({ error: null }),
+        },
+    },
+}));
+
 // Mock react-i18next: provide a t() that returns the key so assertions can use keys.
 jest.mock('react-i18next', () => ({
     useTranslation: () => ({

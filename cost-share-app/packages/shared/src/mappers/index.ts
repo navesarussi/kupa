@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY } from '../constants';
 import {
     User,
     Group,
@@ -21,7 +22,7 @@ export const profileFromRow = (r: Row): User => ({
     email: (r.email as string) ?? undefined,
     avatarUrl: (r.avatar_url as string) ?? undefined,
     phone: (r.phone as string) ?? undefined,
-    defaultCurrency: r.default_currency as string,
+    defaultCurrency: (r.default_currency as string) || DEFAULT_CURRENCY,
     language: r.language as User['language'],
     createdAt: toDate(r.created_at),
     updatedAt: toDate(r.updated_at),

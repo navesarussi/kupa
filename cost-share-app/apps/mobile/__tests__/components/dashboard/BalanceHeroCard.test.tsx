@@ -9,28 +9,59 @@ const multi = { totalOwed: null, totalOwedToUser: null, defaultCurrency: 'ILS',
     byCurrency: [{ currency: 'ILS', owed: 0, owedToUser: 100 }, { currency: 'USD', owed: 150, owedToUser: 0 }] };
 
 describe('BalanceHeroCard', () => {
-    it('renders headline numbers when single currency', () => {
-        const { getByText } = render(<BalanceHeroCard summary={single as any} />);
-        expect(getByText('dashboard.youOwe')).toBeTruthy();
-        expect(getByText(/50\.00/)).toBeTruthy();
-        expect(getByText(/100\.00/)).toBeTruthy();
-    });
-
-    it('renders friendly zero labels instead of 0 amounts', () => {
-        const { getByText } = render(<BalanceHeroCard summary={zero as any} />);
-        expect(getByText('dashboard.nothingOwed')).toBeTruthy();
-        expect(getByText('dashboard.notOwedToYou')).toBeTruthy();
-    });
-
-    it('renders em-dash and breakdown by default when multi-currency', () => {
-        const { getAllByText, getByText } = render(<BalanceHeroCard summary={multi as any} />);
-        expect(getAllByText('—').length).toBeGreaterThanOrEqual(2);
-        expect(getByText('USD')).toBeTruthy();
-    });
-
-    it('toggles breakdown for single currency', () => {
+    it('renders single net balance (owed to user minus owed)', () => {
         const { getByTestId, getByText } = render(<BalanceHeroCard summary={single as any} />);
+        expect(getByText('dashboard.netOwedToYou')).toBeTruthy();
+        expect(getByTestId('balance-hero-net').props.children).toMatch(/50\.00/);
+    });
+
+    it('renders settled label when net is zero', () => {
+        const { getByText } = render(<BalanceHeroCard summary={zero as any} />);
+        expect(getByText('dashboard.netSettled')).toBeTruthy();
+        expect(getByText('dashboard.settled')).toBeTruthy();
+    });
+
+    it('renders em-dash when multi-currency without conversion', () => {
+        const { getByTestId } = render(<BalanceHeroCard summary={multi as any} />);
+        expect(getByTestId('balance-hero-net').props.children).toBe('—');
+        expect(getByTestId('currency-badge-USD')).toBeTruthy();
+    });
+
+    it('renders converted net total with footnote', () => {
+        const converted = {
+            totalOwed: 150,
+            totalOwedToUser: 100,
+            defaultCurrency: 'ILS',
+            byCurrency: multi.byCurrency,
+        };
+        const { getByText, getByTestId } = render(
+            <BalanceHeroCard
+                summary={converted as any}
+                conversion={{
+                    isConverted: true,
+                    ratesDate: '2026-05-20',
+                    isLoading: false,
+                    failed: false,
+                }}
+            />,
+        );
+        expect(getByText('dashboard.convertedLabel')).toBeTruthy();
+        expect(getByText('dashboard.netYouOwe')).toBeTruthy();
+        expect(getByTestId('balance-hero-net').props.children).toMatch(/50\.00/);
+    });
+
+    it('toggles breakdown with currency symbols and chips', () => {
+        const { getByTestId, queryByTestId } = render(<BalanceHeroCard summary={single as any} />);
         fireEvent.press(getByTestId('balance-hero-toggle'));
-        expect(getByText('ILS')).toBeTruthy();
+        expect(getByTestId('currency-badge-ILS')).toBeTruthy();
+        expect(getByTestId('breakdown-owe-ILS')).toBeTruthy();
+        expect(getByTestId('breakdown-owed-ILS')).toBeTruthy();
+        expect(queryByTestId('breakdown-owe-USD')).toBeNull();
+    });
+
+    it('shows dollar symbol badge for USD row', () => {
+        const { getByTestId } = render(<BalanceHeroCard summary={multi as any} />);
+        const badge = getByTestId('currency-badge-USD');
+        expect(badge).toBeTruthy();
     });
 });

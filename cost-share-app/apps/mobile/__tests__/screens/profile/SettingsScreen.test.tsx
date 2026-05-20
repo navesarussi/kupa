@@ -13,9 +13,15 @@ jest.mock('../../../i18n', () => ({ changeLanguage: jest.fn().mockResolvedValue(
 jest.mock('../../../services/account.service', () => ({
     deleteMyAccount: jest.fn().mockResolvedValue({ ok: true }),
 }));
+jest.mock('../../../services/users.service', () => ({
+    updateUser: jest.fn(),
+}));
 
 import { SettingsScreen } from '../../../screens/profile/SettingsScreen';
 import { useAppStore } from '../../../store';
+import { updateUser } from '../../../services/users.service';
+
+const mockUpdateUser = updateUser as jest.MockedFunction<typeof updateUser>;
 
 let mockOpenURL: jest.SpyInstance;
 let mockCanOpen: jest.SpyInstance;
@@ -23,6 +29,8 @@ let mockCanOpen: jest.SpyInstance;
 beforeEach(() => {
     mockOpenURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     mockCanOpen = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    mockUpdateUser.mockReset();
+    mockUpdateUser.mockResolvedValue({ id: 'u1' } as any);
     useAppStore.setState({
         language: 'en',
         currentUser: { id: 'u1', email: 'a@x.com', name: 'Alice', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date() },
@@ -73,5 +81,17 @@ describe('SettingsScreen (grouped, no notifications)', () => {
         const { getByText } = render(<SettingsScreen />);
         fireEvent.press(getByText('settings.deleteAccount'));
         expect(getByText('deleteAccount.warningTitle')).toBeTruthy();
+    });
+
+    it('renders default currency row in General section', () => {
+        const { getByText, getByTestId } = render(<SettingsScreen />);
+        expect(getByText('settings.defaultCurrency')).toBeTruthy();
+        expect(getByTestId('settings-currency-row')).toBeTruthy();
+    });
+
+    it('opens currency picker when default currency row is pressed', () => {
+        const { getByTestId, getByText } = render(<SettingsScreen />);
+        fireEvent.press(getByTestId('settings-currency-row'));
+        expect(getByText('currencyPicker.title')).toBeTruthy();
     });
 });

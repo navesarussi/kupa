@@ -6,6 +6,8 @@ import { useNavigation } from '@react-navigation/native';
 import { FriendBalance } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { useDashboardQuery } from '../../hooks/queries/useDashboardQuery';
+import { useProfileBalanceSummary } from '../../hooks/useProfileBalanceSummary';
+import { useFriendBalancesDisplay } from '../../hooks/useFriendBalancesDisplay';
 import { AppIcon } from '../../components/AppIcon';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
@@ -23,6 +25,11 @@ export function ProfileScreen() {
     const currentUser = useAppStore((s) => s.currentUser);
 
     const { data: dashboard, isLoading, isRefetching, refetch, isError } = useDashboardQuery();
+    const { summary: balanceSummary, conversion } = useProfileBalanceSummary(dashboard?.balanceSummary);
+    const friendDisplays = useFriendBalancesDisplay(
+        dashboard?.friends,
+        balanceSummary?.defaultCurrency ?? dashboard?.balanceSummary.defaultCurrency,
+    );
     const incomingQ = useIncomingFriendRequestsQuery();
     const pendingCount = incomingQ.data?.length ?? 0;
 
@@ -87,7 +94,26 @@ export function ProfileScreen() {
                 />
             ) : (
                 <>
-                    <BalanceHeroCard summary={dashboard.balanceSummary} />
+                    <BalanceHeroCard
+                        summary={balanceSummary ?? dashboard.balanceSummary}
+                        conversion={conversion}
+                    />
+
+                    <StatGroup>
+                        <StatTile
+                            label={t('dashboard.activeGroups')}
+                            value={dashboard.stats.activeGroupsCount}
+                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+                            testID="stat-active"
+                        />
+                        <StatDivider />
+                        <StatTile
+                            label={t('dashboard.closedGroups')}
+                            value={dashboard.stats.closedGroupsCount}
+                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+                            testID="stat-closed"
+                        />
+                    </StatGroup>
 
                     <TouchableOpacity
                         onPress={() => navigation.navigate('Friends')}
@@ -115,24 +141,6 @@ export function ProfileScreen() {
                         />
                     </TouchableOpacity>
 
-                    <Text className="px-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        {t('dashboard.yourGroups')}
-                    </Text>
-                    <StatGroup>
-                        <StatTile
-                            label={t('dashboard.activeGroups')}
-                            value={dashboard.stats.activeGroupsCount}
-                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
-                            testID="stat-active"
-                        />
-                        <StatDivider />
-                        <StatTile
-                            label={t('dashboard.closedGroups')}
-                            value={dashboard.stats.closedGroupsCount}
-                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
-                            testID="stat-closed"
-                        />
-                    </StatGroup>
 
                     {dashboard.friends.length > 0 ? (
                         <View className="mx-4 mb-8">
@@ -146,15 +154,20 @@ export function ProfileScreen() {
                                 className="rounded-xl bg-white border border-slate-200/80 overflow-hidden"
                                 style={shadows.sm}
                             >
-                                {dashboard.friends.map((f, index) => (
-                                    <FriendBalanceRow
-                                        key={f.userId}
-                                        friend={f}
-                                        onPress={handleFriendPress}
-                                        testID={`friend-${f.userId}`}
-                                        isLast={index === dashboard.friends.length - 1}
-                                    />
-                                ))}
+                                {dashboard.friends.map((f, index) => {
+                                    const display = friendDisplays.get(f.userId);
+                                    if (!display) return null;
+                                    return (
+                                        <FriendBalanceRow
+                                            key={f.userId}
+                                            friend={f}
+                                            display={display}
+                                            onPress={handleFriendPress}
+                                            testID={`friend-${f.userId}`}
+                                            isLast={index === dashboard.friends.length - 1}
+                                        />
+                                    );
+                                })}
                             </View>
                         </View>
                     ) : null}

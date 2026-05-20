@@ -53,4 +53,21 @@ describe('ActivityItem', () => {
         fireEvent.press(getByText('Coffee'));
         expect(onPress).toHaveBeenCalledWith(expenseActivity);
     });
+
+    it('renders message body without amount', () => {
+        const messageActivity: RecentActivity = {
+            ...expenseActivity,
+            id: 'm1',
+            activityType: 'message',
+            description: 'See you tonight',
+            amount: 0,
+            currency: '',
+        };
+        const { getByText, queryByText, getByTestId } = render(
+            <ActivityItem activity={messageActivity} onPress={jest.fn()} />,
+        );
+        expect(getByText('See you tonight')).toBeTruthy();
+        expect(getByTestId('activity-icon-message')).toBeTruthy();
+        expect(queryByText(/USD/)).toBeNull();
+    });
 });

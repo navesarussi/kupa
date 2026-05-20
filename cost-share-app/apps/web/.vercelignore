@@ -1,0 +1,9 @@
+../../node_modules
+../../apps/mobile
+../../packages
+../../supabase
+../../scripts
+../../.turbo
+../mobile
+node_modules
+.next

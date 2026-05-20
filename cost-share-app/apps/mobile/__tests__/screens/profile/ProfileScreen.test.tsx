@@ -18,6 +18,13 @@ jest.mock('@react-navigation/native', () => {
 
 jest.mock('../../../services/dashboard.service', () => ({ fetchDashboard: jest.fn() }));
 
+jest.mock('../../../hooks/useProfileBalanceSummary', () => ({
+    useProfileBalanceSummary: (raw: unknown) => ({
+        summary: raw,
+        conversion: { isConverted: false, ratesDate: null, isLoading: false, failed: false },
+    }),
+}));
+
 import { fetchDashboard } from '../../../services/dashboard.service';
 import { ProfileScreen } from '../../../screens/profile/ProfileScreen';
 import { useAppStore } from '../../../store';
@@ -36,7 +43,12 @@ function renderWithQuery(ui: React.ReactElement) {
 const dashboardPayload = {
     balanceSummary: { totalOwed: 0, totalOwedToUser: 50, defaultCurrency: 'USD', byCurrency: [{ currency: 'USD', owed: 0, owedToUser: 50 }] },
     stats: { closedGroupsCount: 1, activeGroupsCount: 2 },
-    friends: [{ userId: 'u2', name: 'Bob', netBalance: 50, currency: 'USD', sharedGroupIds: ['g1'] }],
+    friends: [{
+        userId: 'u2',
+        name: 'Bob',
+        byCurrency: [{ currency: 'USD', netBalance: 50 }],
+        sharedGroupIds: ['g1'],
+    }],
 };
 
 beforeEach(() => {
@@ -57,7 +69,7 @@ describe('ProfileScreen (dashboard)', () => {
         expect(queryByText('a@x.com')).toBeNull();
         await waitFor(() => expect(mockedFetch).toHaveBeenCalled());
         expect(await findByText('Bob')).toBeTruthy();
-        expect(getByText('dashboard.youAreOwed')).toBeTruthy();
+        expect(getByText('dashboard.netOwedToYou')).toBeTruthy();
     });
 
     it('settings header button navigates to Settings', async () => {

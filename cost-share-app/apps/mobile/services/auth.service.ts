@@ -77,7 +77,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   console.log('[Auth] OAuth URL redirect_to =', redirectTo);
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
-    preferEphemeralSession: true,
+    preferEphemeralSession: false,
   });
 
   if (result.type === 'cancel' || result.type === 'dismiss') {

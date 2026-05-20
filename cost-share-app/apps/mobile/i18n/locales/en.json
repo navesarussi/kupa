@@ -228,6 +228,9 @@
         "owes": "Owes",
         "paid": "Paid",
         "simplifiedDebts": "Simplified Debts",
+        "paymentsToSettle_one": "1 payment to settle everyone",
+        "paymentsToSettle_other": "{{count}} payments to settle everyone",
+        "minimumBadge": "Minimum",
         "allSettled": "All settled up!",
         "noDebts": "No outstanding debts in this group",
         "noBalances": "No balances to display",
@@ -262,6 +265,7 @@
         "title": "Settings",
         "general": "General",
         "language": "Language",
+        "defaultCurrency": "Default Currency",
         "support": "Support",
         "rateUs": "Rate us",
         "contactWhatsApp": "Contact us on WhatsApp",
@@ -294,7 +298,19 @@
         "languageChangeError": "Failed to change language. Please try again.",
         "profileUpdated": "Profile updated successfully",
         "updateError": "Failed to update profile",
-        "nameRequired": "Name is required"
+        "nameRequired": "Name is required",
+        "profileImage": "Profile Photo",
+        "tapToChangeImage": "Tap to choose or change photo",
+        "removeImage": "Remove photo",
+        "imageUploadError": "Failed to upload photo",
+        "imagePermissionTitle": "Photo Access Required",
+        "imagePermissionMessage": "Allow photo library access to set your profile photo"
+    },
+    "currencyPicker": {
+        "title": "Select Currency",
+        "selectCurrency": "Select currency",
+        "searchPlaceholder": "Search by code or name...",
+        "empty": "No currencies found"
     },
     "activity": {
         "title": "Activity",
@@ -307,10 +323,30 @@
         "sortDateAsc": "Oldest first",
         "sortAmountDesc": "Highest amount",
         "sortAmountAsc": "Lowest amount",
+        "filters": {
+            "title": "Filter & sort",
+            "subtitle": "Narrow the feed or change how items are ordered",
+            "sort": {
+                "label": "Sort by"
+            },
+            "types": {
+                "label": "Show",
+                "hint": "Pick one or both — leave empty to show everything"
+            },
+            "currency": {
+                "label": "Currency"
+            },
+            "group": {
+                "label": "Group"
+            },
+            "onlyMine": "Only my activity",
+            "onlyMineHint": "Expenses I added and payments I sent"
+        },
         "noActivity": "No activity yet",
-        "noActivityMessage": "Your recent expenses and settlements will appear here",
+        "noActivityMessage": "Your recent expenses, settlements, and group messages will appear here",
         "expense": "Expense",
         "settlement": "Settlement",
+        "message": "Message",
         "addedExpense": "added an expense",
         "settledPayment": "settled a payment",
         "loadError": "Failed to load activity",
@@ -355,6 +391,10 @@
         "youOwe": "You owe",
         "youAreOwed": "You're owed",
         "balanceOverview": "Balance overview",
+        "netBalance": "Net balance",
+        "netOwedToYou": "Net in your favor",
+        "netYouOwe": "Net you owe",
+        "netSettled": "All settled up",
         "nothingOwed": "You don't owe anything",
         "notOwedToYou": "Nothing owed to you",
         "nothingOwedShort": "Clear",
@@ -362,6 +402,9 @@
         "yourGroups": "Your groups",
         "viewBreakdown": "View per-currency breakdown",
         "hideBreakdown": "Hide breakdown",
+        "convertedLabel": "All currencies combined",
+        "convertedFootnote": "Converted to {{currency}} · rates as of {{date}}",
+        "conversionFailed": "Could not load exchange rates — see per-currency breakdown below",
         "closedGroups": "Closed groups",
         "activeGroups": "Active groups",
         "friends": "Friends",
@@ -369,6 +412,8 @@
         "settled": "Settled up",
         "owesYou": "owes you",
         "youOweFriend": "you owe",
+        "friendConverted": "combined currencies",
+        "friendConversionFailed": "rates unavailable",
         "noFriendsYet": "No shared groups yet"
     },
     "legal": {
