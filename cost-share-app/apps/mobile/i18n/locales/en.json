@@ -391,9 +391,6 @@
             "subtitle": "Send a link via WhatsApp and more",
             "cta": "Share link",
             "shareMessage": "Hey! Let's split expenses together on Kupa. If you sign up through this link we'll automatically become friends: {{url}}",
-            "linkLabel": "My invite link",
-            "copyButton": "Copy",
-            "copied": "Link copied",
             "rotate": "Rotate link",
             "rotateConfirmTitle": "Rotate invite link?",
             "rotateConfirmBody": "The previous link will stop working. Anyone holding the old link won't be able to become your friend until you send them the new one.",
@@ -405,7 +402,6 @@
         "group": {
             "title": "Share group link",
             "shareMessage": "I added you to the '{{groupName}}' group on Kupa. Join via this link: {{url}}",
-            "linkLabel": "Invite link",
             "rotate": "Rotate link",
             "rotateConfirmTitle": "Rotate group invite link?",
             "rotateConfirmBody": "Anyone holding the current link won't be able to join until you send them the new one. Members already in the group are unaffected.",

@@ -44,7 +44,7 @@ interface GroupHeroProps {
     memberCount: number;
     onBack: () => void;
     onSettings: () => void;
-    onOverflow?: () => void;
+    onShare?: () => void;
 }
 
 function HeroChrome({
@@ -52,7 +52,7 @@ function HeroChrome({
     memberCount,
     onBack,
     onSettings,
-    onOverflow,
+    onShare,
     topInset,
 }: GroupHeroProps & { topInset: number }) {
     const { t } = useTranslation();
@@ -114,6 +114,18 @@ function HeroChrome({
                     />
                 </TouchableOpacity>
                 <View className="flex-row items-center gap-2">
+                    {onShare && (
+                        <TouchableOpacity
+                            onPress={onShare}
+                            accessibilityRole="button"
+                            accessibilityLabel="Share invite link"
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            className="w-10 h-10 rounded-full bg-black/40 items-center justify-center"
+                            testID="hero-share-btn"
+                        >
+                            <AppIcon name="share-outline" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                         onPress={onSettings}
                         accessibilityRole="button"
@@ -124,25 +136,13 @@ function HeroChrome({
                     >
                         <AppIcon name="settings-outline" size={20} color="#fff" />
                     </TouchableOpacity>
-                    {onOverflow && (
-                        <TouchableOpacity
-                            onPress={onOverflow}
-                            accessibilityRole="button"
-                            accessibilityLabel="More options"
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            className="mr-2"
-                            testID="group-overflow-button"
-                        >
-                            <AppIcon name="ellipsis-horizontal" size={22} color={colors.gray600} />
-                        </TouchableOpacity>
-                    )}
                 </View>
             </View>
         </>
     );
 }
 
-export function GroupHero({ group, memberCount, onBack, onSettings, onOverflow }: GroupHeroProps) {
+export function GroupHero({ group, memberCount, onBack, onSettings, onShare }: GroupHeroProps) {
     const insets = useSafeAreaInsets();
 
     if (group.imageUrl) {
@@ -158,7 +158,7 @@ export function GroupHero({ group, memberCount, onBack, onSettings, onOverflow }
                     memberCount={memberCount}
                     onBack={onBack}
                     onSettings={onSettings}
-                    onOverflow={onOverflow}
+                    onShare={onShare}
                     topInset={insets.top}
                 />
             </ImageBackground>
@@ -184,7 +184,7 @@ export function GroupHero({ group, memberCount, onBack, onSettings, onOverflow }
                 memberCount={memberCount}
                 onBack={onBack}
                 onSettings={onSettings}
-                onOverflow={onOverflow}
+                onShare={onShare}
                 topInset={insets.top}
             />
         </LinearGradient>
