@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, I18nManager } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
     createNativeStackNavigator,
@@ -14,8 +14,10 @@ import { useTranslation } from 'react-i18next';
 import { useRtlLayout } from '../hooks/useRtlLayout';
 import { AppIcon, AppIconName } from '../components/AppIcon';
 import { APP_BRAND_TITLE, colors } from '../theme';
+import { useInviteRedemption } from '../hooks/useInviteRedemption';
 
 function HeaderBackButton({ onPress }: { onPress: () => void }) {
+    const isRtl = useRtlLayout();
     return (
         <TouchableOpacity
             onPress={onPress}
@@ -25,7 +27,7 @@ function HeaderBackButton({ onPress }: { onPress: () => void }) {
             style={{ paddingHorizontal: 4, paddingVertical: 4 }}
         >
             <AppIcon
-                name={I18nManager.isRTL ? 'chevron-forward' : 'chevron-back'}
+                name={isRtl ? 'chevron-forward' : 'chevron-back'}
                 size={26}
                 color={colors.primary}
             />
@@ -111,7 +113,7 @@ function GroupsStack() {
             <Stack.Screen
                 name="GroupMembers"
                 component={GroupMembersScreen}
-                options={{ title: t('groups.members') }}
+                options={{ title: t('groups.members.title') }}
             />
             <Stack.Screen
                 name="ExpenseList"
@@ -209,6 +211,7 @@ function ProfileStack() {
 
 export function AppNavigator() {
     const { t } = useTranslation();
+    useInviteRedemption();
 
     return (
         <Tab.Navigator

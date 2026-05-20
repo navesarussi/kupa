@@ -184,10 +184,10 @@ export function GroupsListScreen() {
                             onPress={handleCreateGroup}
                             accessibilityRole="button"
                             accessibilityLabel={t('groups.createGroup')}
-                            className="h-9 w-9 items-center justify-center"
+                            className="h-9 w-9 items-center justify-center rounded-full bg-primary"
                             testID="groups-create-btn"
                         >
-                            <AppIcon name="add" size={26} color={colors.gray700} />
+                            <AppIcon name="add" size={22} color={colors.white} />
                         </TouchableOpacity>
                     </>
                 )}

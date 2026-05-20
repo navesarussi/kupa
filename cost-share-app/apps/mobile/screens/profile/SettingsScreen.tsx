@@ -21,6 +21,7 @@ import { DeleteAccountWarningSheet } from '../../components/settings/DeleteAccou
 import { DeleteAccountConfirmSheet } from '../../components/settings/DeleteAccountConfirmSheet';
 import currencyCodes from 'currency-codes';
 import { getCurrencyDisplayName } from '../../lib/currencyDisplay';
+import { InviteLinkBlock } from '../../components/InviteLinkBlock';
 
 const WHATSAPP_NUMBER = (process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER || '+972528616878').replace(/[^\d]/g, '');
 const APP_STORE_URL = process.env.EXPO_PUBLIC_APP_STORE_URL;
@@ -120,6 +121,10 @@ export function SettingsScreen() {
     return (
         <ScrollView className="flex-1 bg-slate-50">
             <View className="pt-4">
+                <View className="px-4 mb-4">
+                    <InviteLinkBlock kind="friend" mode="expanded" />
+                </View>
+
                 <SettingsSection title={t('settings.general')}>
                     <SettingsRow
                         iconName="globe-outline"
