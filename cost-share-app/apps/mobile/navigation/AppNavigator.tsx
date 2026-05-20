@@ -57,6 +57,8 @@ import { ActivityFeedScreen } from '../screens/activity/ActivityFeedScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { SettingsScreen } from '../screens/profile/SettingsScreen';
+import { FriendsScreen } from '../screens/profile/FriendsScreen';
+import { FindFriendsScreen } from '../screens/profile/FindFriendsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -190,6 +192,16 @@ function ProfileStack() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ title: t('settings.title') }}
+            />
+            <Stack.Screen
+                name="Friends"
+                component={FriendsScreen}
+                options={{ title: t('friends.title') }}
+            />
+            <Stack.Screen
+                name="FindFriends"
+                component={FindFriendsScreen}
+                options={{ title: t('friends.find.title') }}
             />
         </Stack.Navigator>
     );

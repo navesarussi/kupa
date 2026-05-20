@@ -160,7 +160,19 @@
         "emptyFeed": {
             "title": "Nothing here yet",
             "message": "Add the first expense or send the first message.",
-            "action": "Add the first expense"
+            "action": "Add the first expense",
+            "addMembers": "Add members"
+        },
+        "members": {
+            "title": "Members",
+            "seeAll": "See all",
+            "add": "Add",
+            "addMembers": "Add members",
+            "allFriendsAdded": "All your friends are already in this group.",
+            "searchPlaceholder": "Search friends",
+            "noSearchResults": "No friends match your search.",
+            "mutualHint": "You only see friends you've added each other.",
+            "missingSomeoneCta": "Can't find them? Add friends"
         }
     },
     "expenses": {
@@ -337,6 +349,37 @@
         "privacyTitle": "Privacy Policy",
         "privacyBody": "Kupa stores your profile (name, email, avatar) and the groups, expenses, and settlements you create. We use your email only for authentication.\n\nWe do not sell your data. We may share anonymous aggregate analytics. You can request deletion of your data at any time.\n\nContact: support via WhatsApp +972528616878.",
         "close": "Close"
+    },
+    "friends": {
+        "title": "Friends",
+        "empty": "You don't have any friends yet. Add some to start sharing expenses.",
+        "incomingRequests": "Incoming requests",
+        "noIncoming": "No pending requests",
+        "noFriends": "No friends yet",
+        "actions": {
+            "accept": "Accept",
+            "reject": "Reject",
+            "remove": "Remove",
+            "removeConfirm": "Remove this friend? You'll need to send a new request to re-friend.",
+            "sendRequest": "Send request",
+            "pending": "Pending",
+            "friends": "Friends"
+        },
+        "find": {
+            "title": "Find friends",
+            "searchPlaceholder": "Name, email, or phone",
+            "tooShort": "Type at least 2 characters",
+            "noResults": "No matches",
+            "self": "(You)"
+        },
+        "toasts": {
+            "requestSent": "Friend request sent",
+            "requestSentError": "Couldn't send the request",
+            "accepted": "Friend added",
+            "rejected": "Request declined",
+            "removed": "Friend removed",
+            "error": "Something went wrong"
+        }
     },
     "deleteAccount": {
         "warningTitle": "Delete account?",

@@ -15,6 +15,7 @@ import { StatTile, StatGroup, StatDivider } from '../../components/dashboard/Sta
 import { FriendBalanceRow } from '../../components/dashboard/FriendBalanceRow';
 import { APP_BRAND_TITLE, colors, shadows } from '../../theme';
 import { useRtlLayout, rtlRowStyle } from '../../hooks/useRtlLayout';
+import { useIncomingFriendRequestsQuery } from '../../hooks/queries/useFriendsQueries';
 
 export function ProfileScreen() {
     const { t } = useTranslation();
@@ -22,6 +23,8 @@ export function ProfileScreen() {
     const currentUser = useAppStore((s) => s.currentUser);
 
     const { data: dashboard, isLoading, isRefetching, refetch, isError } = useDashboardQuery();
+    const incomingQ = useIncomingFriendRequestsQuery();
+    const pendingCount = incomingQ.data?.length ?? 0;
 
     const handleRefresh = useCallback(() => {
         void refetch();
@@ -85,6 +88,32 @@ export function ProfileScreen() {
             ) : (
                 <>
                     <BalanceHeroCard summary={dashboard.balanceSummary} />
+
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Friends')}
+                        activeOpacity={0.7}
+                        className="mx-4 mb-4 px-4 py-3 bg-white rounded-xl border border-slate-200/80 flex-row items-center"
+                        style={shadows.sm}
+                        testID="profile-friends-row"
+                    >
+                        <AppIcon name="people-outline" size={22} color={colors.primary} />
+                        <Text className="flex-1 ml-3 text-sm font-semibold text-gray-800">
+                            {t('friends.title')}
+                        </Text>
+                        {pendingCount > 0 && (
+                            <View
+                                className="bg-primary rounded-full px-2 mr-2"
+                                style={{ minWidth: 22, height: 22, justifyContent: 'center', alignItems: 'center' }}
+                            >
+                                <Text className="text-xs font-bold text-white">{pendingCount}</Text>
+                            </View>
+                        )}
+                        <AppIcon
+                            name={isRtl ? 'chevron-back' : 'chevron-forward'}
+                            size={18}
+                            color={colors.gray400}
+                        />
+                    </TouchableOpacity>
 
                     <Text className="px-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                         {t('dashboard.yourGroups')}

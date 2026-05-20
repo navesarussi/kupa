@@ -30,5 +30,11 @@ supabase db query --linked --agent=no -f "$SUPABASE_DIR/get-user-dashboard.sql"
 echo "▶ Applying profiles account deactivation (is_active, delete_my_account) ..."
 supabase db query --linked --agent=no -f "$SUPABASE_DIR/fix-profiles-account-deactivation.sql"
 
+echo "▶ Applying groups SELECT policy fix for creators ..."
+supabase db query --linked --agent=no -f "$SUPABASE_DIR/fix-groups-select-creator.sql"
+
+echo "▶ Applying friends system (tables, trigger, backfill, RLS, RPCs) ..."
+supabase db query --linked --agent=no -f "$SUPABASE_DIR/friends-system.sql"
+
 echo "▶ Verifying REST probes ..."
 bash "$SCRIPT_DIR/verify-supabase-schema.sh"

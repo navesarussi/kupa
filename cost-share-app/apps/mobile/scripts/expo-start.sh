@@ -40,7 +40,7 @@ start_ios_watcher() {
 }
 
 start_mobile_auto_open() {
-  [[ "$AUTO_OPEN_MOBILE" == "1" ]] || return
+  [[ "$AUTO_OPEN_MOBILE" == "1" ]] || return 0
   (
     EXPO_METRO_PORT="$PORT" bash "$OPEN_MOBILE"
   ) &

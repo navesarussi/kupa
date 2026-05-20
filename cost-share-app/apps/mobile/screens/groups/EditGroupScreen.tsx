@@ -5,11 +5,11 @@
  */
 
 import { Text } from '../../components/AppText';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { GroupType, DEFAULT_CURRENCY } from '@cost-share/shared';
+import { GroupType, DEFAULT_CURRENCY, User } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import {
     getGroupById,
@@ -17,6 +17,7 @@ import {
     deleteGroup,
     removeGroupMember,
 } from '../../services/groups.service';
+import { fetchGroupUsers } from '../../services/users.service';
 import { uploadGroupImage } from '../../services/storage.service';
 import { getCurrentUserId } from '../../lib/auth';
 import { GroupImagePicker } from '../../components/GroupImagePicker';
@@ -25,6 +26,10 @@ import { Button } from '../../components/Button';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { MemberAvatar } from '../../components/MemberAvatar';
+import { AddMembersSheet } from '../../components/AddMembersSheet';
+import { AppIcon } from '../../components/AppIcon';
+import { colors } from '../../theme';
 
 const groupTypes: { key: GroupType; emoji: string }[] = [
     { key: 'trip', emoji: '✈️' },
@@ -51,6 +56,13 @@ export function EditGroupScreen() {
     const [imageRemoved, setImageRemoved] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+    const [members, setMembers] = useState<User[]>([]);
+    const [addMembersOpen, setAddMembersOpen] = useState(false);
+
+    const loadMembers = useCallback(async () => {
+        const users = await fetchGroupUsers(groupId);
+        setMembers(users);
+    }, [groupId]);
 
     useEffect(() => {
         const loadGroup = async () => {
@@ -62,10 +74,11 @@ export function EditGroupScreen() {
                 setCurrency(group.defaultCurrency);
                 setImageUrl(group.imageUrl);
             }
+            await loadMembers();
             setLoading(false);
         };
         void loadGroup();
-    }, [groupId]);
+    }, [groupId, loadMembers]);
 
     const validateForm = (): boolean => {
         if (!name.trim()) {
@@ -197,6 +210,57 @@ export function EditGroupScreen() {
                     label={t('groups.currency')}
                 />
 
+                {/* Members */}
+                <View className="mb-4">
+                    <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-sm font-medium text-gray-700">
+                            {t('groups.members.title')}
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('GroupMembers', { groupId })}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                            <Text className="text-xs font-semibold text-primary">
+                                {t('groups.members.seeAll')}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingVertical: 4, gap: 12 }}
+                    >
+                        {members.map(m => (
+                            <View key={m.id} className="items-center" style={{ width: 56 }}>
+                                <MemberAvatar name={m.name} avatarUrl={m.avatarUrl} size="md" />
+                                <Text
+                                    numberOfLines={1}
+                                    className="text-xs text-gray-600 mt-1 w-14 text-center"
+                                >
+                                    {m.name}
+                                </Text>
+                            </View>
+                        ))}
+                        <TouchableOpacity
+                            onPress={() => setAddMembersOpen(true)}
+                            activeOpacity={0.7}
+                            className="items-center"
+                            style={{ width: 56 }}
+                            testID="edit-group-add-member"
+                        >
+                            <View
+                                className="bg-primary-extra-light border border-primary items-center justify-center"
+                                style={{ width: 44, height: 44, borderRadius: 22 }}
+                            >
+                                <AppIcon name="add" size={22} color={colors.primary} />
+                            </View>
+                            <Text className="text-xs text-primary mt-1 w-14 text-center">
+                                {t('groups.members.add')}
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+
                 {/* Action Buttons */}
                 <View className="mt-4 gap-2">
                     <Button
@@ -251,6 +315,14 @@ export function EditGroupScreen() {
                 onConfirm={handleLeave}
                 onCancel={() => setShowLeaveDialog(false)}
                 destructive
+            />
+
+            <AddMembersSheet
+                visible={addMembersOpen}
+                groupId={groupId}
+                currentMemberIds={members.map(m => m.id)}
+                onClose={() => setAddMembersOpen(false)}
+                onAdded={loadMembers}
             />
         </ScrollView>
     );

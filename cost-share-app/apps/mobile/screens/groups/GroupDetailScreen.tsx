@@ -50,6 +50,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeedItemRow } from '../../components/FeedItemRow';
 import { SearchExpandable } from '../../components/SearchExpandable';
 import { MessageComposerSheet } from '../../components/MessageComposerSheet';
+import { AddMembersSheet } from '../../components/AddMembersSheet';
 import {
     DEFAULT_EXPENSE_FILTERS,
     ExpenseFilters,
@@ -100,6 +101,7 @@ export function GroupDetailScreen() {
     const [filters, setFilters] = useState<ExpenseFilters>(DEFAULT_EXPENSE_FILTERS);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [composer, setComposer] = useState<ComposerState>({ open: false });
+    const [addMembersOpen, setAddMembersOpen] = useState(false);
 
     const expenses = useAppStore(s => s.expenses);
     const messagesMap = useAppStore(s => s.messagesByGroup);
@@ -373,11 +375,21 @@ export function GroupDetailScreen() {
                         </Text>
                         <TouchableOpacity
                             onPress={handleAddExpense}
-                            className="h-11 rounded-xl bg-primary px-5 items-center justify-center"
+                            className="h-11 rounded-xl bg-primary px-5 items-center justify-center mb-2"
                             testID="empty-feed-add"
                         >
                             <Text className="text-sm font-semibold text-white">
                                 {t('groups.emptyFeed.action')}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setAddMembersOpen(true)}
+                            className="h-11 rounded-xl border border-primary px-5 items-center justify-center flex-row"
+                            testID="empty-feed-add-members"
+                        >
+                            <AppIcon name="person-add-outline" size={18} color={colors.primary} />
+                            <Text className="text-sm font-semibold text-primary-dark ml-2">
+                                {t('groups.emptyFeed.addMembers')}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -445,6 +457,16 @@ export function GroupDetailScreen() {
                 }
                 onSubmit={handleComposerSubmit}
                 onClose={() => setComposer({ open: false })}
+            />
+
+            <AddMembersSheet
+                visible={addMembersOpen}
+                groupId={groupId}
+                currentMemberIds={memberLites.map(m => m.userId)}
+                onClose={() => setAddMembersOpen(false)}
+                onAdded={() => {
+                    void loadAll();
+                }}
             />
         </View>
     );
