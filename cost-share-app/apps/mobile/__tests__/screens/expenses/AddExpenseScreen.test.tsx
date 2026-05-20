@@ -24,11 +24,16 @@ jest.mock('../../../services/groups.service', () => ({
     getGroupMembers: jest.fn().mockResolvedValue([
         { id: 'm1', groupId: 'g1', userId: 'u1', role: 'member', isActive: true, joinedAt: new Date() },
     ]),
+    getGroupById: jest.fn().mockResolvedValue({
+        id: 'g1',
+        name: 'Test Group',
+        defaultCurrency: 'USD',
+    }),
 }));
 
 jest.mock('../../../services/users.service', () => ({
     fetchGroupUsers: jest.fn().mockResolvedValue([
-        { id: 'u1', name: 'Alice', email: 'a@x.com', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date() },
+        { id: 'u1', name: 'Alice', email: 'a@x.com', inviteToken: 'alice123456', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date() },
     ]),
 }));
 
@@ -49,6 +54,7 @@ beforeEach(() => {
             id: 'u1',
             email: 'a@x.com',
             name: 'Alice',
+            inviteToken: 'alice123456',
             defaultCurrency: 'USD',
             language: 'en',
             createdAt: new Date(),

@@ -9,6 +9,7 @@ const baseGroup: GroupWithMembers = {
     description: 'Summer trip',
     groupType: 'trip',
     defaultCurrency: 'EUR',
+    inviteToken: 'abc1234567',
     createdBy: 'u1',
     isActive: true,
     createdAt: new Date(),
@@ -32,7 +33,7 @@ describe('GroupCard', () => {
             <GroupCard group={baseGroup} onPress={() => {}} />,
         );
         expect(getByText(/groups\.types\.trip/)).toBeTruthy();
-        expect(getByText(/2/)).toBeTruthy();
+        expect(getByText(/groups\.memberCount/)).toBeTruthy();
     });
 
     it('renders a settled chip when no balance is provided', () => {

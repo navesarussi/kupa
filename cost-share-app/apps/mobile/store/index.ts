@@ -9,6 +9,7 @@ import {
     BalanceSummaryRow,
     GroupBalance,
     BalanceSummaryResponse,
+    PendingInvite,
 } from '@cost-share/shared';
 
 interface AppState {
@@ -48,6 +49,10 @@ interface AppState {
     // Language state
     language: 'en' | 'he';
     setLanguage: (language: 'en' | 'he') => void;
+
+    // Pending invite — set when an invite link arrives before sign-in.
+    pendingInvite: PendingInvite | null;
+    setPendingInvite: (invite: PendingInvite | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -62,6 +67,7 @@ export const useAppStore = create<AppState>((set) => ({
                     email: session.user.email ?? '',
                     name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
                     avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
+                    inviteToken: '',
                     defaultCurrency: DEFAULT_CURRENCY,
                     language: 'en' as const,
                     createdAt: new Date(session.user.created_at),
@@ -77,7 +83,7 @@ export const useAppStore = create<AppState>((set) => ({
     // Groups state
     groups: [],
     setGroups: (groups) => set({ groups }),
-    addGroup: (group) => set((state) => ({ groups: [...state.groups, group] })),
+    addGroup: (group) => set((state) => ({ groups: [group, ...state.groups] })),
     updateGroup: (group) => set((state) => ({
         groups: state.groups.map((g) => (g.id === group.id ? group : g)),
     })),
@@ -145,4 +151,8 @@ export const useAppStore = create<AppState>((set) => ({
     // Language state
     language: 'en',
     setLanguage: (language) => set({ language }),
+
+    // Pending invite state
+    pendingInvite: null,
+    setPendingInvite: (invite) => set({ pendingInvite: invite }),
 }));

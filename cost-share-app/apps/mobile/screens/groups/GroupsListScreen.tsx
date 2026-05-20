@@ -1,6 +1,6 @@
 /**
  * GroupsListScreen
- * Main groups list with expandable search, filter sheet, balance summary,
+ * Main groups list with expandable search, filter sheet,
  * per-group balance chips, and a pinned bottom Create-a-group CTA.
  */
 
@@ -24,7 +24,6 @@ import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
 import { GroupCard } from '../../components/GroupCard';
 import { SearchExpandable } from '../../components/SearchExpandable';
-import { BalanceSummaryHeader } from '../../components/BalanceSummaryHeader';
 import {
     DEFAULT_FILTERS,
     Filters,
@@ -77,7 +76,6 @@ export function GroupsListScreen() {
     const navigation = useNavigation<any>();
     const { isLoading, startLoading, stopLoading } = useLoading();
     const groups = useAppStore(s => s.groups);
-    const summary = useAppStore(s => s.balanceSummary);
     const groupBalances = useAppStore(s => s.groupBalances);
 
     const [refreshing, setRefreshing] = useState(false);
@@ -177,16 +175,14 @@ export function GroupsListScreen() {
                             onPress={handleCreateGroup}
                             accessibilityRole="button"
                             accessibilityLabel={t('groups.createGroup')}
-                            className="h-9 w-9 items-center justify-center"
+                            className="h-9 w-9 items-center justify-center rounded-full bg-primary"
                             testID="groups-create-btn"
                         >
-                            <AppIcon name="add" size={26} color={colors.gray700} />
+                            <AppIcon name="add" size={22} color={colors.white} />
                         </TouchableOpacity>
                     </>
                 )}
             </View>
-
-            <BalanceSummaryHeader rows={summary} />
 
             <FlatList
                 data={filteredRows}
