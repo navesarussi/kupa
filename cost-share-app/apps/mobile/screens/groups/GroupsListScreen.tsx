@@ -19,6 +19,7 @@ import { GroupWithMembers } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { useLoading } from '../../hooks/useLoading';
 import { fetchGroups } from '../../services/groups.service';
+import { fetchBalanceSummary } from '../../services/users.service';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
 import { GroupCard } from '../../components/GroupCard';
@@ -65,14 +66,19 @@ export function GroupsListScreen() {
     const [filtersOpen, setFiltersOpen] = useState(false);
 
     const incomingBalanceState = route.params?.balanceState as BalanceState | undefined;
+    const incomingShowArchived = route.params?.showArchived as boolean | undefined;
     useEffect(() => {
-        if (!incomingBalanceState) return;
-        setFilters(f => ({ ...f, balanceState: incomingBalanceState }));
-        navigation.setParams({ balanceState: undefined });
-    }, [incomingBalanceState, navigation]);
+        if (incomingBalanceState === undefined && incomingShowArchived === undefined) return;
+        setFilters(f => ({
+            ...f,
+            ...(incomingBalanceState !== undefined && { balanceState: incomingBalanceState }),
+            ...(incomingShowArchived !== undefined && { showArchived: incomingShowArchived }),
+        }));
+        navigation.setParams({ balanceState: undefined, showArchived: undefined });
+    }, [incomingBalanceState, incomingShowArchived, navigation]);
 
     const loadAll = useCallback(async () => {
-        await fetchGroups();
+        await Promise.all([fetchGroups(), fetchBalanceSummary()]);
     }, []);
 
     useEffect(() => {
@@ -206,13 +212,21 @@ export function GroupsListScreen() {
                         />
                     }
                     ListEmptyComponent={
-                        <EmptyState
-                            iconName="people-outline"
-                            title={t('groups.noGroups')}
-                            message={t('groups.noGroupsMessage')}
-                            actionTitle={t('groups.createGroup')}
-                            onAction={handleCreateGroup}
-                        />
+                        filters.showArchived ? (
+                            <View className="px-4 py-10 items-center">
+                                <Text className="text-sm text-gray-500">
+                                    {t('groups.archive.noArchived')}
+                                </Text>
+                            </View>
+                        ) : (
+                            <EmptyState
+                                iconName="people-outline"
+                                title={t('groups.noGroups')}
+                                message={t('groups.noGroupsMessage')}
+                                actionTitle={t('groups.createGroup')}
+                                onAction={handleCreateGroup}
+                            />
+                        )
                     }
                 />
 

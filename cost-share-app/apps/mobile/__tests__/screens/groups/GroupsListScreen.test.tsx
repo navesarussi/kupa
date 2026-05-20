@@ -49,6 +49,8 @@ const makeGroup = (overrides: Partial<{
     createdAt: new Date(),
     updatedAt: new Date(),
     members: [{ userId: 'u1', displayName: 'Alice' }],
+    isArchivedByMe: false,
+    isAutoArchived: false,
     ...overrides,
 });
 

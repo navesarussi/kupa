@@ -127,10 +127,10 @@ export function FiltersSheet({
 
                     <FilterSection label={t('groups.filters.status.label')}>
                         <FilterToggleRow
-                            label={t('groups.filters.status.includeArchived')}
-                            value={draft.includeArchived}
+                            label={t('groups.filters.status.showArchived')}
+                            value={draft.showArchived}
                             onValueChange={(v) =>
-                                setDraft((d) => ({ ...d, includeArchived: v }))
+                                setDraft((d) => ({ ...d, showArchived: v }))
                             }
                         />
                     </FilterSection>

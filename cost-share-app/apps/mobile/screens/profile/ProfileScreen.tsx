@@ -106,7 +106,7 @@ export function ProfileScreen() {
                             onPress={() =>
                                 navigation.navigate('Groups', {
                                     screen: 'GroupsList',
-                                    params: { balanceState: 'unsettled' },
+                                    params: { balanceState: 'unsettled', showArchived: true },
                                 })
                             }
                             testID="stat-active"
@@ -118,7 +118,7 @@ export function ProfileScreen() {
                             onPress={() =>
                                 navigation.navigate('Groups', {
                                     screen: 'GroupsList',
-                                    params: { balanceState: 'settled' },
+                                    params: { balanceState: 'settled', showArchived: true },
                                 })
                             }
                             testID="stat-closed"
