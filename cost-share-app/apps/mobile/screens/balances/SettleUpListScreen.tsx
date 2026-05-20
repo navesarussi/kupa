@@ -65,6 +65,7 @@ export function SettleUpListScreen() {
     const {
         data: debts = [],
         isLoading,
+        isFetching,
         isRefetching,
         refetch,
     } = useGroupPairwiseDebtsQuery(groupId);
@@ -112,7 +113,7 @@ export function SettleUpListScreen() {
         [createMutation, groupId],
     );
 
-    if (isLoading && debts.length === 0) {
+    if ((isLoading || isFetching) && debts.length === 0) {
         return <LoadingIndicator />;
     }
 
@@ -140,11 +141,13 @@ export function SettleUpListScreen() {
                     />
                 )}
                 ListEmptyComponent={
-                    <EmptyState
-                        iconName="checkmark-circle-outline"
-                        title={t('settleUp.empty')}
-                        message={t('balances.noDebts')}
-                    />
+                    isFetching ? null : (
+                        <EmptyState
+                            iconName="checkmark-circle-outline"
+                            title={t('settleUp.empty')}
+                            message={t('balances.noDebts')}
+                        />
+                    )
                 }
                 refreshControl={
                     <RefreshControl
