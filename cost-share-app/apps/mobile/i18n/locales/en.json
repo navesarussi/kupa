@@ -92,6 +92,7 @@
             "subtitle": "Narrow the list or change how groups are ordered",
             "apply": "Apply",
             "clearAll": "Clear all",
+            "close": "Close",
             "sort": {
                 "label": "Sort by",
                 "recentDesc": "Recently updated",

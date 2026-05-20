@@ -238,7 +238,7 @@ export function GroupsListScreen() {
                 visible={filtersOpen}
                 filters={filters}
                 availableCurrencies={availableCurrencies}
-                onApply={setFilters}
+                onChange={setFilters}
                 onClose={() => setFiltersOpen(false)}
             />
         </SafeAreaView>

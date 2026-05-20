@@ -27,7 +27,7 @@ interface FiltersSheetProps {
     visible: boolean;
     filters: GroupListFilters;
     availableCurrencies: string[];
-    onApply: (next: GroupListFilters) => void;
+    onChange: (next: GroupListFilters) => void;
     onClose: () => void;
 }
 
@@ -35,7 +35,7 @@ export function FiltersSheet({
     visible,
     filters,
     availableCurrencies,
-    onApply,
+    onChange,
     onClose,
 }: FiltersSheetProps) {
     const { t } = useTranslation();
@@ -67,32 +67,28 @@ export function FiltersSheet({
             filters={filters}
             title={t('groups.filters.title')}
             subtitle={t('groups.filters.subtitle')}
-            onApply={onApply}
+            onChange={onChange}
             onClose={onClose}
             onClear={() => DEFAULT_GROUP_LIST_FILTERS}
         >
-            {({ draft, setDraft }) => (
+            {({ filters: f, patch }) => (
                 <>
                     <FilterSection
                         first
                         label={t('groups.filters.sort.label')}
                     >
                         <FilterSingleChipGrid
-                            value={draft.sortBy}
+                            value={f.sortBy}
                             options={sortOptions}
-                            onChange={(key) =>
-                                setDraft((d) => ({ ...d, sortBy: key }))
-                            }
+                            onChange={(sortBy) => patch({ sortBy })}
                         />
                     </FilterSection>
 
                     <FilterSection label={t('groups.filters.balance.label')}>
                         <FilterSingleChipGrid
-                            value={draft.balanceState}
+                            value={f.balanceState}
                             options={balanceOptions}
-                            onChange={(key) =>
-                                setDraft((d) => ({ ...d, balanceState: key }))
-                            }
+                            onChange={(balanceState) => patch({ balanceState })}
                         />
                     </FilterSection>
 
@@ -102,10 +98,8 @@ export function FiltersSheet({
                     >
                         <GroupTypeFilterGrid
                             allLabel={t('groups.filters.balance.all')}
-                            selected={draft.types}
-                            onChange={(types) =>
-                                setDraft((d) => ({ ...d, types }))
-                            }
+                            selected={f.types}
+                            onChange={(types) => patch({ types })}
                         />
                     </FilterSection>
 
@@ -113,12 +107,10 @@ export function FiltersSheet({
                         <FilterSection label={t('groups.filters.currency.label')}>
                             <FilterChipGrid
                                 allLabel={t('groups.filters.balance.all')}
-                                selected={draft.currencies}
+                                selected={f.currencies}
                                 allValues={availableCurrencies}
                                 options={currencyOptions}
-                                onChange={(currencies) =>
-                                    setDraft((d) => ({ ...d, currencies }))
-                                }
+                                onChange={(currencies) => patch({ currencies })}
                             />
                         </FilterSection>
                     )}
@@ -126,9 +118,9 @@ export function FiltersSheet({
                     <FilterSection label={t('groups.filters.status.label')}>
                         <FilterToggleRow
                             label={t('groups.filters.status.includeArchived')}
-                            value={draft.includeArchived}
-                            onValueChange={(v) =>
-                                setDraft((d) => ({ ...d, includeArchived: v }))
+                            value={f.includeArchived}
+                            onValueChange={(includeArchived) =>
+                                patch({ includeArchived })
                             }
                         />
                     </FilterSection>
