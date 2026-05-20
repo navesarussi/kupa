@@ -9,6 +9,7 @@ import {
     BalanceSummaryRow,
     GroupBalance,
     BalanceSummaryResponse,
+    PendingInvite,
 } from '@cost-share/shared';
 
 interface AppState {
@@ -48,6 +49,10 @@ interface AppState {
     // Language state
     language: 'en' | 'he';
     setLanguage: (language: 'en' | 'he') => void;
+
+    // Pending invite — set when an invite link arrives before sign-in.
+    pendingInvite: PendingInvite | null;
+    setPendingInvite: (invite: PendingInvite | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -146,4 +151,8 @@ export const useAppStore = create<AppState>((set) => ({
     // Language state
     language: 'en',
     setLanguage: (language) => set({ language }),
+
+    // Pending invite state
+    pendingInvite: null,
+    setPendingInvite: (invite) => set({ pendingInvite: invite }),
 }));
