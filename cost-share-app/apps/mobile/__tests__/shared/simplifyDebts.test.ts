@@ -154,3 +154,111 @@ describe('simplifyDebtsExact', () => {
         expect(transfers[0]).toEqual({ fromUserId: 'A', toUserId: 'C', cents: 2000 });
     });
 });
+
+import { simplifyDebts } from '@cost-share/shared/calculations/simplifyDebts';
+import { UnbalancedLedgerError } from '@cost-share/shared/calculations/simplifyDebts/shared';
+import type { UserBalance } from '@cost-share/shared';
+
+function bal(userId: string, netBalance: number, currency = 'USD'): UserBalance {
+    return {
+        groupId: 'g1',
+        userId,
+        currency,
+        totalPaid: 0,
+        totalOwed: 0,
+        totalSettledPaid: 0,
+        totalSettledReceived: 0,
+        netBalance,
+    };
+}
+
+const names = new Map<string, string>([
+    ['A', 'Alice'],
+    ['B', 'Bob'],
+    ['C', 'Carol'],
+    ['D', 'Dave'],
+    ['E', 'Eve'],
+]);
+
+describe('simplifyDebts (orchestrator)', () => {
+    it('returns empty result with algorithm "exact" when all balances are zero', () => {
+        const result = simplifyDebts([bal('A', 0), bal('B', 0)], names);
+        expect(result).toEqual({ debts: [], transactionCount: 0, algorithm: 'exact' });
+    });
+
+    it('returns empty result when no members are provided', () => {
+        expect(simplifyDebts([], names)).toEqual({
+            debts: [],
+            transactionCount: 0,
+            algorithm: 'exact',
+        });
+    });
+
+    it('selects exact algorithm for ≤10 non-zero balances', () => {
+        const result = simplifyDebts(
+            [bal('A', -50), bal('B', 50)],
+            names,
+        );
+        expect(result.algorithm).toBe('exact');
+        expect(result.transactionCount).toBe(1);
+        expect(result.debts).toEqual([
+            {
+                fromUserId: 'A',
+                fromUserName: 'Alice',
+                toUserId: 'B',
+                toUserName: 'Bob',
+                amount: 50,
+                currency: 'USD',
+            },
+        ]);
+    });
+
+    it('selects greedy algorithm for >10 non-zero balances', () => {
+        const balances: UserBalance[] = [];
+        for (let i = 0; i < 6; i++) balances.push(bal(`d${i}`, -10));
+        for (let i = 0; i < 6; i++) balances.push(bal(`c${i}`, 10));
+        const result = simplifyDebts(balances, new Map());
+        expect(result.algorithm).toBe('greedy');
+        expect(result.transactionCount).toBeGreaterThan(0);
+    });
+
+    it('correctly handles decimal balances ($33.33 split three ways)', () => {
+        // $100 paid by A, split evenly: A -33.33, others gain.
+        // Easier: A = -33.34, B = +16.67, C = +16.67.
+        const result = simplifyDebts(
+            [bal('A', -33.34), bal('B', 16.67), bal('C', 16.67)],
+            names,
+        );
+        expect(result.algorithm).toBe('exact');
+        const totalCents = result.debts.reduce((sum, d) => sum + Math.round(d.amount * 100), 0);
+        expect(totalCents).toBe(3334);
+        expect(result.debts.every(d => d.currency === 'USD')).toBe(true);
+    });
+
+    it('falls back to "Unknown" for missing names rather than crashing', () => {
+        const result = simplifyDebts(
+            [bal('A', -50), bal('B', 50)],
+            new Map(), // empty
+        );
+        expect(result.debts[0].fromUserName).toBe('Unknown');
+        expect(result.debts[0].toUserName).toBe('Unknown');
+    });
+
+    it('throws UnbalancedLedgerError when balances do not sum to zero', () => {
+        expect(() => simplifyDebts([bal('A', -50), bal('B', 30)], names))
+            .toThrow(UnbalancedLedgerError);
+    });
+
+    it('throws UnbalancedLedgerError on a single non-zero member', () => {
+        expect(() => simplifyDebts([bal('A', -50), bal('B', 0)], names))
+            .toThrow(UnbalancedLedgerError);
+    });
+
+    it('preserves the input currency on each debt', () => {
+        const result = simplifyDebts(
+            [bal('A', -25, 'ILS'), bal('B', 25, 'ILS')],
+            names,
+        );
+        expect(result.debts[0].currency).toBe('ILS');
+    });
+});
