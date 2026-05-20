@@ -1,8 +1,9 @@
 /**
  * Shared bottom-sheet shell for filter & sort modals.
+ * Changes apply immediately; no Apply button.
  */
 
-import React, { useEffect, useState, type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import {
     View,
     Modal,
@@ -11,9 +12,10 @@ import {
     TouchableOpacity,
     StyleSheet,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Text } from '../AppText';
-import { useRtlLayout, rtlRowStyle } from '../../hooks/useRtlLayout';
+import { AppIcon } from '../AppIcon';
 import { colors } from '../../theme';
 import { shadows } from '../../theme/shadows';
 
@@ -22,12 +24,13 @@ export interface FilterBottomSheetProps<T> {
     filters: T;
     title: string;
     subtitle: string;
-    onApply: (next: T) => void;
+    onChange: (next: T) => void;
     onClose: () => void;
     onClear: () => T;
     children: (ctx: {
-        draft: T;
-        setDraft: React.Dispatch<React.SetStateAction<T>>;
+        filters: T;
+        patch: (patch: Partial<T>) => void;
+        replace: (next: T) => void;
     }) => ReactNode;
 }
 
@@ -36,18 +39,25 @@ export function FilterBottomSheet<T>({
     filters,
     title,
     subtitle,
-    onApply,
+    onChange,
     onClose,
     onClear,
     children,
 }: FilterBottomSheetProps<T>) {
     const { t } = useTranslation();
-    const isRtl = useRtlLayout();
-    const [draft, setDraft] = useState<T>(filters);
+    const insets = useSafeAreaInsets();
 
-    useEffect(() => {
-        if (visible) setDraft(filters);
-    }, [visible, filters]);
+    const patch = (partial: Partial<T>) => {
+        onChange({ ...filters, ...partial });
+    };
+
+    const replace = (next: T) => {
+        onChange(next);
+    };
+
+    const handleClear = () => {
+        onChange(onClear());
+    };
 
     return (
         <Modal
@@ -57,44 +67,56 @@ export function FilterBottomSheet<T>({
             onRequestClose={onClose}
         >
             <Pressable onPress={onClose} style={styles.backdrop}>
-                <Pressable onPress={() => {}} style={[styles.sheet, shadows.lg]}>
+                <Pressable
+                    onPress={() => {}}
+                    style={[styles.sheet, shadows.lg]}
+                >
                     <View className="px-5 pt-4 pb-3">
-                        <View className="self-center w-12 h-1 rounded-full bg-gray-200 mb-4" />
-                        <Text className="text-xl font-bold text-gray-900">{title}</Text>
+                        <View className="self-center w-12 h-1 rounded-full bg-gray-200 mb-3" />
+
+                        <View style={styles.headerTop}>
+                            <TouchableOpacity
+                                onPress={handleClear}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('groups.filters.clearAll')}
+                                style={styles.clearBtn}
+                            >
+                                <Text className="text-xs font-medium text-primary">
+                                    {t('groups.filters.clearAll')}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={onClose}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('groups.filters.close')}
+                                style={styles.closeBtn}
+                            >
+                                <AppIcon
+                                    name="close"
+                                    size={20}
+                                    color={colors.gray600}
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text className="text-xl font-bold text-gray-900">
+                            {title}
+                        </Text>
                         <Text className="text-sm text-gray-500 mt-1">{subtitle}</Text>
                     </View>
 
                     <ScrollView
                         className="px-5"
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            { paddingBottom: insets.bottom + 20 },
+                        ]}
                         showsVerticalScrollIndicator={false}
                     >
-                        {children({ draft, setDraft })}
+                        {children({ filters, patch, replace })}
                     </ScrollView>
-
-                    <View style={[rtlRowStyle(isRtl), styles.footer]}>
-                        <TouchableOpacity
-                            onPress={() => setDraft(onClear())}
-                            activeOpacity={0.85}
-                            style={styles.footerBtnSecondary}
-                        >
-                            <Text className="text-sm font-semibold text-gray-700">
-                                {t('groups.filters.clearAll')}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => {
-                                onApply(draft);
-                                onClose();
-                            }}
-                            activeOpacity={0.85}
-                            style={styles.footerBtnPrimary}
-                        >
-                            <Text className="text-sm font-semibold text-white">
-                                {t('groups.filters.apply')}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
                 </Pressable>
             </Pressable>
         </Modal>
@@ -113,32 +135,28 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         maxHeight: '88%',
     },
-    scrollContent: {
-        paddingBottom: 8,
+    headerTop: {
+        position: 'relative',
+        minHeight: 32,
+        marginBottom: 6,
     },
-    footer: {
-        paddingHorizontal: 20,
-        paddingTop: 14,
-        paddingBottom: 28,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: colors.gray200,
-        gap: 10,
-        backgroundColor: colors.white,
+    clearBtn: {
+        position: 'absolute',
+        left: 0,
+        top: 4,
     },
-    footerBtnSecondary: {
-        flex: 1,
-        height: 48,
-        borderRadius: 14,
+    closeBtn: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: colors.gray100,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    footerBtnPrimary: {
-        flex: 1,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
+    scrollContent: {
+        paddingBottom: 8,
     },
 });

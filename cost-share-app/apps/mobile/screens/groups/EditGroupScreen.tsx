@@ -54,6 +54,24 @@ export function EditGroupScreen() {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [unsettledMemberIds, setUnsettledMemberIds] = useState<Set<string>>(new Set());
 
+    useEffect(() => {
+        void getCurrentUserId().then(setCurrentUserId);
+    }, []);
+
+    const loadMembers = useCallback(async () => {
+        const [users, debts] = await Promise.all([
+            fetchGroupUsers(groupId),
+            fetchGroupPairwiseDebts(groupId),
+        ]);
+        setMembers(users);
+        const unsettled = new Set<string>();
+        debts.forEach(d => {
+            unsettled.add(d.fromUserId);
+            unsettled.add(d.toUserId);
+        });
+        setUnsettledMemberIds(unsettled);
+    }, [groupId]);
+
     const openRemoveDialog = useCallback(
         (m: User) => {
             if (unsettledMemberIds.has(m.id)) {
@@ -76,24 +94,6 @@ export function EditGroupScreen() {
         },
         [unsettledMemberIds, groupId, t, loadMembers],
     );
-
-    useEffect(() => {
-        void getCurrentUserId().then(setCurrentUserId);
-    }, []);
-
-    const loadMembers = useCallback(async () => {
-        const [users, debts] = await Promise.all([
-            fetchGroupUsers(groupId),
-            fetchGroupPairwiseDebts(groupId),
-        ]);
-        setMembers(users);
-        const unsettled = new Set<string>();
-        debts.forEach(d => {
-            unsettled.add(d.fromUserId);
-            unsettled.add(d.toUserId);
-        });
-        setUnsettledMemberIds(unsettled);
-    }, [groupId]);
 
     useEffect(() => {
         const loadGroup = async () => {

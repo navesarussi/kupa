@@ -32,7 +32,7 @@ interface ActivityFiltersSheetProps {
     filters: ActivityFilters;
     availableCurrencies: string[];
     availableGroups: GroupOption[];
-    onApply: (next: ActivityFilters) => void;
+    onChange: (next: ActivityFilters) => void;
     onClose: () => void;
 }
 
@@ -41,7 +41,7 @@ export function ActivityFiltersSheet({
     filters,
     availableCurrencies,
     availableGroups,
-    onApply,
+    onChange,
     onClose,
 }: ActivityFiltersSheetProps) {
     const { t } = useTranslation();
@@ -77,22 +77,20 @@ export function ActivityFiltersSheet({
             filters={filters}
             title={t('activity.filters.title')}
             subtitle={t('activity.filters.subtitle')}
-            onApply={onApply}
+            onChange={onChange}
             onClose={onClose}
             onClear={() => DEFAULT_ACTIVITY_FILTERS}
         >
-            {({ draft, setDraft }) => (
+            {({ filters: f, patch }) => (
                 <>
                     <FilterSection
                         first
                         label={t('activity.filters.sort.label')}
                     >
                         <FilterSingleChipGrid
-                            value={draft.sortBy}
+                            value={f.sortBy}
                             options={sortOptions}
-                            onChange={(key) =>
-                                setDraft((d) => ({ ...d, sortBy: key }))
-                            }
+                            onChange={(sortBy) => patch({ sortBy })}
                         />
                     </FilterSection>
 
@@ -102,12 +100,10 @@ export function ActivityFiltersSheet({
                     >
                         <FilterChipGrid
                             allLabel={t('activity.filterAll')}
-                            selected={draft.types}
+                            selected={f.types}
                             allValues={allTypeKeys}
                             options={typeOptions}
-                            onChange={(types) =>
-                                setDraft((d) => ({ ...d, types }))
-                            }
+                            onChange={(types) => patch({ types })}
                         />
                     </FilterSection>
 
@@ -117,10 +113,8 @@ export function ActivityFiltersSheet({
                     >
                         <GroupTypeFilterGrid
                             allLabel={t('activity.filterAll')}
-                            selected={draft.groupTypes}
-                            onChange={(groupTypes) =>
-                                setDraft((d) => ({ ...d, groupTypes }))
-                            }
+                            selected={f.groupTypes}
+                            onChange={(groupTypes) => patch({ groupTypes })}
                         />
                     </FilterSection>
 
@@ -128,12 +122,10 @@ export function ActivityFiltersSheet({
                         <FilterSection label={t('activity.filters.currency.label')}>
                             <FilterChipGrid
                                 allLabel={t('activity.filterAll')}
-                                selected={draft.currencies}
+                                selected={f.currencies}
                                 allValues={availableCurrencies}
                                 options={currencyOptions}
-                                onChange={(currencies) =>
-                                    setDraft((d) => ({ ...d, currencies }))
-                                }
+                                onChange={(currencies) => patch({ currencies })}
                             />
                         </FilterSection>
                     )}
@@ -142,12 +134,10 @@ export function ActivityFiltersSheet({
                         <FilterSection label={t('activity.filters.group.label')}>
                             <FilterChipGrid
                                 allLabel={t('activity.filterAll')}
-                                selected={draft.groupIds}
+                                selected={f.groupIds}
                                 allValues={allGroupIds}
                                 options={groupOptions}
-                                onChange={(groupIds) =>
-                                    setDraft((d) => ({ ...d, groupIds }))
-                                }
+                                onChange={(groupIds) => patch({ groupIds })}
                             />
                         </FilterSection>
                     )}
@@ -156,23 +146,17 @@ export function ActivityFiltersSheet({
                         <FilterToggleRow
                             label={t('activity.filters.onlyMine')}
                             hint={t('activity.filters.onlyMineHint')}
-                            value={draft.onlyMine}
-                            onValueChange={(v) =>
-                                setDraft((d) => ({ ...d, onlyMine: v }))
-                            }
+                            value={f.onlyMine}
+                            onValueChange={(onlyMine) => patch({ onlyMine })}
                         />
                     </FilterSection>
 
                     <FilterSection label={t('groups.filters.dateRange.label')}>
                         <FilterDateRange
-                            dateFrom={draft.dateFrom}
-                            dateTo={draft.dateTo}
-                            onChangeFrom={(dateFrom) =>
-                                setDraft((d) => ({ ...d, dateFrom }))
-                            }
-                            onChangeTo={(dateTo) =>
-                                setDraft((d) => ({ ...d, dateTo }))
-                            }
+                            dateFrom={f.dateFrom}
+                            dateTo={f.dateTo}
+                            onChangeFrom={(dateFrom) => patch({ dateFrom })}
+                            onChangeTo={(dateTo) => patch({ dateTo })}
                         />
                     </FilterSection>
                 </>

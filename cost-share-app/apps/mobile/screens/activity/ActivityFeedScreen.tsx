@@ -245,7 +245,7 @@ export function ActivityFeedScreen() {
                 filters={filters}
                 availableCurrencies={availableCurrencies}
                 availableGroups={availableGroups}
-                onApply={setFilters}
+                onChange={setFilters}
                 onClose={() => setFiltersOpen(false)}
             />
         </SafeAreaView>
