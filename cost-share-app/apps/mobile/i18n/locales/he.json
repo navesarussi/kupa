@@ -94,6 +94,7 @@
                 "all": "הכל",
                 "owe": "אני חייב",
                 "owed": "חייבים לי",
+                "unsettled": "עם יתרה",
                 "settled": "מסודר"
             },
             "type": {
@@ -407,8 +408,8 @@
         "convertedLabel": "שקלול כל המטבעות",
         "convertedFootnote": "מומר ל-{{currency}} · שער לפי {{date}}",
         "conversionFailed": "לא ניתן לטעון שערי מטבע — ראה פירוט לפי מטבע למטה",
-        "closedGroups": "קבוצות סגורות",
-        "activeGroups": "קבוצות פעילות",
+        "closedGroups": "קופות ללא יתרה",
+        "activeGroups": "קופות עם יתרה",
         "friends": "חברים",
         "loadError": "טעינת לוח הבקרה נכשלה",
         "settled": "מסולק",

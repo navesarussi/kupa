@@ -94,6 +94,7 @@
                 "all": "All",
                 "owe": "I owe",
                 "owed": "I'm owed",
+                "unsettled": "Unsettled",
                 "settled": "Settled"
             },
             "type": {
@@ -405,8 +406,8 @@
         "convertedLabel": "All currencies combined",
         "convertedFootnote": "Converted to {{currency}} · rates as of {{date}}",
         "conversionFailed": "Could not load exchange rates — see per-currency breakdown below",
-        "closedGroups": "Closed groups",
-        "activeGroups": "Active groups",
+        "closedGroups": "Settled groups",
+        "activeGroups": "Unsettled groups",
         "friends": "Friends",
         "loadError": "Failed to load dashboard",
         "settled": "Settled up",

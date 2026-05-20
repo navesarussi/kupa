@@ -103,14 +103,24 @@ export function ProfileScreen() {
                         <StatTile
                             label={t('dashboard.activeGroups')}
                             value={dashboard.stats.activeGroupsCount}
-                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+                            onPress={() =>
+                                navigation.navigate('Groups', {
+                                    screen: 'GroupsList',
+                                    params: { balanceState: 'unsettled' },
+                                })
+                            }
                             testID="stat-active"
                         />
                         <StatDivider />
                         <StatTile
                             label={t('dashboard.closedGroups')}
                             value={dashboard.stats.closedGroupsCount}
-                            onPress={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+                            onPress={() =>
+                                navigation.navigate('Groups', {
+                                    screen: 'GroupsList',
+                                    params: { balanceState: 'settled' },
+                                })
+                            }
                             testID="stat-closed"
                         />
                     </StatGroup>

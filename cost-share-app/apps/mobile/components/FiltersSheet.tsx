@@ -17,7 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { GroupType } from '@cost-share/shared';
 
-export type BalanceState = 'all' | 'owe' | 'owed' | 'settled';
+export type BalanceState = 'all' | 'owe' | 'owed' | 'settled' | 'unsettled';
 
 export interface Filters {
     balanceState: BalanceState;
@@ -105,6 +105,7 @@ export function FiltersSheet({
         { key: 'all', label: t('groups.filters.balance.all') },
         { key: 'owe', label: t('groups.filters.balance.owe') },
         { key: 'owed', label: t('groups.filters.balance.owed') },
+        { key: 'unsettled', label: t('groups.filters.balance.unsettled') },
         { key: 'settled', label: t('groups.filters.balance.settled') },
     ];
 

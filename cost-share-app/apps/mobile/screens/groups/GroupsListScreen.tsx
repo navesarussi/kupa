@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { GroupType, GroupWithMembers } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { useLoading } from '../../hooks/useLoading';
@@ -24,6 +24,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { GroupCard } from '../../components/GroupCard';
 import { SearchExpandable } from '../../components/SearchExpandable';
 import {
+    BalanceState,
     DEFAULT_FILTERS,
     Filters,
     FiltersSheet,
@@ -66,6 +67,7 @@ function passesFilters(
         if (filters.balanceState === 'owed' && net <= 0.01) return false;
         if (filters.balanceState === 'owe' && net >= -0.01) return false;
         if (filters.balanceState === 'settled' && Math.abs(net) >= 0.01) return false;
+        if (filters.balanceState === 'unsettled' && Math.abs(net) < 0.01) return false;
     }
     return true;
 }
@@ -73,6 +75,7 @@ function passesFilters(
 export function GroupsListScreen() {
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
+    const route = useRoute<any>();
     const { isLoading, startLoading, stopLoading } = useLoading();
     const groups = useAppStore(s => s.groups);
     const groupBalances = useAppStore(s => s.groupBalances);
@@ -82,6 +85,13 @@ export function GroupsListScreen() {
     const [searchExpanded, setSearchExpanded] = useState(false);
     const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
     const [filtersOpen, setFiltersOpen] = useState(false);
+
+    const incomingBalanceState = route.params?.balanceState as BalanceState | undefined;
+    useEffect(() => {
+        if (!incomingBalanceState) return;
+        setFilters(f => ({ ...f, balanceState: incomingBalanceState }));
+        navigation.setParams({ balanceState: undefined });
+    }, [incomingBalanceState, navigation]);
 
     const loadAll = useCallback(async () => {
         await fetchGroups();
