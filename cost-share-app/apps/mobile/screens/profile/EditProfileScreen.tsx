@@ -11,9 +11,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useAppStore } from '../../store';
 import { useLoading } from '../../hooks/useLoading';
 import { updateUser } from '../../services/users.service';
+import { uploadProfileImage } from '../../services/storage.service';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
+import { ProfileImagePicker } from '../../components/ProfileImagePicker';
 import { DEFAULT_CURRENCY } from '@cost-share/shared';
 import Toast from 'react-native-toast-message';
 
@@ -26,7 +28,14 @@ export function EditProfileScreen() {
     const [name, setName] = useState(currentUser?.name || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
     const [currency, setCurrency] = useState(currentUser?.defaultCurrency || DEFAULT_CURRENCY);
+    const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
+    const [avatarRemoved, setAvatarRemoved] = useState(false);
     const [nameError, setNameError] = useState('');
+
+    const handleAvatarChange = (uri: string | null) => {
+        setLocalAvatarUri(uri);
+        setAvatarRemoved(uri === null);
+    };
 
     const validateForm = (): boolean => {
         if (!name.trim()) {
@@ -42,10 +51,27 @@ export function EditProfileScreen() {
         if (!currentUser) return;
 
         startLoading();
+        let nextAvatarUrl: string | undefined = avatarRemoved ? undefined : currentUser.avatarUrl;
+
+        if (localAvatarUri) {
+            const uploadedUrl = await uploadProfileImage(currentUser.id, localAvatarUri);
+            if (!uploadedUrl) {
+                stopLoading();
+                Toast.show({
+                    type: 'error',
+                    text1: t('common.error'),
+                    text2: t('profile.imageUploadError'),
+                });
+                return;
+            }
+            nextAvatarUrl = uploadedUrl;
+        }
+
         const result = await updateUser(currentUser.id, {
             name: name.trim(),
             phone: phone.trim() || undefined,
             defaultCurrency: currency,
+            avatarUrl: avatarRemoved ? '' : nextAvatarUrl,
         });
         stopLoading();
 
@@ -68,6 +94,13 @@ export function EditProfileScreen() {
     return (
         <ScrollView className="flex-1 bg-slate-50">
             <View className="p-4">
+                <ProfileImagePicker
+                    name={name.trim() || currentUser?.name || ''}
+                    avatarUrl={avatarRemoved ? null : currentUser?.avatarUrl}
+                    localUri={localAvatarUri}
+                    onChange={handleAvatarChange}
+                />
+
                 {/* Name */}
                 <Input
                     label={t('profile.name')}

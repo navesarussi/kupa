@@ -206,12 +206,12 @@ export interface UserExpenseView {
 }
 
 /**
- * RecentActivity - Combined feed of expenses and settlements
- * Implements: recent_activity_view logic
+ * RecentActivity - Combined feed of expenses, settlements, and group messages
+ * Implements: cross-group activity tab (REQ-ACT-01)
  */
 export interface RecentActivity {
     id: string;
-    activityType: 'expense' | 'settlement';
+    activityType: 'expense' | 'settlement' | 'message';
     groupId: string;
     description: string;
     amount: number;
@@ -498,7 +498,8 @@ export type FeedItem =
 
 /**
  * Profile dashboard payload — supabase.rpc('get_user_dashboard')
- * Headlines (totalOwed / totalOwedToUser) are null when balances span multiple currencies.
+ * Headlines are null when balances span multiple currencies (server-side).
+ * Profile screen may fill totals client-side via FX conversion (REQ-PROF-07).
  */
 export interface BalanceSummary {
     totalOwed: number | null;
@@ -511,14 +512,23 @@ export interface BalanceSummary {
     }[];
 }
 
+/** Per-currency net with a friend (positive = friend owes you). */
+export interface FriendBalanceByCurrency {
+    currency: string;
+    netBalance: number;
+}
+
 /** A peer with whom the user shares groups and has a non-zero net balance. */
 export interface FriendBalance {
     userId: string;
     name: string;
     avatarUrl?: string;
-    netBalance: number;          // Positive = friend owes you
-    currency: string;            // Always equals user's defaultCurrency
     sharedGroupIds: string[];
+    /** Balances per group currency from `get_user_dashboard`. */
+    byCurrency: FriendBalanceByCurrency[];
+    /** @deprecated Legacy RPC fields; prefer `byCurrency`. */
+    netBalance?: number;
+    currency?: string;
 }
 
 /** Group-count statistics shown on the profile dashboard. */

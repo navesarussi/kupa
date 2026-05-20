@@ -107,11 +107,32 @@ describe('ActivityFeedScreen', () => {
         );
         expect(await findByText('Lunch')).toBeTruthy();
 
-        fireEvent.press(await findByText('activity.search'));
+        fireEvent.press(await findByTestId('activity-search'));
         fireEvent.changeText(await findByTestId('activity-search-input'), 'Dinner');
 
         expect(await findByText('Dinner')).toBeTruthy();
         expect(queryByText('Lunch')).toBeNull();
+    });
+
+    it('renders group messages in the feed', async () => {
+        mockFetchRecentActivity.mockResolvedValue({
+            items: [
+                {
+                    id: 'm1',
+                    activityType: 'message',
+                    groupId: 'g1',
+                    description: 'Hello everyone',
+                    amount: 0,
+                    currency: '',
+                    userId: 'u1',
+                    userName: 'Alice',
+                    activityDate: new Date('2026-05-01'),
+                    createdAt: new Date(),
+                },
+            ],
+        });
+        const { findByText } = renderWithQuery(<ActivityFeedScreen />);
+        expect(await findByText('Hello everyone')).toBeTruthy();
     });
 
     it('fetches activity only once on mount (no double-fetch)', async () => {

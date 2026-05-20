@@ -267,6 +267,7 @@
         "title": "הגדרות",
         "general": "כללי",
         "language": "שפה",
+        "defaultCurrency": "מטבע ברירת מחדל",
         "support": "תמיכה",
         "rateUs": "דרגו אותנו",
         "contactWhatsApp": "פנו אלינו בוואטסאפ",
@@ -299,7 +300,19 @@
         "languageChangeError": "שינוי השפה נכשל. אנא נסה שוב.",
         "profileUpdated": "הפרופיל עודכן בהצלחה",
         "updateError": "עדכון הפרופיל נכשל",
-        "nameRequired": "שם נדרש"
+        "nameRequired": "שם נדרש",
+        "profileImage": "תמונת פרופיל",
+        "tapToChangeImage": "הקש לבחירה או החלפת תמונה",
+        "removeImage": "הסר תמונה",
+        "imageUploadError": "העלאת התמונה נכשלה",
+        "imagePermissionTitle": "נדרשת גישה לתמונות",
+        "imagePermissionMessage": "אפשר גישה לגלריה כדי להגדיר תמונת פרופיל"
+    },
+    "currencyPicker": {
+        "title": "בחר מטבע",
+        "selectCurrency": "בחר מטבע",
+        "searchPlaceholder": "חיפוש לפי קוד או שם...",
+        "empty": "לא נמצאו מטבעות"
     },
     "activity": {
         "title": "פעילות",
@@ -312,10 +325,30 @@
         "sortDateAsc": "מהישן לחדש",
         "sortAmountDesc": "סכום גבוה",
         "sortAmountAsc": "סכום נמוך",
+        "filters": {
+            "title": "סינון ומיון",
+            "subtitle": "צמצום הפיד או שינוי סדר התצוגה",
+            "sort": {
+                "label": "מיון לפי"
+            },
+            "types": {
+                "label": "הצג",
+                "hint": "אפשר לבחור אחד או שניהם — ריק = הכל"
+            },
+            "currency": {
+                "label": "מטבע"
+            },
+            "group": {
+                "label": "קבוצה"
+            },
+            "onlyMine": "רק הפעילות שלי",
+            "onlyMineHint": "הוצאות שהוספתי ותשלומים ששלחתי"
+        },
         "noActivity": "אין פעילות עדיין",
-        "noActivityMessage": "הוצאות ותשלומים אחרונים יופיעו כאן",
+        "noActivityMessage": "הוצאות, תשלומים והודעות מקבוצות יופיעו כאן",
         "expense": "הוצאה",
         "settlement": "תשלום",
+        "message": "הודעה",
         "addedExpense": "הוסיף הוצאה",
         "settledPayment": "ביצע תשלום",
         "loadError": "טעינת הפעילות נכשלה",
@@ -360,6 +393,10 @@
         "youOwe": "אתה חייב",
         "youAreOwed": "חייבים לך",
         "balanceOverview": "סיכום יתרות",
+        "netBalance": "יתרה נטו",
+        "netOwedToYou": "יתרה לזכותך",
+        "netYouOwe": "יתרת חוב נטו",
+        "netSettled": "הכל מסולק",
         "nothingOwed": "אין לך חובות",
         "notOwedToYou": "לא חייבים לך",
         "nothingOwedShort": "אין חוב",
@@ -367,6 +404,9 @@
         "yourGroups": "הקבוצות שלך",
         "viewBreakdown": "פירוט לפי מטבע",
         "hideBreakdown": "הסתר פירוט",
+        "convertedLabel": "שקלול כל המטבעות",
+        "convertedFootnote": "מומר ל-{{currency}} · שער לפי {{date}}",
+        "conversionFailed": "לא ניתן לטעון שערי מטבע — ראה פירוט לפי מטבע למטה",
         "closedGroups": "קבוצות סגורות",
         "activeGroups": "קבוצות פעילות",
         "friends": "חברים",
@@ -374,6 +414,8 @@
         "settled": "מסולק",
         "owesYou": "חייב לך",
         "youOweFriend": "אתה חייב",
+        "friendConverted": "שקלול מטבעות",
+        "friendConversionFailed": "שערים לא זמינים",
         "noFriendsYet": "אין קבוצות משותפות"
     },
     "legal": {

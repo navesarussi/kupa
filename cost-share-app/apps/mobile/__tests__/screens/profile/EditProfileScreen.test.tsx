@@ -18,17 +18,37 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('../../../services/users.service', () => ({
     updateUser: jest.fn(),
 }));
+jest.mock('../../../services/storage.service', () => ({
+    uploadProfileImage: jest.fn(),
+}));
+jest.mock('../../../components/ProfileImagePicker', () => ({
+    ProfileImagePicker: ({ onChange }: { onChange: (uri: string | null) => void }) => {
+        const { TouchableOpacity, Text } = require('react-native');
+        return (
+            <TouchableOpacity
+                testID="profile-image-picker-mock"
+                onPress={() => onChange('file:///new-avatar.jpg')}
+            >
+                <Text>mock picker</Text>
+            </TouchableOpacity>
+        );
+    },
+}));
 
 import { EditProfileScreen } from '../../../screens/profile/EditProfileScreen';
 import { useAppStore } from '../../../store';
 import { updateUser } from '../../../services/users.service';
+import { uploadProfileImage } from '../../../services/storage.service';
 
 const mockUpdate = updateUser as jest.MockedFunction<typeof updateUser>;
+const mockUploadProfileImage = uploadProfileImage as jest.MockedFunction<typeof uploadProfileImage>;
 
 beforeEach(() => {
     mockNavigate.mockClear();
     mockGoBack.mockClear();
     mockUpdate.mockReset();
+    mockUploadProfileImage.mockReset();
+    mockUploadProfileImage.mockResolvedValue('https://cdn.example.com/avatar.jpg');
     useAppStore.setState({
         currentUser: {
             id: 'u1',
@@ -75,5 +95,24 @@ describe('EditProfileScreen', () => {
         const { getByText } = render(<EditProfileScreen />);
         fireEvent.press(getByText('common.cancel'));
         expect(mockGoBack).toHaveBeenCalled();
+    });
+
+    it('renders profile image picker', () => {
+        const { getByTestId } = render(<EditProfileScreen />);
+        expect(getByTestId('profile-image-picker-mock')).toBeTruthy();
+    });
+
+    it('uploads avatar and saves avatarUrl when a new photo is selected', async () => {
+        mockUpdate.mockResolvedValueOnce({ id: 'u1' } as any);
+        const { getByTestId, getByText } = render(<EditProfileScreen />);
+        fireEvent.press(getByTestId('profile-image-picker-mock'));
+        fireEvent.press(getByText('common.save'));
+        await waitFor(() => expect(mockUploadProfileImage).toHaveBeenCalledWith('u1', 'file:///new-avatar.jpg'));
+        await waitFor(() =>
+            expect(mockUpdate).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ avatarUrl: 'https://cdn.example.com/avatar.jpg' })
+            )
+        );
     });
 });

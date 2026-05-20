@@ -10,8 +10,10 @@ import { AppNavigator } from './navigation/AppNavigator';
 import { LoginScreen } from './screens/auth/LoginScreen';
 import { initializeLanguage } from './i18n';
 import i18n from './i18n';
+import { hydrateAuthSession } from './lib/authSessionLifecycle';
 import { supabase } from './lib/supabase';
 import { assertProfileActive } from './lib/auth';
+import { hydrateCurrentUserProfile } from './services/users.service';
 import { queryClient } from './lib/queryClient';
 import { useAppStore } from './store';
 import { colors } from './theme';
@@ -69,9 +71,10 @@ export default function App() {
     const init = async () => {
       try {
         await initializeLanguage();
-        const { data } = await supabase.auth.getSession();
-        if (mounted) setSession(data.session);
-        if (mounted && data.session) {
+        const session = await hydrateAuthSession();
+        if (mounted) setSession(session);
+        if (mounted && session) {
+          void hydrateCurrentUserProfile(session.user.id);
           void guardSession();
         }
       } catch (e) {
@@ -86,6 +89,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+        void hydrateCurrentUserProfile(session.user.id);
         void guardSession();
       }
     });

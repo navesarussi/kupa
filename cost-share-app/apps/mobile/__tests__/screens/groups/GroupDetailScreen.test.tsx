@@ -68,6 +68,10 @@ jest.mock('../../../lib/supabase', () => ({
     },
 }));
 
+jest.mock('../../../components/AddMembersSheet', () => ({
+    AddMembersSheet: () => null,
+}));
+
 import { GroupDetailScreen } from '../../../screens/groups/GroupDetailScreen';
 import { getGroupById } from '../../../services/groups.service';
 import { fetchMessages, createMessage } from '../../../services/messages.service';

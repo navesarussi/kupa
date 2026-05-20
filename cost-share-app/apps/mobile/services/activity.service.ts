@@ -1,5 +1,5 @@
 /**
- * Activity feed — Supabase direct (expenses + settlements for user's groups)
+ * Activity feed — Supabase direct (expenses + settlements + messages for user's groups)
  */
 
 import { RecentActivity } from '@cost-share/shared';
@@ -57,6 +57,21 @@ function buildExpenseQuery(groupIds: string[], limit: number, before?: string) {
     return query;
 }
 
+function buildMessageQuery(groupIds: string[], limit: number, before?: string) {
+    let query = supabase
+        .from('group_messages')
+        .select('id, group_id, body, created_at, user_id')
+        .in('group_id', groupIds)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (before) {
+        query = query.lt('created_at', before);
+    }
+    return query;
+}
+
 function buildSettlementQuery(groupIds: string[], limit: number, before?: string) {
     let query = supabase
         .from('settlements')
@@ -92,6 +107,7 @@ async function fetchGroupNames(groupIds: string[]): Promise<Map<string, string>>
 function mapToActivities(
     expenses: Record<string, unknown>[],
     settlements: Record<string, unknown>[],
+    messages: Record<string, unknown>[],
     namesById: Map<string, string>,
     groupNamesById: Map<string, string>,
     currentUserId: string,
@@ -153,6 +169,23 @@ function mapToActivities(
         });
     }
 
+    for (const row of messages) {
+        const userId = row.user_id as string;
+        const createdAt = new Date(row.created_at as string);
+        activities.push({
+            id: row.id as string,
+            activityType: 'message',
+            groupId: row.group_id as string,
+            description: row.body as string,
+            amount: 0,
+            currency: '',
+            userId,
+            userName: namesById.get(userId) ?? 'Unknown',
+            activityDate: createdAt,
+            createdAt,
+        });
+    }
+
     return activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
@@ -169,13 +202,15 @@ export async function fetchRecentActivity(
         const groupIds = await getUserGroupIds(userId);
         if (groupIds.length === 0) return { items: [] };
 
-        const [expensesResult, settlementsResult] = await Promise.all([
+        const [expensesResult, settlementsResult, messagesResult] = await Promise.all([
             buildExpenseQuery(groupIds, fetchLimit, options.before),
             buildSettlementQuery(groupIds, fetchLimit, options.before),
+            buildMessageQuery(groupIds, fetchLimit, options.before),
         ]);
 
         if (expensesResult.error) throw expensesResult.error;
         if (settlementsResult.error) throw settlementsResult.error;
+        if (messagesResult.error) throw messagesResult.error;
 
         const userIds = new Set<string>();
         for (const row of expensesResult.data ?? []) {
@@ -184,6 +219,9 @@ export async function fetchRecentActivity(
         for (const row of settlementsResult.data ?? []) {
             userIds.add(row.from_user_id as string);
             userIds.add(row.to_user_id as string);
+        }
+        for (const row of messagesResult.data ?? []) {
+            userIds.add(row.user_id as string);
         }
 
         const settlementGroupIds = new Set<string>();
@@ -199,6 +237,7 @@ export async function fetchRecentActivity(
         const merged = mapToActivities(
             (expensesResult.data ?? []) as Record<string, unknown>[],
             (settlementsResult.data ?? []) as Record<string, unknown>[],
+            (messagesResult.data ?? []) as Record<string, unknown>[],
             namesById,
             groupNamesById,
             userId,
@@ -207,7 +246,8 @@ export async function fetchRecentActivity(
         const hasMore =
             merged.length > limit ||
             (expensesResult.data?.length ?? 0) === fetchLimit ||
-            (settlementsResult.data?.length ?? 0) === fetchLimit;
+            (settlementsResult.data?.length ?? 0) === fetchLimit ||
+            (messagesResult.data?.length ?? 0) === fetchLimit;
         const items = merged.slice(0, limit);
         const nextCursor =
             hasMore && items.length > 0

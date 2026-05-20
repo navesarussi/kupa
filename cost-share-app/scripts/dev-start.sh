@@ -8,9 +8,11 @@
 #   scripts/dev-start.sh --skip-tests
 #   scripts/dev-start.sh --skip-schema   # skip Supabase HTTP probe
 #   scripts/dev-start.sh --check-only
-#   scripts/dev-start.sh --no-open       # skip auto-open web + mobile simulators
+#   scripts/dev-start.sh --no-open         # skip auto-open web in browser
+#   scripts/dev-start.sh --open-simulators # boot iOS/Android + open dev clients (legacy)
 #
-# Full stack auto-opens: Next.js in browser, iOS + Android dev clients (after Metro).
+# Default: web may open in browser; Expo runs without starting simulators.
+# Press i / a in the Expo terminal to open iOS / Android when you want.
 # First time on a new simulator: npm run mobile:ios && npm run mobile:android
 #
 # Env: WEB_PORT=3001 (Next.js). Data: Supabase via apps/mobile/.env
@@ -50,6 +52,7 @@ MOBILE_ONLY=false
 CHECK_ONLY=false
 FORCE_INSTALL=false
 DEV_AUTO_OPEN=1
+DEV_AUTO_OPEN_MOBILE=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -79,8 +82,9 @@ while [[ $# -gt 0 ]]; do
     --with-mobile)   WEB_ONLY=false ;; # legacy alias
     -h|--help)       usage; exit 0 ;;
     --install)       FORCE_INSTALL=true ;;
-    --no-open)       DEV_AUTO_OPEN=0 ;;
-    *)               fail "Unknown option: $1 (try --help)" ;;
+    --no-open)         DEV_AUTO_OPEN=0 ;;
+    --open-simulators) DEV_AUTO_OPEN_MOBILE=1 ;;
+    *)                 fail "Unknown option: $1 (try --help)" ;;
   esac
   shift
 done
@@ -358,7 +362,6 @@ warn_missing_mobile_builds() {
 }
 
 prepare_mobile_simulators() {
-  [[ "$DEV_AUTO_OPEN" == "1" ]] || return 0
   [[ "$WITH_MOBILE" == true ]] || return 0
   local ensure="$MOBILE_DIR/scripts/ensure-simulators.sh"
   if [[ -x "$ensure" ]] || [[ -f "$ensure" ]]; then
@@ -389,8 +392,12 @@ start_expo_foreground() {
   echo "══════════════════════════════════════════"
   echo "  Expo — interactive (this terminal)"
   echo "══════════════════════════════════════════"
-  echo "  Auto-open: web browser + iOS + Android (when dev builds are installed)"
-  echo "  w → Expo web  |  a → Android  |  i → iOS  (manual retry)"
+  if [[ "$DEV_AUTO_OPEN_MOBILE" == "1" ]]; then
+    echo "  Simulators: auto-boot + open dev clients (--open-simulators)"
+  else
+    echo "  Simulators: off until you press i (iOS) or a (Android) in Expo"
+  fi
+  echo "  w → Expo web  |  a → Android  |  i → iOS"
   echo "  First time on a simulator? npm run mobile:ios && npm run mobile:android"
   echo "  Metro: exp://127.0.0.1:8081"
   if [[ "$WITH_WEB" == true ]]; then
@@ -402,12 +409,12 @@ start_expo_foreground() {
 
   unset CI
   export EXPO_METRO_PORT=8081
-  if [[ "$DEV_AUTO_OPEN" == "1" ]]; then
+  if [[ "$DEV_AUTO_OPEN_MOBILE" == "1" ]]; then
     export EXPO_AUTO_OPEN_MOBILE=1
+    prepare_mobile_simulators
   else
     export EXPO_AUTO_OPEN_MOBILE=0
   fi
-  prepare_mobile_simulators
   cd "$MOBILE_DIR"
   npm run start
 }

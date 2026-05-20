@@ -4,32 +4,37 @@ import { View, ScrollView, Linking, Platform, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Application from 'expo-application';
 import * as StoreReview from 'expo-store-review';
-import { Language } from '@cost-share/shared';
+import { Language, DEFAULT_CURRENCY } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { changeLanguage } from '../../i18n';
 import { signOut } from '../../services/auth.service';
+import { updateUser } from '../../services/users.service';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { SettingsSection } from '../../components/settings/SettingsSection';
 import { SettingsRow } from '../../components/settings/SettingsRow';
 import { LegalSheet } from '../../components/settings/LegalSheet';
 import { LanguageSheet } from '../../components/settings/LanguageSheet';
+import { CurrencyPicker } from '../../components/CurrencyPicker';
 import Toast from 'react-native-toast-message';
 import { deleteMyAccount } from '../../services/account.service';
 import { DeleteAccountWarningSheet } from '../../components/settings/DeleteAccountWarningSheet';
 import { DeleteAccountConfirmSheet } from '../../components/settings/DeleteAccountConfirmSheet';
+import currencyCodes from 'currency-codes';
+import { getCurrencyDisplayName } from '../../lib/currencyDisplay';
 
 const WHATSAPP_NUMBER = (process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER || '+972528616878').replace(/[^\d]/g, '');
 const APP_STORE_URL = process.env.EXPO_PUBLIC_APP_STORE_URL;
 const PLAY_STORE_URL = process.env.EXPO_PUBLIC_PLAY_STORE_URL;
 
 export function SettingsScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const language = useAppStore((s) => s.language);
     const setLanguage = useAppStore((s) => s.setLanguage);
     const currentUser = useAppStore((s) => s.currentUser);
 
     const [showLogout, setShowLogout] = useState(false);
     const [showLanguage, setShowLanguage] = useState(false);
+    const [showCurrency, setShowCurrency] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
     const [showPrivacy, setShowPrivacy] = useState(false);
     const [showDeleteWarning, setShowDeleteWarning] = useState(false);
@@ -47,6 +52,32 @@ export function SettingsScreen() {
             Alert.alert(t('common.error'), t('profile.languageChangeError'));
         }
     }, [setLanguage, t]);
+
+    const currencyCode = currentUser?.defaultCurrency ?? DEFAULT_CURRENCY;
+    const currencyMeta = currencyCodes.code(currencyCode);
+    const currencyValueText = currencyMeta
+        ? `${currencyMeta.code} - ${getCurrencyDisplayName(currencyMeta.code, currencyMeta.currency, i18n.language)}`
+        : currencyCode;
+
+    const handleCurrencyPick = useCallback(async (nextCurrency: string) => {
+        setShowCurrency(false);
+        if (!currentUser || nextCurrency === currentUser.defaultCurrency) return;
+
+        const result = await updateUser(currentUser.id, { defaultCurrency: nextCurrency });
+        if (result) {
+            Toast.show({
+                type: 'success',
+                text1: t('common.success'),
+                text2: t('profile.profileUpdated'),
+            });
+        } else {
+            Toast.show({
+                type: 'error',
+                text1: t('common.error'),
+                text2: t('profile.updateError'),
+            });
+        }
+    }, [currentUser, t]);
 
     const handleRate = useCallback(async () => {
         if (await StoreReview.isAvailableAsync()) {
@@ -97,6 +128,14 @@ export function SettingsScreen() {
                         valueText={language === 'he' ? t('profile.hebrew') : t('profile.english')}
                         onPress={() => setShowLanguage(true)}
                     />
+                    <SettingsRow
+                        iconName="cash-outline"
+                        label={t('settings.defaultCurrency')}
+                        variant="value"
+                        valueText={currencyValueText}
+                        onPress={() => setShowCurrency(true)}
+                        testID="settings-currency-row"
+                    />
                 </SettingsSection>
 
                 <SettingsSection title={t('settings.support')}>
@@ -140,6 +179,13 @@ export function SettingsScreen() {
                 current={language as Language}
                 onSelect={handleLanguagePick}
                 onClose={() => setShowLanguage(false)}
+            />
+
+            <CurrencyPicker
+                value={currencyCode}
+                onChange={handleCurrencyPick}
+                visible={showCurrency}
+                onClose={() => setShowCurrency(false)}
             />
 
             <LegalSheet visible={showTerms} title={t('legal.termsTitle')} body={t('legal.termsBody')} onClose={() => setShowTerms(false)} />

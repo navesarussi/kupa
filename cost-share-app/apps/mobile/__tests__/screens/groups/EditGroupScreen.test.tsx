@@ -26,6 +26,14 @@ jest.mock('../../../services/storage.service', () => ({
     uploadGroupImage: jest.fn(),
 }));
 
+jest.mock('../../../services/users.service', () => ({
+    fetchGroupUsers: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../../../components/AddMembersSheet', () => ({
+    AddMembersSheet: () => null,
+}));
+
 jest.mock('../../../lib/auth', () => ({
     getCurrentUserId: jest.fn().mockResolvedValue('me'),
 }));

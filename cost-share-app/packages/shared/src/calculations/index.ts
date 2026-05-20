@@ -1,6 +1,21 @@
 import { UserBalance } from '../types';
 
 export {
+    aggregateBalanceInBaseCurrency,
+    aggregateBalanceWithoutFx,
+    convertToBaseCurrency,
+    type BalanceByCurrencyRow,
+    type RatesFromBase,
+} from './fxConversion';
+
+export {
+    collectFriendFxCurrencies,
+    friendBalanceRows,
+    resolveFriendDisplayBalance,
+    type FriendBalanceDisplay,
+} from './friendBalanceDisplay';
+
+export {
     simplifyDebts,
     simplifyDebtsExact,
     simplifyDebtsGreedy,

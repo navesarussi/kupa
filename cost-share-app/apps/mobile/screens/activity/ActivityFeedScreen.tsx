@@ -1,11 +1,17 @@
 /**
  * ActivityFeedScreen
- * Cross-group activity feed (Supabase)
+ * Cross-group activity feed (Supabase) — REQ-ACT-01
  */
 
 import { Text } from '../../components/AppText';
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, FlatList, RefreshControl, TextInput, TouchableOpacity, Modal, Pressable, ActivityIndicator } from 'react-native';
+import {
+    View,
+    FlatList,
+    RefreshControl,
+    TouchableOpacity,
+    ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -14,17 +20,30 @@ import { useActivityQuery } from '../../hooks/queries/useActivityQuery';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
 import { ActivityItem } from '../../components/ActivityItem';
-import { AppIcon, AppIconName } from '../../components/AppIcon';
+import { AppIcon } from '../../components/AppIcon';
+import { SearchExpandable } from '../../components/SearchExpandable';
+import {
+    ActivityFiltersSheet,
+    DEFAULT_ACTIVITY_FILTERS,
+    isAnyActivityFilterActive,
+    type ActivityFilters,
+} from '../../components/ActivityFiltersSheet';
+import {
+    filterAndSortActivities,
+    matchesActivitySearch,
+} from '../../lib/activityFilters';
+import { useAppStore } from '../../store';
 import { APP_BRAND_TITLE, colors } from '../../theme';
-import { resolveAutoTextInputStyle, useRtlLayout } from '../../hooks/useRtlLayout';
 
-type ActivityFilter = 'all' | 'expense' | 'settlement';
-type SortOption = 'dateDesc' | 'dateAsc' | 'amountDesc' | 'amountAsc';
+function unique<T>(values: T[]): T[] {
+    return Array.from(new Set(values));
+}
 
 export function ActivityFeedScreen() {
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
-    const isRtl = useRtlLayout();
+    const currentUser = useAppStore((s) => s.currentUser);
+    const groups = useAppStore((s) => s.groups);
 
     const {
         data,
@@ -37,11 +56,9 @@ export function ActivityFeedScreen() {
     } = useActivityQuery();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [showSearch, setShowSearch] = useState(false);
-    const [filter, setFilter] = useState<ActivityFilter>('all');
-    const [sortBy, setSortBy] = useState<SortOption>('dateDesc');
-    const [filterModalVisible, setFilterModalVisible] = useState(false);
-    const [sortModalVisible, setSortModalVisible] = useState(false);
+    const [searchExpanded, setSearchExpanded] = useState(false);
+    const [filters, setFilters] = useState<ActivityFilters>(DEFAULT_ACTIVITY_FILTERS);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const activities = useMemo(
         () => data?.pages.flatMap((page) => page.items) ?? [],
@@ -58,46 +75,29 @@ export function ActivityFeedScreen() {
         }
     }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+    const availableCurrencies = useMemo(
+        () => unique(activities.map((a) => a.currency)).sort(),
+        [activities],
+    );
+
+    const availableGroups = useMemo(() => {
+        const ids = unique(activities.map((a) => a.groupId));
+        const nameById = new Map(groups.map((g) => [g.id, g.name]));
+        return ids
+            .map((id) => ({ id, name: nameById.get(id) ?? id }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [activities, groups]);
+
     const displayedActivities = useMemo(() => {
-        let list = [...activities];
+        const filtered = filterAndSortActivities(
+            activities,
+            filters,
+            currentUser?.id,
+        );
+        return filtered.filter((item) => matchesActivitySearch(item, searchQuery));
+    }, [activities, filters, searchQuery, currentUser?.id]);
 
-        if (filter !== 'all') {
-            list = list.filter((item) => item.activityType === filter);
-        }
-
-        const query = searchQuery.trim().toLowerCase();
-        if (query) {
-            list = list.filter(
-                (item) =>
-                    item.description.toLowerCase().includes(query) ||
-                    item.userName.toLowerCase().includes(query) ||
-                    item.currency.toLowerCase().includes(query) ||
-                    String(item.amount).includes(query),
-            );
-        }
-
-        list.sort((a, b) => {
-            switch (sortBy) {
-                case 'dateAsc':
-                    return (
-                        new Date(a.activityDate).getTime() -
-                        new Date(b.activityDate).getTime()
-                    );
-                case 'amountDesc':
-                    return b.amount - a.amount;
-                case 'amountAsc':
-                    return a.amount - b.amount;
-                case 'dateDesc':
-                default:
-                    return (
-                        new Date(b.activityDate).getTime() -
-                        new Date(a.activityDate).getTime()
-                    );
-            }
-        });
-
-        return list;
-    }, [activities, filter, searchQuery, sortBy]);
+    const filterActive = isAnyActivityFilterActive(filters);
 
     const handleActivityPress = useCallback(
         (activity: RecentActivity) => {
@@ -108,7 +108,10 @@ export function ActivityFeedScreen() {
                 });
                 return;
             }
-            if (activity.activityType === 'settlement') {
+            if (
+                activity.activityType === 'message' ||
+                activity.activityType === 'settlement'
+            ) {
                 navigation.navigate('Groups', {
                     screen: 'GroupDetail',
                     params: { groupId: activity.groupId },
@@ -122,26 +125,13 @@ export function ActivityFeedScreen() {
         <ActivityItem activity={item} onPress={handleActivityPress} />
     );
 
-    const filterOptions: { key: ActivityFilter; label: string }[] = [
-        { key: 'all', label: t('activity.filterAll') },
-        { key: 'expense', label: t('activity.expense') },
-        { key: 'settlement', label: t('activity.settlement') },
-    ];
-
-    const sortOptions: { key: SortOption; label: string }[] = [
-        { key: 'dateDesc', label: t('activity.sortDateDesc') },
-        { key: 'dateAsc', label: t('activity.sortDateAsc') },
-        { key: 'amountDesc', label: t('activity.sortAmountDesc') },
-        { key: 'amountAsc', label: t('activity.sortAmountAsc') },
-    ];
-
     if (isLoading && activities.length === 0) {
         return <LoadingIndicator />;
     }
 
     return (
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-            <View className="px-4 pt-2 pb-3">
+            <View className="px-4 pt-2 pb-1">
                 <Text
                     className="text-2xl font-bold text-gray-900 text-center"
                     accessibilityRole="header"
@@ -150,41 +140,34 @@ export function ActivityFeedScreen() {
                 </Text>
             </View>
 
-            <View className="flex-row items-center gap-2 px-4 pb-3">
-                <ToolbarButton
-                    icon="search-outline"
-                    label={t('activity.search')}
-                    active={showSearch}
-                    onPress={() => setShowSearch((prev) => !prev)}
+            <View className="flex-row items-center px-4 py-2">
+                <SearchExpandable
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    expanded={searchExpanded}
+                    onExpandedChange={setSearchExpanded}
+                    placeholder={t('activity.searchPlaceholder')}
+                    testID="activity-search"
                 />
-                <ToolbarButton
-                    icon="funnel-outline"
-                    label={t('activity.filter')}
-                    active={filter !== 'all'}
-                    onPress={() => setFilterModalVisible(true)}
-                />
-                <ToolbarButton
-                    icon="swap-vertical-outline"
-                    label={t('activity.sort')}
-                    active={sortBy !== 'dateDesc'}
-                    onPress={() => setSortModalVisible(true)}
-                />
+                {!searchExpanded && (
+                    <TouchableOpacity
+                        onPress={() => setFiltersOpen(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('activity.filters.title')}
+                        className="ml-1 h-9 w-9 items-center justify-center relative"
+                        testID="activity-filter-btn"
+                    >
+                        <AppIcon
+                            name="options-outline"
+                            size={22}
+                            color={colors.gray500}
+                        />
+                        {filterActive && (
+                            <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+                        )}
+                    </TouchableOpacity>
+                )}
             </View>
-
-            {showSearch && (
-                <View className="px-4 pb-3">
-                    <TextInput
-                        className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900"
-                        style={resolveAutoTextInputStyle(isRtl)}
-                        placeholder={t('activity.searchPlaceholder')}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        testID="activity-search-input"
-                    />
-                </View>
-            )}
 
             <FlatList
                 data={displayedActivities}
@@ -214,110 +197,14 @@ export function ActivityFeedScreen() {
                 }
             />
 
-            <OptionModal
-                visible={filterModalVisible}
-                title={t('activity.filter')}
-                options={filterOptions}
-                selectedKey={filter}
-                onSelect={(key) => setFilter(key as ActivityFilter)}
-                onClose={() => setFilterModalVisible(false)}
-            />
-
-            <OptionModal
-                visible={sortModalVisible}
-                title={t('activity.sort')}
-                options={sortOptions}
-                selectedKey={sortBy}
-                onSelect={(key) => setSortBy(key as SortOption)}
-                onClose={() => setSortModalVisible(false)}
+            <ActivityFiltersSheet
+                visible={filtersOpen}
+                filters={filters}
+                availableCurrencies={availableCurrencies}
+                availableGroups={availableGroups}
+                onApply={setFilters}
+                onClose={() => setFiltersOpen(false)}
             />
         </SafeAreaView>
-    );
-}
-
-function ToolbarButton({
-    icon,
-    label,
-    active,
-    onPress,
-}: {
-    icon: AppIconName;
-    label: string;
-    active: boolean;
-    onPress: () => void;
-}) {
-    return (
-        <TouchableOpacity
-            onPress={onPress}
-            activeOpacity={0.7}
-            className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border ${
-                active
-                    ? 'bg-primary/10 border-primary'
-                    : 'bg-white border-gray-200'
-            }`}
-        >
-            <AppIcon
-                name={icon}
-                size={18}
-                color={active ? colors.primary : colors.gray600}
-            />
-            <Text
-                className={`text-sm font-medium ${
-                    active ? 'text-primary' : 'text-gray-700'
-                }`}
-            >
-                {label}
-            </Text>
-        </TouchableOpacity>
-    );
-}
-
-function OptionModal<T extends string>({
-    visible,
-    title,
-    options,
-    selectedKey,
-    onSelect,
-    onClose,
-}: {
-    visible: boolean;
-    title: string;
-    options: { key: T; label: string }[];
-    selectedKey: T;
-    onSelect: (key: T) => void;
-    onClose: () => void;
-}) {
-    return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <Pressable className="flex-1 bg-black/40 justify-end" onPress={onClose}>
-                <Pressable className="bg-white rounded-t-2xl px-4 pt-4 pb-8" onPress={() => {}}>
-                    <Text className="text-lg font-semibold text-gray-900 mb-3">{title}</Text>
-                    {options.map((option) => {
-                        const selected = option.key === selectedKey;
-                        return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => {
-                                    onSelect(option.key);
-                                    onClose();
-                                }}
-                                className="py-3 flex-row items-center justify-between border-b border-gray-100"
-                            >
-                                <Text
-                                    className={`text-base ${
-                                        selected ? 'text-primary font-semibold' : 'text-gray-800'
-                                    }`}
-                                >
-                                    {option.label}
-                                </Text>
-                                {selected && (
-                                    <AppIcon name="checkmark" size={20} color={colors.primary} />
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </Pressable>
-            </Pressable>
-        </Modal>
     );
 }

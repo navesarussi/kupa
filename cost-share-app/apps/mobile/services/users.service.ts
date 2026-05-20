@@ -6,7 +6,17 @@ import { User, UpdateProfileDto, BalanceSummaryResponse } from '@cost-share/shar
 import { profileFromRow } from '@cost-share/shared';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
+import { queryClient } from '../lib/queryClient';
+import { queryKeys } from '../hooks/queries/keys';
 import { useAppStore } from '../store';
+
+/** Load profiles.default_currency (and other fields) after auth — session alone only has ILS placeholder. */
+export async function hydrateCurrentUserProfile(userId: string): Promise<void> {
+    const user = await getUserById(userId);
+    if (user) {
+        useAppStore.getState().setCurrentUser(user);
+    }
+}
 
 export async function fetchUsers(): Promise<User[]> {
     const { data, error } = await supabase
@@ -100,6 +110,8 @@ export async function updateUser(id: string, dto: UpdateProfileDto): Promise<Use
     const currentUser = useAppStore.getState().currentUser;
     if (currentUser && currentUser.id === id) {
         useAppStore.getState().setCurrentUser(user);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        void queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
     }
     return user;
 }

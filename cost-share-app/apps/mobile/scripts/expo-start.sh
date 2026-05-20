@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Start Expo dev client with a real TTY (QR + w/i/a keys).
-# When EXPO_AUTO_OPEN_MOBILE=1, opens iOS + Android dev clients once Metro is ready.
+# When EXPO_AUTO_OPEN_MOBILE=1 (dev-start --open-simulators), opens iOS + Android dev clients once Metro is ready.
+# Default: no auto-open — press i / a in Expo to launch simulators.
 # Log watcher still runs ios-open after manual "i" in Expo.
 set -euo pipefail
 

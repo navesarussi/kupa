@@ -136,37 +136,36 @@ BEGIN
         'activeGroupsCount', COALESCE(COUNT(*) FILTER (WHERE NOT is_closed), 0)
     ) INTO v_stats FROM group_status;
 
-    WITH user_groups_in_default AS (
+    WITH user_groups_all AS (
         SELECT gm.group_id FROM group_members gm JOIN groups g ON g.id = gm.group_id
-        WHERE gm.user_id = p_user_id AND gm.is_active = TRUE
-          AND g.is_active = TRUE AND g.default_currency = v_default_currency
+        WHERE gm.user_id = p_user_id AND gm.is_active = TRUE AND g.is_active = TRUE
     ),
     gma AS (
         SELECT gm.group_id, gm.user_id FROM group_members gm
-        WHERE gm.is_active = TRUE AND gm.group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE gm.is_active = TRUE AND gm.group_id IN (SELECT group_id FROM user_groups_all)
     ),
     mp AS (
         SELECT e.group_id, e.paid_by AS user_id, SUM(e.amount) AS amount
         FROM expenses e
-        WHERE e.is_deleted = FALSE AND e.group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE e.is_deleted = FALSE AND e.group_id IN (SELECT group_id FROM user_groups_all)
         GROUP BY e.group_id, e.paid_by
     ),
     mo AS (
         SELECT e.group_id, es.user_id, SUM(es.amount) AS amount
         FROM expense_splits es JOIN expenses e ON e.id = es.expense_id
-        WHERE e.is_deleted = FALSE AND e.group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE e.is_deleted = FALSE AND e.group_id IN (SELECT group_id FROM user_groups_all)
         GROUP BY e.group_id, es.user_id
     ),
     msr AS (
         SELECT group_id, to_user_id AS user_id, SUM(amount) AS amount
         FROM settlements
-        WHERE group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE group_id IN (SELECT group_id FROM user_groups_all)
         GROUP BY group_id, to_user_id
     ),
     msp AS (
         SELECT group_id, from_user_id AS user_id, SUM(amount) AS amount
         FROM settlements
-        WHERE group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE group_id IN (SELECT group_id FROM user_groups_all)
         GROUP BY group_id, from_user_id
     ),
     member_bal AS (
@@ -181,13 +180,14 @@ BEGIN
     ),
     co_members AS (
         SELECT DISTINCT gm.user_id FROM group_members gm
-        WHERE gm.group_id IN (SELECT group_id FROM user_groups_in_default)
+        WHERE gm.group_id IN (SELECT group_id FROM user_groups_all)
           AND gm.is_active = TRUE AND gm.user_id <> p_user_id
     ),
     pair_per_group AS (
         SELECT
             mb_friend.user_id AS friend_id,
             mb_friend.group_id,
+            g.default_currency AS currency,
             mb_friend.net AS friend_net,
             mb_user.net AS user_net
         FROM co_members cm
@@ -195,25 +195,45 @@ BEGIN
         JOIN member_bal mb_user
             ON mb_user.group_id = mb_friend.group_id
            AND mb_user.user_id = p_user_id
+        JOIN groups g ON g.id = mb_friend.group_id
     ),
-    friend_totals AS (
-        SELECT friend_id,
+    friend_by_currency AS (
+        SELECT friend_id, currency,
             SUM(LEAST(GREATEST(user_net, 0), GREATEST(-friend_net, 0)))
               - SUM(LEAST(GREATEST(-user_net, 0), GREATEST(friend_net, 0))) AS net_toward_user,
-            ARRAY_AGG(DISTINCT group_id) AS shared_group_ids
+            ARRAY_AGG(DISTINCT group_id) AS group_ids
         FROM pair_per_group
-        GROUP BY friend_id
+        GROUP BY friend_id, currency
+        HAVING ABS(
+            SUM(LEAST(GREATEST(user_net, 0), GREATEST(-friend_net, 0)))
+              - SUM(LEAST(GREATEST(-user_net, 0), GREATEST(friend_net, 0)))
+        ) >= 0.01
+    ),
+    friends_merged AS (
+        SELECT fbc.friend_id,
+            jsonb_agg(
+                jsonb_build_object(
+                    'currency', fbc.currency,
+                    'netBalance', ROUND(fbc.net_toward_user::numeric, 2)
+                )
+                ORDER BY fbc.currency
+            ) AS by_currency,
+            (
+                SELECT ARRAY_AGG(DISTINCT gid ORDER BY gid)
+                FROM friend_by_currency f2, unnest(f2.group_ids) AS gid
+                WHERE f2.friend_id = fbc.friend_id
+            ) AS shared_group_ids
+        FROM friend_by_currency fbc
+        GROUP BY fbc.friend_id
     )
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
-        'userId', ft.friend_id,
+        'userId', fm.friend_id,
         'name', p.name,
         'avatarUrl', p.avatar_url,
-        'netBalance', ROUND(ft.net_toward_user::numeric, 2),
-        'currency', v_default_currency,
-        'sharedGroupIds', ft.shared_group_ids
-    )), '[]'::jsonb) INTO v_friends
-    FROM friend_totals ft JOIN profiles p ON p.id = ft.friend_id
-    WHERE ABS(ft.net_toward_user) >= 0.01;
+        'byCurrency', fm.by_currency,
+        'sharedGroupIds', fm.shared_group_ids
+    ) ORDER BY p.name), '[]'::jsonb) INTO v_friends
+    FROM friends_merged fm JOIN profiles p ON p.id = fm.friend_id;
 
     RETURN jsonb_build_object(
         'balanceSummary', jsonb_build_object(
