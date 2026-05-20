@@ -1,4 +1,11 @@
-import { DebtSummary, UserBalance } from '../types';
+import { UserBalance } from '../types';
+
+export {
+    simplifyDebts,
+    simplifyDebtsExact,
+    simplifyDebtsGreedy,
+    UnbalancedLedgerError,
+} from './simplifyDebts';
 
 export function calculateEqualSplit(totalAmount: number, numPeople: number): number[] {
     const baseAmount = Math.floor((totalAmount * 100) / numPeople) / 100;
@@ -72,38 +79,6 @@ export function calculateUserBalancesFromData(
             netBalance: Number(netBalance.toFixed(2)),
         };
     });
-}
-
-export function simplifyDebts(
-    balances: UserBalance[],
-    nameById: Map<string, string>,
-): DebtSummary[] {
-    const debts: DebtSummary[] = [];
-    const creditors = balances.filter(b => b.netBalance > 0.01).map(b => ({ ...b }));
-    const debtors = balances.filter(b => b.netBalance < -0.01).map(b => ({ ...b }));
-
-    for (const debtor of debtors) {
-        let remaining = Math.abs(debtor.netBalance);
-        for (const creditor of creditors) {
-            if (remaining <= 0.01) break;
-            if (creditor.netBalance <= 0.01) continue;
-
-            const amount = Math.min(remaining, creditor.netBalance);
-            debts.push({
-                fromUserId: debtor.userId,
-                fromUserName: nameById.get(debtor.userId) ?? 'Unknown',
-                toUserId: creditor.userId,
-                toUserName: nameById.get(creditor.userId) ?? 'Unknown',
-                amount: Number(amount.toFixed(2)),
-                currency: debtor.currency,
-            });
-
-            remaining -= amount;
-            creditor.netBalance -= amount;
-        }
-    }
-
-    return debts;
 }
 
 export function validateSettlementAmount(
