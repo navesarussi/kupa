@@ -16,6 +16,144 @@
 
 ---
 
+## Council Review Revisions (2026-05-20)
+
+This plan was reviewed by a 5-agent council (DB, Edge Functions, Mobile, Security, Architect). The revisions below are normative — apply them as part of executing each task. The original task body remains as the spine; this section is the patch log.
+
+### Pre-flight blockers (do these BEFORE Task 1)
+
+- **B1. EAS projectId.** Run `npx eas init` in `apps/mobile` and verify `expo.extra.eas.projectId` in `app.json`. Without it, `getExpoPushTokenAsync` cannot fire. Phase 1 cannot smoke-test push otherwise.
+- **B2. Verify `pg_cron` + `pg_net` availability.** Both are present in `pg_available_extensions` on this Supabase project but `installed_version` is null. Decide whether to enable them now (Phase 1) or defer Task 20. If deferred, mark Phase 3 as gated on Supabase plan tier.
+- **B3. Shared package name is `@cost-share/shared`, NOT `@kupa/shared`.** Every code block in the plan that says `@kupa/shared/notifications` must be `@cost-share/shared` (and the new module re-exported from `packages/shared/src/index.ts`). This affects Tasks 1, 4, 14, 15, 16, 17.
+- **B4. Realtime publication is required.** Add `ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;` to Task 2's migration. Without it, the inbox is dead.
+- **B5. Kill switch FIRST, not last.** Move the `notifications_enabled` feature flag (originally Task 23) into Task 2: a row in a `feature_flags` table OR a Postgres GUC (`current_setting('app.notifications_enabled', true)`) that every `fanout_*` function checks at the top and early-returns on `false`. Triggers fire on every expense/settlement/membership write in prod — without a kill switch, rollback is messy.
+
+### Critical fixes (Phase 1)
+
+- **C1. Lock down all SECURITY DEFINER fanout functions.** After EVERY `CREATE OR REPLACE FUNCTION fanout_*` and `_notif_*`, append:
+  ```sql
+  REVOKE EXECUTE ON FUNCTION <name>(<args>) FROM PUBLIC, anon, authenticated;
+  ```
+  Without this, any authenticated user can call `SELECT fanout_expense_deleted(gen_random_uuid(), '<group>', 'URGENT: call +1-555-...', 999999, 'USD', auth.uid(), ARRAY['<victim>']);` and inject arbitrary push/inbox content to any user. **This is the highest-severity finding in the review.** Affects Tasks 3, 10, 11, 12.
+- **C2. Webhook authentication on `send-push` AND `retry-push`.** First line of `Deno.serve` handler:
+  ```typescript
+  const auth = req.headers.get('authorization') ?? '';
+  const expected = `Bearer ${Deno.env.get('WEBHOOK_SHARED_SECRET') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`;
+  // constant-time compare:
+  if (auth.length !== expected.length || !crypto.subtle.timingSafeEqual?.(new TextEncoder().encode(auth), new TextEncoder().encode(expected))) {
+    return new Response('unauthorized', { status: 401 });
+  }
+  ```
+  (If `crypto.subtle.timingSafeEqual` is not available in the Deno runtime, write a constant-time string compare helper.) The Database Webhook config must include the `Authorization: Bearer <secret>` header to match. Affects Tasks 4 and 20.
+- **C3. Per-statement (not per-row) trigger on `expense_splits`.** The plan's per-row trigger fires N times per multi-row INSERT, doing N× fanout work and racing on partial split visibility. Use transition tables:
+  ```sql
+  CREATE OR REPLACE FUNCTION trg_after_expense_splits_insert_stmt()
+  RETURNS trigger LANGUAGE plpgsql AS $$
+  DECLARE v_expense_id uuid; v_actor uuid;
+  BEGIN
+    FOR v_expense_id IN SELECT DISTINCT expense_id FROM new_splits LOOP
+      SELECT COALESCE(auth.uid(), created_by) INTO v_actor FROM expenses WHERE id = v_expense_id;
+      PERFORM fanout_expense_added(v_expense_id, v_actor);
+    END LOOP;
+    RETURN NULL;
+  END $$;
+
+  DROP TRIGGER IF EXISTS tr_expense_splits_insert ON expense_splits;
+  CREATE TRIGGER tr_expense_splits_insert
+  AFTER INSERT ON expense_splits
+  REFERENCING NEW TABLE AS new_splits
+  FOR EACH STATEMENT EXECUTE FUNCTION trg_after_expense_splits_insert_stmt();
+  ```
+  Affects Task 3.
+- **C4. CAS claim step in `send-push` to prevent double-push.** Before calling Expo, atomically transition `pending → sending` and proceed only if the UPDATE returned a row:
+  ```typescript
+  const { data: claimed, error: claimErr } = await sb
+    .from('notifications')
+    .update({ push_status: 'sending', push_attempts: row.push_attempts + 1, push_last_attempt: new Date().toISOString() })
+    .eq('id', row.id)
+    .in('push_status', ['pending', 'failed'])
+    .select('id')
+    .maybeSingle();
+  if (claimErr || !claimed) return { status: 200 }; // already being processed or no longer eligible
+  ```
+  Also: replace the constant `push_attempts: 1` (in 3+ places in Task 4) with the incremented value — otherwise `retry-push`'s `lt('push_attempts', 3)` guard is meaningless and retries are unbounded. Affects Task 4.
+- **C5. Fix cross-function import in `retry-push`.** Edge Functions are independent isolates; `import { handle } from '../send-push/index.ts'` won't work AND it would re-evaluate `Deno.serve`. Refactor:
+  - Extract `handle()` into `send-push/handler.ts` (no `Deno.serve`).
+  - `send-push/index.ts` imports `handle` from `./handler.ts` and serves it.
+  - Either (a) vendor-copy `handler.ts` into `retry-push/`, or (b) have `retry-push` call `send-push` via authenticated `fetch` per row.
+  - Recommended: **(b)** — clearer separation, single deploy unit per function. Affects Tasks 4 and 20.
+- **C6. Replace `useAuth` with Zustand store in mobile hooks.** `hooks/useAuth.ts` does not exist. Use:
+  ```typescript
+  import { useAppStore } from '../store';
+  const userId = useAppStore((s) => s.session?.user.id);
+  ```
+  Affects Task 14.
+- **C7. Nested-navigator routing.** `navigationRef.navigate('ExpenseDetail', ...)` from root will throw — `ExpenseDetail`/`Balances`/`GroupMembers`/`GroupDetail` are inside the `Groups` tab stack. Mirror the existing `deepLinks.service.ts:95–98` pattern:
+  ```typescript
+  case 'expense_added':
+  case 'expense_updated':
+  case 'expense_deleted':
+    return { screen: 'Groups', params: { screen: 'ExpenseDetail', params: { groupId: intent.group_id, expenseId: intent.entity_id } } };
+  // ...etc — wrap every leaf in { screen: 'Groups', params: {...} }
+  ```
+  Affects Task 16.
+- **C8. Foreground push + Realtime dedup.** Both fire for the same row on a live device. Realtime should update the inbox cache only; the push listener owns the toast. Add an LRU set keyed on `notification_id` (30s window) in `showInAppToast` and short-circuit duplicates. Affects Tasks 14 + 15.
+- **C9. Wire `navigationRef`.** `App.tsx:136` mounts `<NavigationContainer>` with no `ref`. Add an explicit step in Task 16 to attach `navigationRef`. Also implement cold-start deep-link queue: on mount, call `Notifications.getLastNotificationResponseAsync()` and, if `!navRef.isReady()`, queue the intent and replay once ready.
+
+### Major fixes
+
+- **M1. Improve dedup_key resolution.** Replace `extract(epoch from updated_at)::text` with `extract(epoch from updated_at)::bigint::text || '-' || md5(coalesce(description,'') || amount::text || coalesce(currency,''))` (or similar semantic hash) so sub-second back-to-back edits don't collapse. Affects Tasks 10, 11.
+- **M2. `auth.uid()` NULL safety in `trg_after_group_members_insert`.** When `auth.uid()` is NULL (service_role, cron, backfill), the current code falls into the self-join branch and spams "X joined." Either RAISE EXCEPTION on null actor for `group_members` writes, or require admin-add paths to use a SECURITY DEFINER RPC that sets `app.actor_id` GUC explicitly. Affects Task 12.
+- **M3. Tighten `notif_update_own` policy.** Recipients can currently UPDATE any column (push_status, params, dedup_key). Use a column-restricted policy or a BEFORE UPDATE trigger that enforces only `read_at` may change:
+  ```sql
+  CREATE OR REPLACE FUNCTION notif_block_non_read_updates() RETURNS trigger LANGUAGE plpgsql AS $$
+  BEGIN
+    IF NEW.recipient_user_id IS DISTINCT FROM OLD.recipient_user_id
+       OR NEW.params IS DISTINCT FROM OLD.params
+       OR NEW.push_status IS DISTINCT FROM OLD.push_status
+       OR NEW.dedup_key IS DISTINCT FROM OLD.dedup_key
+       OR NEW.event_type IS DISTINCT FROM OLD.event_type THEN
+      RAISE EXCEPTION 'only read_at may be updated by recipients';
+    END IF;
+    RETURN NEW;
+  END $$;
+  CREATE TRIGGER tr_notif_block_non_read_updates BEFORE UPDATE ON notifications
+  FOR EACH ROW WHEN (current_setting('role') <> 'service_role')
+  EXECUTE FUNCTION notif_block_non_read_updates();
+  ```
+  Affects Task 2.
+- **M4. Add `currency` to settlement no-op guard.** Task 11's `trg_after_settlement_update` early-return forgets `currency` — currency-only edits silently miss notifications.
+- **M5. Zod payload validation in `send-push`.** Replace silent 200-on-error with a Zod schema for the webhook payload; log structured errors. Use the existing `zod` dep from `@cost-share/shared/package.json`.
+- **M6. Install `expo-haptics` in Task 5.** `InAppToast` (Task 15) imports it but it's not in `package.json`. Add `npx expo install expo-haptics` to Task 5 Step 1.
+- **M7. Update OS badge on mark-read.** Currently only Realtime insert updates `setAppBadge`. After `useMarkRead.mutate` and `useMarkAllRead.mutate`, call `setAppBadge(remaining)`. Affects Task 14.
+- **M8. Wire `unregisterCurrentDevice` to logout.** Add a step in Task 6 OR Task 18 that calls `unregisterCurrentDevice(token)` inside `services/auth.service.ts:signOut` BEFORE `supabase.auth.signOut()` (so RLS still allows the delete).
+- **M9. RTL via `useRtlLayout()`, not `I18nManager.isRTL`.** Codebase convention. `I18nManager.isRTL` reflects device locale, not app language — Hebrew user on English device gets wrong alignment. Affects Tasks 15, 17.
+- **M10. Realtime channel cleanup.** Use `supabase.removeChannel(ch)` not `ch.unsubscribe()` — mirrors existing `useGroupMessagesRealtime` pattern. Affects Task 14.
+- **M11. Document PII-on-lockscreen accepted-risk.** Push payloads carry `expense_title`, `amount`, `currency`, `actor_name`, `payer_name`, `payee_name` through Expo/APNs/FCM. Add an entry to `docs/SSOT/TECHNICAL_DEBT.md` under "Notifications follow-ups" naming this explicitly, with a future-fix option (generic body + opt-in to show details).
+- **M12. `notifications_send_push` webhook header must include the new `WEBHOOK_SHARED_SECRET`.** Update the Dashboard step in Task 4 Step 7 to set the matching header — and document this in `docs/SSOT/SETUP.md`.
+
+### Phase 1 slimming (recommended)
+
+- **S1. Ship Phase 1 with `expense_added` ONLY.** Defer Tasks 10, 11, 12 (settlement events, member events, expense_updated/deleted) to Phase 2. The plan already sequences `expense_added` first in Task 3 — just commit to that as the Phase 1 boundary.
+- **S2. Simplify soft prompt.** Drop the 7-day AsyncStorage cooldown in Task 7 for v1. Show the modal once when permission is `undetermined` after the first group join, accept the result, move on. Reduces test surface significantly.
+- **S3. Cut snapshot tests in Task 1.** 9 events × 2 locales = 18 snapshots that all break on any copy edit. Replace with 4 targeted assertions: en interpolation, he interpolation, unknown-locale fallback, missing-param graceful render.
+- **S4. Add a SQL-only fallback for Task 9 smoke.** Two-device test is the gold standard, but a `SELECT fanout_expense_added(<id>, <actor>); SELECT * FROM notifications WHERE event_type='expense_added' ORDER BY created_at DESC LIMIT 5;` + curl-the-edge-function smoke is enough to validate the wiring without two physical devices.
+
+### Minor observations (apply opportunistically)
+
+- Add migration index: `CREATE INDEX IF NOT EXISTS idx_notif_push_retry ON notifications(push_status, push_attempts, created_at) WHERE push_status IN ('failed','sending');` (the existing `idx_notif_push_queue` is `WHERE push_status = 'pending'` only).
+- Centralize React Query keys in `hooks/queries/keys.ts` instead of inline `['notifications', 'list']` literals.
+- Reuse `FeedItemRow` / `MessageRow` / `ActivityItem` patterns for `NotificationRow` rather than re-implementing avatar+title+body+RTL from scratch.
+- `device_tokens` retention: add a periodic cleanup of `WHERE disabled_at < now() - interval '90 days'` (note in TECHNICAL_DEBT.md, not Phase 1).
+- `schema.sql` is dev-recreate-only; production truth is applied migrations. State this explicitly when mirroring.
+- Maestro fixtures: confirm hardcoded strings (`כן, הפעלה`, `Allow`) match the actual UI copy from i18n.
+
+### Verdict
+
+**Fix B1–B5, C1–C9 before starting Task 1. Apply M1–M12 inside each affected task. S1–S4 are recommended scope cuts to ship in 1–2 weeks instead of 4.**
+
+---
+
 ## File Structure
 
 | Path | Responsibility |
@@ -66,6 +204,8 @@
 ## Phase 1 — Foundation
 
 ### Task 1: Add shared notification types and i18n content lib
+
+> **Council revisions:** B3 (package name `@cost-share/shared`, not `@kupa/shared` — re-export from existing barrel). S3 (replace 18 snapshot tests with 4 targeted assertions).
 
 **Files:**
 - Create: `cost-share-app/packages/shared/src/notifications/types.ts`
@@ -204,19 +344,11 @@ Add to `packages/shared/src/index.ts` (append):
 export * from './notifications';
 ```
 
-- [ ] **Step 4: Write snapshot tests**
+- [ ] **Step 4: Write targeted assertions (no snapshots — see S3)**
 
 `packages/shared/src/notifications/content.test.ts`:
 ```typescript
 import { renderNotification } from './content';
-import type { NotificationEvent, NotificationLocale } from './types';
-
-const events: NotificationEvent[] = [
-  'expense_added','expense_updated','expense_deleted',
-  'settlement_recorded','settlement_updated','settlement_deleted',
-  'member_joined','member_left','member_added_self',
-];
-const locales: NotificationLocale[] = ['en','he'];
 
 const sampleParams = {
   actor_name: 'Dana',
@@ -229,18 +361,32 @@ const sampleParams = {
 };
 
 describe('renderNotification', () => {
-  for (const event of events) {
-    for (const locale of locales) {
-      it(`${event} / ${locale}`, () => {
-        expect(renderNotification(event, sampleParams, locale)).toMatchSnapshot();
-      });
-    }
-  }
+  it('en interpolation includes actor, group, amount', () => {
+    const r = renderNotification('expense_added', sampleParams, 'en');
+    expect(r.title).toContain('Dana');
+    expect(r.title).toContain('Apartment');
+    expect(r.body).toContain('Pizza');
+    expect(r.body).toContain('₪150.00');
+  });
+
+  it('he interpolation includes actor, group, amount', () => {
+    const r = renderNotification('expense_added', sampleParams, 'he');
+    expect(r.title).toContain('Dana');
+    expect(r.title).toContain('Apartment');
+    expect(r.body).toContain('₪150.00');
+  });
 
   it('falls back to en for unknown locale', () => {
     const en = renderNotification('expense_added', sampleParams, 'en');
     const xx = renderNotification('expense_added', sampleParams, 'xx' as never);
     expect(xx).toEqual(en);
+  });
+
+  it('renders gracefully when optional params are missing', () => {
+    const r = renderNotification('member_joined', { actor_name: 'A', group_name: 'G' } as never, 'en');
+    expect(r.title).toContain('A');
+    expect(r.title).toContain('G');
+    expect(r.body).toBe('');
   });
 });
 ```
@@ -248,7 +394,7 @@ describe('renderNotification', () => {
 - [ ] **Step 5: Run tests, expect green**
 
 Run: `cd cost-share-app/packages/shared && npx jest src/notifications/content.test.ts`
-Expected: 19 tests pass (18 snapshots + 1 fallback).
+Expected: 4 tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -260,6 +406,8 @@ git commit -m "feat(shared): notification types + i18n content templates"
 ---
 
 ### Task 2: DB migration — schema (tables, enums, RLS, RPCs)
+
+> **Council revisions:** B4 (Realtime publication). B5 (kill switch via GUC). M3 (tighten notif_update_own). Add `idx_notif_push_retry`. Extensions only if pg_cron/pg_net are confirmed available (otherwise gate Task 20).
 
 **Files:**
 - Create: `cost-share-app/supabase/notifications.sql`
@@ -275,6 +423,10 @@ git commit -m "feat(shared): notification types + i18n content templates"
 -- ============================================================================
 
 BEGIN;
+
+-- Kill switch (B5): every fanout_* function early-returns when this is 'false'.
+-- Set via:  ALTER DATABASE postgres SET app.notifications_enabled = 'true';
+-- (read-back uses current_setting('app.notifications_enabled', true) which returns null when unset)
 
 -- ---------- Enums ----------
 DO $$ BEGIN
@@ -332,6 +484,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notif_inbox ON notifications(recipient_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(recipient_user_id) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_notif_push_queue ON notifications(push_status, created_at) WHERE push_status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_notif_push_retry ON notifications(push_status, push_attempts, created_at) WHERE push_status IN ('failed','sending');
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_notif_dedup ON notifications(recipient_user_id, dedup_key) WHERE dedup_key IS NOT NULL;
 
 -- ---------- notification_preferences ----------
@@ -369,6 +522,32 @@ CREATE POLICY notif_select_own ON notifications FOR SELECT USING (recipient_user
 CREATE POLICY notif_update_own ON notifications FOR UPDATE USING (recipient_user_id = auth.uid()) WITH CHECK (recipient_user_id = auth.uid());
 CREATE POLICY notif_delete_own ON notifications FOR DELETE USING (recipient_user_id = auth.uid());
 -- (no INSERT policy → blocked for anon/authenticated; service_role bypasses)
+
+-- M3: column-level guard — recipients may only flip read_at; everything else is owner-only.
+CREATE OR REPLACE FUNCTION notif_block_non_read_updates() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF current_setting('role', true) = 'service_role' THEN RETURN NEW; END IF;
+  IF NEW.recipient_user_id IS DISTINCT FROM OLD.recipient_user_id
+     OR NEW.actor_user_id    IS DISTINCT FROM OLD.actor_user_id
+     OR NEW.category         IS DISTINCT FROM OLD.category
+     OR NEW.event_type       IS DISTINCT FROM OLD.event_type
+     OR NEW.group_id         IS DISTINCT FROM OLD.group_id
+     OR NEW.entity_type      IS DISTINCT FROM OLD.entity_type
+     OR NEW.entity_id        IS DISTINCT FROM OLD.entity_id
+     OR NEW.params           IS DISTINCT FROM OLD.params
+     OR NEW.push_status      IS DISTINCT FROM OLD.push_status
+     OR NEW.push_attempts    IS DISTINCT FROM OLD.push_attempts
+     OR NEW.dedup_key        IS DISTINCT FROM OLD.dedup_key THEN
+    RAISE EXCEPTION 'recipients may only update read_at';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS tr_notif_block_non_read_updates ON notifications;
+CREATE TRIGGER tr_notif_block_non_read_updates BEFORE UPDATE ON notifications
+FOR EACH ROW EXECUTE FUNCTION notif_block_non_read_updates();
+
+-- B4: Realtime publication — required for postgres_changes broadcasts to the mobile inbox.
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 
 -- preferences: own only
 CREATE POLICY prefs_own ON notification_preferences FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
@@ -507,7 +686,9 @@ git commit -m "feat(db): notifications schema + RLS + user-facing RPCs"
 
 ### Task 3: DB — fanout SQL functions + triggers (one event at a time)
 
-Implement and ship `expense_added` end-to-end first to prove the pattern before fanning out to all 9 events.
+> **Council revisions:** C1 (REVOKE EXECUTE FROM PUBLIC on every function). C3 (statement-level trigger with transition tables). B5 (kill-switch early-return in every fanout). Lock down `_notif_*` helpers.
+
+Implement and ship `expense_added` end-to-end first to prove the pattern before fanning out to all 9 events. **Per S1, Phase 1 stops here** — Tasks 10/11/12 (other events) move to Phase 2.
 
 **Files:**
 - Modify: `cost-share-app/supabase/notifications.sql` (append)
@@ -519,14 +700,22 @@ Append to `notifications.sql`:
 ```sql
 CREATE OR REPLACE FUNCTION _notif_actor_name(p_user_id uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public AS $$
+SET search_path = public, extensions AS $$
   SELECT name FROM profiles WHERE id = p_user_id;
 $$;
+REVOKE EXECUTE ON FUNCTION _notif_actor_name(uuid) FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION _notif_group_name(p_group_id uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public AS $$
+SET search_path = public, extensions AS $$
   SELECT name FROM groups WHERE id = p_group_id;
+$$;
+REVOKE EXECUTE ON FUNCTION _notif_group_name(uuid) FROM PUBLIC, anon, authenticated;
+
+-- B5 kill-switch helper:
+CREATE OR REPLACE FUNCTION _notif_enabled() RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(current_setting('app.notifications_enabled', true)::boolean, true);
 $$;
 ```
 
@@ -539,6 +728,7 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, extensions AS $$
 DECLARE v_exp expenses%ROWTYPE; v_actor_name text; v_group_name text; v_rec record;
 BEGIN
+  IF NOT _notif_enabled() THEN RETURN; END IF;
   SELECT * INTO v_exp FROM expenses WHERE id = p_expense_id;
   IF NOT FOUND OR p_actor IS NULL THEN RETURN; END IF;
 
@@ -578,32 +768,37 @@ BEGIN
     ON CONFLICT (recipient_user_id, dedup_key) DO NOTHING;
   END LOOP;
 END $$;
+REVOKE EXECUTE ON FUNCTION fanout_expense_added(uuid, uuid) FROM PUBLIC, anon, authenticated;
 ```
 
 Note: `expenses.description` is the existing column (not `title`).
 
-- [ ] **Step 3: Trigger function — defer fanout to end of statement**
+- [ ] **Step 3: Trigger function — STATEMENT-level via transition tables (C3)**
+
+The trigger MUST fire once per multi-row INSERT, not once per split. A multi-row `INSERT INTO expense_splits VALUES (...), (...)` from the client lets later splits be invisible to the snapshot of a per-row trigger executing on split #1, and produces N× redundant fanout work.
 
 ```sql
-CREATE OR REPLACE FUNCTION trg_after_expense_splits_insert()
+CREATE OR REPLACE FUNCTION trg_after_expense_splits_insert_stmt()
 RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE v_actor uuid;
+DECLARE v_expense_id uuid; v_actor uuid;
 BEGIN
-  -- Actor is whoever holds the current auth session
-  v_actor := COALESCE(auth.uid(), (SELECT created_by FROM expenses WHERE id = NEW.expense_id));
-  PERFORM fanout_expense_added(NEW.expense_id, v_actor);
-  RETURN NEW;
+  FOR v_expense_id IN SELECT DISTINCT expense_id FROM new_splits LOOP
+    SELECT COALESCE(auth.uid(), e.created_by) INTO v_actor
+    FROM expenses e WHERE e.id = v_expense_id;
+    IF v_actor IS NULL THEN CONTINUE; END IF;
+    PERFORM fanout_expense_added(v_expense_id, v_actor);
+  END LOOP;
+  RETURN NULL;
 END $$;
 
--- Fire once per expense, not once per split: use a statement-level trigger via transition table
--- We use a per-row trigger with the dedup_key to ensure idempotence.
 DROP TRIGGER IF EXISTS tr_expense_splits_insert ON expense_splits;
 CREATE TRIGGER tr_expense_splits_insert
 AFTER INSERT ON expense_splits
-FOR EACH ROW EXECUTE FUNCTION trg_after_expense_splits_insert();
+REFERENCING NEW TABLE AS new_splits
+FOR EACH STATEMENT EXECUTE FUNCTION trg_after_expense_splits_insert_stmt();
 ```
 
-Rationale: the trigger fires on `expense_splits` (the leaf write), not `expenses`, so splits are already present when fanout reads them. `dedup_key` makes the per-row trigger idempotent across multiple splits for one expense.
+Rationale: statement-level + `REFERENCING NEW TABLE` gives the fanout function a complete view of all splits inserted in this statement. `dedup_key` is still the safety net against any future ad-hoc multiple-INSERTs for the same expense.
 
 - [ ] **Step 4: Apply migration**
 
@@ -634,10 +829,14 @@ git commit -m "feat(db): fanout_expense_added + trigger on expense_splits insert
 
 ### Task 4: Edge Function `send-push` (skeleton + happy path)
 
+> **Council revisions:** C2 (webhook auth — `WEBHOOK_SHARED_SECRET`). C4 (CAS claim step before Expo POST, `push_attempts + 1` not constant `1`). C5 (extract `handle()` into `send-push/handler.ts` so `retry-push` can call via fetch — no cross-function import). B3 (`@cost-share/shared` not `@kupa/shared`; vendor-copy or import-map). M5 (Zod payload validation). Add `requireEnv()` helper.
+
 **Files:**
 - Create: `cost-share-app/supabase/functions/send-push/deno.json`
 - Create: `cost-share-app/supabase/functions/send-push/expo.ts`
-- Create: `cost-share-app/supabase/functions/send-push/index.ts`
+- Create: `cost-share-app/supabase/functions/send-push/handler.ts` — exports `handle()` (no `Deno.serve`)
+- Create: `cost-share-app/supabase/functions/send-push/index.ts` — wraps `handle()` in `Deno.serve` + webhook auth
+- Create: `cost-share-app/supabase/functions/send-push/content.ts` — vendor-copy of `packages/shared/src/notifications/content.ts` (B3 — Deno can't resolve workspace package)
 - Create: `cost-share-app/supabase/functions/send-push/index.test.ts`
 
 - [ ] **Step 1: deno.json**
@@ -700,35 +899,53 @@ export async function sendExpoPush(
 }
 ```
 
-- [ ] **Step 3: index.ts — webhook handler**
+- [ ] **Step 3: handler.ts + index.ts — webhook handler with auth, CAS claim, vendored content lib**
+
+`handler.ts` (exports `handle()`, no `Deno.serve`):
 
 ```typescript
 import { createClient, SupabaseClient } from 'supabase';
-import { renderNotification, EVENT_TO_CATEGORY } from '@kupa/shared/notifications';
-import type { NotificationEvent, NotificationLocale, NotificationParams } from '@kupa/shared/notifications';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { renderNotification } from './content.ts'; // vendor copy of shared/notifications/content.ts
+import type { NotificationEvent, NotificationLocale, NotificationParams } from './content.ts';
 import { sendExpoPush, ExpoMessage, ExpoTicket } from './expo.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+function requireEnv(name: string): string {
+  const v = Deno.env.get(name);
+  if (!v) throw new Error(`missing env var: ${name}`);
+  return v;
+}
+
+const SUPABASE_URL = requireEnv('SUPABASE_URL');
+const SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 const EXPO_ACCESS_TOKEN = Deno.env.get('EXPO_ACCESS_TOKEN') ?? undefined;
 
-interface NotificationRow {
-  id: string;
-  recipient_user_id: string;
-  category: 'friendships' | 'expenses' | 'transfers';
-  event_type: NotificationEvent;
-  group_id: string | null;
-  entity_type: string | null;
-  entity_id: string | null;
-  params: NotificationParams;
-  push_status: string;
-}
+const NotificationRowSchema = z.object({
+  id: z.string().uuid(),
+  recipient_user_id: z.string().uuid(),
+  category: z.enum(['friendships','expenses','transfers']),
+  event_type: z.enum([
+    'expense_added','expense_updated','expense_deleted',
+    'settlement_recorded','settlement_updated','settlement_deleted',
+    'member_joined','member_left','member_added_self',
+  ]),
+  group_id: z.string().uuid().nullable(),
+  entity_type: z.string().nullable(),
+  entity_id: z.string().uuid().nullable(),
+  params: z.record(z.any()),
+  push_status: z.string(),
+  push_attempts: z.number().int().nonnegative().default(0),
+}).passthrough();
 
-interface WebhookPayload {
-  type: 'INSERT';
-  table: 'notifications';
-  record: NotificationRow;
-}
+const WebhookPayloadSchema = z.object({
+  type: z.literal('INSERT'),
+  table: z.literal('notifications'),
+  schema: z.string().optional(),
+  record: NotificationRowSchema,
+});
+
+type NotificationRow = z.infer<typeof NotificationRowSchema>;
+type WebhookPayload = z.infer<typeof WebhookPayloadSchema>;
 
 function buildDeepLink(row: NotificationRow): string {
   if (row.entity_type === 'expense' && row.group_id && row.entity_id)
@@ -741,7 +958,22 @@ function buildDeepLink(row: NotificationRow): string {
 
 export async function handle(payload: WebhookPayload, sb: SupabaseClient): Promise<{ status: number }> {
   const row = payload.record;
-  if (row.push_status !== 'pending') return { status: 200 };
+  if (row.push_status !== 'pending' && row.push_status !== 'failed') return { status: 200 };
+
+  // C4: Atomic claim — only one execution should proceed past this point per row.
+  const { data: claimed, error: claimErr } = await sb
+    .from('notifications')
+    .update({
+      push_status: 'sending',
+      push_attempts: (row.push_attempts ?? 0) + 1,
+      push_last_attempt: new Date().toISOString(),
+    })
+    .eq('id', row.id)
+    .in('push_status', ['pending', 'failed'])
+    .select('id')
+    .maybeSingle();
+  if (claimErr) throw new Error(`claim: ${claimErr.message}`);
+  if (!claimed) return { status: 200 }; // someone else claimed it / already done
 
   // Tokens
   const { data: tokens, error: tErr } = await sb
@@ -794,8 +1026,6 @@ export async function handle(payload: WebhookPayload, sb: SupabaseClient): Promi
   if (err) {
     await sb.from('notifications').update({
       push_status: 'failed',
-      push_attempts: 1,
-      push_last_attempt: new Date().toISOString(),
       push_error: err,
     }).eq('id', row.id);
     return { status: 200 };
@@ -815,24 +1045,57 @@ export async function handle(payload: WebhookPayload, sb: SupabaseClient): Promi
 
   await sb.from('notifications').update(
     allOk
-      ? { push_status: 'sent', push_sent_at: new Date().toISOString(), push_last_attempt: new Date().toISOString() }
+      ? { push_status: 'sent', push_sent_at: new Date().toISOString() }
       : allBadToken
-      ? { push_status: 'unsubscribed', push_last_attempt: new Date().toISOString() }
-      : { push_status: 'failed', push_attempts: 1, push_last_attempt: new Date().toISOString(), push_error: 'partial_failure' }
+      ? { push_status: 'unsubscribed' }
+      : { push_status: 'failed', push_error: 'partial_failure' }
   ).eq('id', row.id);
 
   return { status: 200 };
 }
+```
+
+`index.ts` — webhook entrypoint with auth (C2):
+
+```typescript
+import { createClient } from 'supabase';
+import { handle } from './handler.ts';
+import { WebhookPayloadSchema } from './handler.ts'; // re-export from handler.ts
+
+function constantTimeEq(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SHARED_SECRET') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 Deno.serve(async (req) => {
+  // C2: authenticate webhook
+  const auth = req.headers.get('authorization') ?? '';
+  if (!constantTimeEq(auth, `Bearer ${WEBHOOK_SECRET}`)) {
+    return new Response('unauthorized', { status: 401 });
+  }
+
   try {
-    const payload = (await req.json()) as WebhookPayload;
-    const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-    const out = await handle(payload, sb);
+    const raw = await req.json();
+    const parsed = WebhookPayloadSchema.safeParse(raw);
+    if (!parsed.success) {
+      console.error('send-push payload invalid', parsed.error.flatten());
+      return new Response('bad payload', { status: 400 });
+    }
+    const sb = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
+    );
+    const out = await handle(parsed.data, sb);
     return new Response('ok', { status: out.status });
   } catch (e) {
-    console.error('send-push error', e);
-    return new Response('ok', { status: 200 }); // never trigger webhook retry — retry job owns recovery
+    console.error('send-push error', { stage: 'handle', err: String(e) });
+    // 200 to prevent webhook retry storms — retry-push (Task 20) owns recovery for stuck rows.
+    return new Response('ok', { status: 200 });
   }
 });
 ```
@@ -899,11 +1162,12 @@ Use `mcp__supabase__deploy_edge_function` with name `send-push` and the index.ts
 
 - [ ] **Step 6: Set secrets**
 
-Run (user does this manually):
+Generate a webhook secret first (any random hex string, NOT the service role key — keep them separate so the webhook can be rotated without rotating the service role):
 ```bash
-supabase secrets set EXPO_ACCESS_TOKEN=<token>
+openssl rand -hex 32   # capture output as WEBHOOK_SHARED_SECRET
+supabase secrets set WEBHOOK_SHARED_SECRET=<random-hex>
+supabase secrets set EXPO_ACCESS_TOKEN=<token>   # optional for dev
 ```
-For initial dev, omit — Expo allows unauthenticated push for small volumes.
 
 - [ ] **Step 7: Configure Database Webhook**
 
@@ -912,9 +1176,9 @@ In Supabase Dashboard → Database → Webhooks → New webhook:
 - Table: `notifications`
 - Events: `INSERT`
 - URL: `https://<project>.supabase.co/functions/v1/send-push`
-- HTTP Headers: `Authorization: Bearer <service-role-key>`
+- HTTP Headers: `Authorization: Bearer <WEBHOOK_SHARED_SECRET>` — **must match** the secret set in Step 6. Mismatch returns 401 and `notifications` stay stuck in `pending`.
 
-Document this in `docs/SSOT/SETUP.md` if it exists, or in the README.
+Document the webhook secret + URL configuration in `docs/SSOT/SETUP.md`.
 
 - [ ] **Step 8: Commit**
 
@@ -935,7 +1199,7 @@ git commit -m "feat(edge): send-push Edge Function + Expo client + tests"
 
 ```bash
 cd cost-share-app/apps/mobile
-npx expo install expo-notifications expo-device
+npx expo install expo-notifications expo-device expo-haptics   # M6: haptics needed by InAppToast
 ```
 
 - [ ] **Step 2: app.json plugin config**
@@ -980,8 +1244,11 @@ git commit -m "chore(mobile): install expo-notifications + configure plugin"
 
 ### Task 6: Mobile — `notifications.service.ts` + tests
 
+> **Council revisions:** M8 (wire `unregisterCurrentDevice` into `auth.service.ts:signOut` so the token is removed BEFORE the auth session is dropped, while RLS still allows the delete).
+
 **Files:**
 - Create: `cost-share-app/apps/mobile/services/notifications.service.ts`
+- Modify: `cost-share-app/apps/mobile/services/auth.service.ts` — call `unregisterCurrentDevice(token)` in `signOut` BEFORE `supabase.auth.signOut()`. Token comes from `Notifications.getExpoPushTokenAsync` cached value or AsyncStorage if you keep one.
 - Create: `cost-share-app/apps/mobile/__tests__/services/notifications.service.test.ts`
 
 - [ ] **Step 1: Service**
@@ -1147,6 +1414,8 @@ git commit -m "feat(mobile): notifications service — token registration + chan
 ---
 
 ### Task 7: Mobile — `SoftPromptModal` + `useSoftPushPrompt` hook
+
+> **Council revisions:** S2 (drop the 7-day AsyncStorage cooldown for v1 — keep the modal simple). Trigger once when permission is `undetermined` and the user has at least one group; record an in-memory flag for this session.
 
 **Files:**
 - Create: `cost-share-app/apps/mobile/components/notifications/SoftPromptModal.tsx`
@@ -1398,9 +1667,34 @@ git commit -m "feat(mobile): register push token on launch + soft prompt after f
 
 ### Task 9: End-to-end smoke (Phase 1 close-out)
 
+> **Council revisions:** S4 (SQL-only smoke as primary fallback for solo dev; two-device is gold-standard but optional). M11 (record PII-on-lockscreen as accepted risk in TECHNICAL_DEBT.md).
+
 **Files:** — (verification only)
 
-- [ ] **Step 1: Two-device test**
+- [ ] **Step 1: SQL smoke (primary, no devices required)**
+
+In Supabase SQL editor (logged-in as a test user):
+```sql
+-- Use an existing expense from a group you're in. Replace UUIDs.
+SELECT id, group_id, created_by FROM expenses ORDER BY created_at DESC LIMIT 1;
+
+-- Inspect what fanout produced for non-actor split members:
+SELECT id, recipient_user_id, event_type, push_status, push_attempts, push_error, params
+FROM notifications
+WHERE event_type = 'expense_added'
+ORDER BY created_at DESC LIMIT 5;
+
+-- Confirm dedup_key keeps a second insert from creating duplicates:
+SELECT count(*) FROM notifications
+WHERE recipient_user_id = '<some-recipient>' AND dedup_key = 'expense:<expense-id>:added';
+-- Expect exactly 1.
+
+-- Confirm send-push has run (Database Webhook):
+SELECT id, push_status, push_sent_at FROM notifications WHERE event_type = 'expense_added' ORDER BY created_at DESC LIMIT 5;
+-- Expect push_status='sent' on rows where the recipient has device_tokens.
+```
+
+- [ ] **Step 2: Two-device test (optional, recommended before production)**
 
 On Device A (user A) and Device B (user B), both members of group G with an expense_splits row containing both:
 1. Both apps launched and tokens registered.
@@ -1408,9 +1702,14 @@ On Device A (user A) and Device B (user B), both members of group G with an expe
 3. Confirm: a `notifications` row exists for user B; `push_status` transitions to `sent`.
 4. Device B receives a push notification with title/body matching `renderNotification` output.
 
-- [ ] **Step 2: Phase-1 retrospective commit (docs)**
+- [ ] **Step 3: Phase-1 retrospective commit (docs)**
 
-If gaps found (asset placeholders, missing projectId, etc.), record them in `docs/SSOT/TECHNICAL_DEBT.md` under a new "Notifications follow-ups" subsection.
+Record in `docs/SSOT/TECHNICAL_DEBT.md` under a new "Notifications follow-ups" subsection:
+- **PII on lock screen (M11):** push body includes `expense_title`, `amount`, `currency`, `actor_name`, `payer_name`, `payee_name`. These traverse Expo/APNs/FCM and render on iOS/Android lock screens by default. Accepted risk for v1; future: opt-in to show details, generic body by default.
+- **Token rotation:** no `addPushTokenListener` wired — tokens that rotate silently break push until next launch.
+- **`device_tokens` retention:** disabled tokens are never purged. Future: monthly job deleting `WHERE disabled_at < now() - interval '90 days'`.
+- **Maestro:** flows live in Phase 3, not Phase 1.
+- Any other gaps surfaced during execution (asset placeholders, missing projectId, etc.).
 
 ```bash
 git add docs/SSOT/TECHNICAL_DEBT.md
@@ -1423,9 +1722,21 @@ git commit -m "docs: notifications Phase 1 follow-ups"
 
 ### Task 10: Fanout — `expense_updated`, `expense_deleted`
 
+> **Council revisions:** C1 (REVOKE EXECUTE on every new function). B5 (kill-switch early-return). M1 (semantic dedup hash — not raw epoch).
+
 **Files:**
 - Modify: `cost-share-app/supabase/notifications.sql` (append)
 - Modify: `cost-share-app/supabase/schema.sql`
+
+Apply these patterns to EVERY function in this Task:
+- First statement inside the function body: `IF NOT _notif_enabled() THEN RETURN; END IF;`
+- After the function definition: `REVOKE EXECUTE ON FUNCTION <name>(<args>) FROM PUBLIC, anon, authenticated;`
+- Replace dedup_key suffixes of the form `extract(epoch from updated_at)::text` with:
+  ```sql
+  extract(epoch from updated_at)::bigint::text || '-' ||
+  md5(coalesce(description,'') || amount::text || coalesce(currency,''))
+  ```
+  (substitute the relevant payload fields for settlement/member events) — this prevents sub-second back-to-back edits from collapsing to the same key.
 
 - [ ] **Step 1: Add functions**
 
@@ -1564,7 +1875,18 @@ git commit -m "feat(db): fanout for expense_updated + expense_deleted"
 
 ### Task 11: Fanout — `settlement_recorded`, `settlement_updated`, `settlement_deleted`
 
-**Files:** same as Task 10.
+> **Council revisions:** C1 (REVOKE EXECUTE). B5 (kill-switch). M1 (semantic dedup hash). M4 (add `currency` to no-op guard — currency-only edits silently miss notifications otherwise).
+
+**Files:** same as Task 10. The no-op short-circuit in `trg_after_settlement_update` must also include `currency`:
+```sql
+IF NEW.deleted_at IS NULL AND OLD.deleted_at IS NULL
+   AND NEW.amount IS NOT DISTINCT FROM OLD.amount
+   AND NEW.currency IS NOT DISTINCT FROM OLD.currency   -- M4
+   AND NEW.from_user_id IS NOT DISTINCT FROM OLD.from_user_id
+   AND NEW.to_user_id IS NOT DISTINCT FROM OLD.to_user_id THEN
+  RETURN NEW;
+END IF;
+```
 
 - [ ] **Step 1: Add fanout function for settlements (single helper)**
 
@@ -1658,6 +1980,22 @@ git commit -m "feat(db): fanout for settlement events"
 ---
 
 ### Task 12: Fanout — `member_joined`, `member_left`, `member_added_self`
+
+> **Council revisions:** C1 (REVOKE EXECUTE). B5 (kill-switch). M2 (NULL `auth.uid()` handling — admin-add must NOT degrade to self-join). Replace the silent `auth.uid() IS NULL` branch in `trg_after_group_members_insert` with explicit handling:
+> ```sql
+> v_actor := auth.uid();
+> IF v_actor IS NULL THEN
+>   -- Server-side / cron / backfill writes: skip fanout rather than mis-classify.
+>   -- Admin-add paths MUST use a SECURITY DEFINER RPC that sets app.actor_id explicitly.
+>   RETURN NEW;
+> END IF;
+> IF v_actor = NEW.user_id THEN
+>   PERFORM fanout_member_event(NEW.group_id, NEW.user_id, NEW.user_id, 'member_joined');
+> ELSE
+>   PERFORM fanout_member_event(NEW.group_id, NEW.user_id, v_actor, 'member_added_self');
+>   PERFORM fanout_member_event(NEW.group_id, NEW.user_id, v_actor, 'member_joined');
+> END IF;
+> ```
 
 **Files:** same.
 
@@ -1771,8 +2109,31 @@ git commit -m "feat(db): fanout for group_members events"
 
 ### Task 13: SQL test script for all fanout functions
 
+> **Council revisions:** Add a "negative" assertion block that confirms `anon` and `authenticated` roles CANNOT call any `fanout_*` function (C1 verification). Without this regression test, a future migration could re-grant EXECUTE to PUBLIC silently.
+
 **Files:**
 - Create: `cost-share-app/supabase/tests/notifications.sql`
+
+Add a top-of-file block that asserts the REVOKE pattern survived:
+```sql
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.proname
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname LIKE 'fanout\_%' ESCAPE '\'
+  LOOP
+    IF has_function_privilege('authenticated', 'public.' || r.proname || '()', 'EXECUTE')
+       OR has_function_privilege('anon',          'public.' || r.proname || '()', 'EXECUTE') THEN
+      RAISE EXCEPTION 'C1 regression: % is callable by anon/authenticated', r.proname;
+    END IF;
+  END LOOP;
+END $$;
+```
+(The bare-`()` probe may return false for functions with required args — fine, the goal is to catch accidental wide grants on no-arg overloads; for the full check, fetch the actual argument signature from `pg_proc` first.)
 
 - [ ] **Step 1: Write script**
 
@@ -1879,6 +2240,8 @@ git commit -m "test(db): notification fanout assertion script"
 
 ### Task 14: Mobile — `useNotifications` hook (Realtime + React Query)
 
+> **Council revisions:** C6 (use Zustand `useAppStore`, not non-existent `useAuth`). B3 (`@cost-share/shared`). M7 (update badge on mark-read). M10 (`supabase.removeChannel`, not `ch.unsubscribe()`). C8 (Realtime updates cache only — no toast here).
+
 **Files:**
 - Create: `cost-share-app/apps/mobile/hooks/useNotifications.ts`
 - Create: `cost-share-app/apps/mobile/__tests__/hooks/useNotifications.test.ts`
@@ -1889,9 +2252,9 @@ git commit -m "test(db): notification fanout assertion script"
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { useAuth } from './useAuth';
+import { useAppStore } from '../store';
 import { setAppBadge } from '../services/notifications.service';
-import type { NotificationRow } from '@kupa/shared/notifications';
+import type { NotificationRow } from '@cost-share/shared';
 
 const KEY_LIST = ['notifications', 'list'] as const;
 const KEY_UNREAD = ['notifications', 'unreadCount'] as const;
@@ -1934,9 +2297,12 @@ export function useMarkRead() {
       const { error } = await supabase.rpc('mark_notification_read', { p_notification_id: id });
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY_UNREAD });
-      qc.invalidateQueries({ queryKey: KEY_LIST });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: KEY_UNREAD });
+      await qc.invalidateQueries({ queryKey: KEY_LIST });
+      // M7: keep OS badge in sync
+      const remaining = qc.getQueryData<number>(KEY_UNREAD) ?? 0;
+      void setAppBadge(remaining);
     },
   });
 }
@@ -1948,15 +2314,17 @@ export function useMarkAllRead() {
       const { error } = await supabase.rpc('mark_all_notifications_read');
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY_UNREAD });
-      qc.invalidateQueries({ queryKey: KEY_LIST });
+    onSuccess: async () => {
+      qc.setQueryData<number>(KEY_UNREAD, 0);
+      void setAppBadge(0); // M7
+      await qc.invalidateQueries({ queryKey: KEY_LIST });
     },
   });
 }
 
+// C8: Realtime updates the cache only. The push listener (Task 15/16) owns the toast.
 export function useNotificationsRealtime() {
-  const { userId } = useAuth();
+  const userId = useAppStore((s) => s.session?.user.id);
   const qc = useQueryClient();
   useEffect(() => {
     if (!userId) return;
@@ -1972,7 +2340,7 @@ export function useNotificationsRealtime() {
         void setAppBadge((qc.getQueryData<number>(KEY_UNREAD) ?? 0));
       })
       .subscribe();
-    return () => { void ch.unsubscribe(); };
+    return () => { void supabase.removeChannel(ch); }; // M10
   }, [userId, qc]);
 }
 ```
@@ -2040,6 +2408,8 @@ git commit -m "feat(mobile): useNotifications hooks + Realtime subscription"
 
 ### Task 15: Mobile — InAppToast component + foreground handler
 
+> **Council revisions:** M6 (install `expo-haptics` in Task 5). C8 (dedup notification_id LRU vs Realtime). M9 (`useRtlLayout()`, not `I18nManager.isRTL`). B3 (`@cost-share/shared`).
+
 **Files:**
 - Create: `cost-share-app/apps/mobile/components/notifications/InAppToast.tsx`
 - Modify: `cost-share-app/apps/mobile/services/notifications.service.ts`
@@ -2072,10 +2442,11 @@ export function installForegroundHandler() {
 ```typescript
 import React from 'react';
 import Toast, { BaseToastProps } from 'react-native-toast-message';
-import { View, Text, Pressable, StyleSheet, I18nManager } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import type { NotificationEvent, NotificationParams } from '@kupa/shared/notifications';
-import { renderNotification } from '@kupa/shared/notifications';
+import type { NotificationEvent, NotificationParams } from '@cost-share/shared';
+import { renderNotification } from '@cost-share/shared';
+import { useRtlLayout } from '../../hooks/useRtlLayout';
 import i18n from '../../i18n';
 
 export interface InAppToastPayload {
@@ -2085,7 +2456,19 @@ export interface InAppToastPayload {
   onPress?: (id: string) => void;
 }
 
+// C8: LRU dedup against Realtime/push double-fire.
+const seen = new Map<string, number>();
+const DEDUP_WINDOW_MS = 30_000;
+function alreadyShown(id: string): boolean {
+  const now = Date.now();
+  for (const [k, t] of seen) if (now - t > DEDUP_WINDOW_MS) seen.delete(k);
+  if (seen.has(id)) return true;
+  seen.set(id, now);
+  return false;
+}
+
 export function showInAppToast(payload: InAppToastPayload) {
+  if (alreadyShown(payload.notification_id)) return;
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   Toast.show({
     type: 'kupa',
@@ -2097,11 +2480,12 @@ export function showInAppToast(payload: InAppToastPayload) {
 }
 
 const KupaToast: React.FC<BaseToastProps & { props: InAppToastPayload }> = ({ props }) => {
+  const { isRTL } = useRtlLayout(); // M9
   const locale = (i18n.language as 'en' | 'he') ?? 'en';
   const { title, body } = renderNotification(props.event_type, props.params, locale);
   return (
     <Pressable testID="inapp-toast" onPress={() => props.onPress?.(props.notification_id)}>
-      <View style={[styles.card, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.card, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.avatar} />
         <View style={styles.body}>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
@@ -2172,16 +2556,19 @@ git commit -m "feat(mobile): InAppToast component + foreground notification hand
 
 ### Task 16: Mobile — `notificationRouting.ts` + listeners wiring
 
+> **Council revisions:** C7 (nested-navigator format — every leaf wrapped in the parent tab `Groups`). C9 (wire `navigationRef` into `<NavigationContainer>` + cold-start replay queue). B3 (`@cost-share/shared`). Mirror `deepLinks.service.ts:95–98` patterns.
+
 **Files:**
 - Create: `cost-share-app/apps/mobile/services/notificationRouting.ts`
 - Create: `cost-share-app/apps/mobile/__tests__/services/notificationRouting.test.ts`
 - Modify: `cost-share-app/apps/mobile/navigation/AppNavigator.tsx`
+- Modify: `cost-share-app/apps/mobile/App.tsx` (attach `navigationRef` to `<NavigationContainer ref={navigationRef}>`)
 
-- [ ] **Step 1: Routing module**
+- [ ] **Step 1: Routing module — nested format (C7)**
 
 ```typescript
 import type { NavigationContainerRef } from '@react-navigation/native';
-import type { NotificationEvent } from '@kupa/shared/notifications';
+import type { NotificationEvent } from '@cost-share/shared';
 
 export interface RouteIntent {
   event_type: NotificationEvent;
@@ -2190,31 +2577,46 @@ export interface RouteIntent {
   group_id: string | null;
 }
 
-export function resolveRoute(intent: RouteIntent): { screen: string; params: Record<string, unknown> } {
+type NestedAction = { screen: 'Groups'; params: { screen: string; params: Record<string, unknown> } };
+
+export function resolveRoute(intent: RouteIntent): NestedAction {
   switch (intent.event_type) {
     case 'expense_added':
     case 'expense_updated':
     case 'expense_deleted':
-      return { screen: 'ExpenseDetail', params: { groupId: intent.group_id, expenseId: intent.entity_id } };
+      return { screen: 'Groups', params: { screen: 'ExpenseDetail', params: { groupId: intent.group_id, expenseId: intent.entity_id } } };
     case 'settlement_recorded':
     case 'settlement_updated':
     case 'settlement_deleted':
-      return { screen: 'Balances', params: { groupId: intent.group_id } };
+      return { screen: 'Groups', params: { screen: 'Balances', params: { groupId: intent.group_id } } };
     case 'member_joined':
     case 'member_left':
-      return { screen: 'GroupMembers', params: { groupId: intent.group_id } };
+      return { screen: 'Groups', params: { screen: 'GroupMembers', params: { groupId: intent.group_id } } };
     case 'member_added_self':
-      return { screen: 'GroupDetail', params: { groupId: intent.group_id } };
+      return { screen: 'Groups', params: { screen: 'GroupDetail', params: { groupId: intent.group_id } } };
   }
 }
+
+// C9: cold-start queue — if navigationRef isn't ready yet, hold the intent and replay.
+let pendingIntent: RouteIntent | null = null;
 
 export function navigateToIntent(
   navRef: NavigationContainerRef<Record<string, object | undefined>> | null,
   intent: RouteIntent,
 ): void {
-  if (!navRef?.isReady()) return;
+  if (!navRef?.isReady()) {
+    pendingIntent = intent;
+    return;
+  }
   const route = resolveRoute(intent);
   navRef.navigate(route.screen as never, route.params as never);
+}
+
+export function flushPendingIntent(navRef: NavigationContainerRef<Record<string, object | undefined>> | null): void {
+  if (!pendingIntent || !navRef?.isReady()) return;
+  const intent = pendingIntent;
+  pendingIntent = null;
+  navigateToIntent(navRef, intent);
 }
 ```
 
@@ -2257,12 +2659,27 @@ function NotificationsBridge() {
   useNotificationsRealtime();
   useEffect(() => {
     installForegroundHandler();
+
+    // C9: replay any notification that opened the app from cold-start
+    (async () => {
+      const last = await Notifications.getLastNotificationResponseAsync();
+      if (last?.notification.request.content.data) {
+        const data = last.notification.request.content.data as any;
+        if (data?.notification_id) {
+          void supabase.rpc('mark_notification_read', { p_notification_id: data.notification_id });
+        }
+        navigateToIntent(navigationRef.current, data);
+      }
+      // also flush any intent queued while navigation wasn't ready
+      flushPendingIntent(navigationRef.current);
+    })();
+
     const sub1 = Notifications.addNotificationReceivedListener((n) => {
       const data = n.request.content.data as any;
       showInAppToast({
         notification_id: data.notification_id,
         event_type: data.event_type,
-        params: n.request.content.body ? { /* fallback */ } : (data.params ?? {}),
+        params: data.params ?? {},
         onPress: (id) => {
           void supabase.rpc('mark_notification_read', { p_notification_id: id });
           navigateToIntent(navigationRef.current, data);
@@ -2278,6 +2695,15 @@ function NotificationsBridge() {
   }, []);
   return null;
 }
+```
+
+In `App.tsx`, wire the ref:
+```typescript
+import { navigationRef } from './navigation/navigationRef';
+// ...
+<NavigationContainer ref={navigationRef}>
+  {/* existing tree */}
+</NavigationContainer>
 ```
 
 Place `<NotificationsBridge />` near the root of the authenticated tree.
@@ -2700,34 +3126,84 @@ git commit -m "feat(mobile): notification settings + per-group mute toggle"
 
 ### Task 20: Edge Function `retry-push` + pg_cron
 
+> **Council revisions:** B2 (verify `pg_cron` + `pg_net` are installed; otherwise gate this task on a Supabase plan upgrade). C2 (webhook auth — `retry-push` is also a public endpoint by default). C5 (no cross-function imports — call `send-push` via authenticated `fetch` per row). Sweep rows stuck in `sending` for too long.
+
 **Files:**
 - Create: `cost-share-app/supabase/functions/retry-push/index.ts`
 - Create: `cost-share-app/supabase/functions/retry-push/deno.json`
 - Create: `cost-share-app/supabase/functions/retry-push/index.test.ts`
 - Modify: `cost-share-app/supabase/notifications.sql`
 
-- [ ] **Step 1: index.ts**
+- [ ] **Step 0: Confirm `pg_cron` and `pg_net` are available, then enable**
+
+Via Supabase MCP `list_extensions` / Dashboard → Database → Extensions: both extensions must have `installed_version` non-null. If they aren't installed (current state at plan time), either upgrade plan / contact Supabase, or DEFER this entire task and rely on the user reopening the app to retry pushes (acceptable for v1 MVP).
+
+If installing now, append to migration:
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_net  WITH SCHEMA extensions;
+```
+
+- [ ] **Step 1: index.ts — call send-push via authenticated fetch (C5)**
 
 ```typescript
 import { createClient } from 'supabase';
-import { handle as sendPush } from '../send-push/index.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+function requireEnv(n: string): string {
+  const v = Deno.env.get(n);
+  if (!v) throw new Error(`missing env var: ${n}`);
+  return v;
+}
 
-Deno.serve(async () => {
+const SUPABASE_URL = requireEnv('SUPABASE_URL');
+const SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SHARED_SECRET') ?? SERVICE_ROLE_KEY;
+const SEND_PUSH_URL = `${SUPABASE_URL}/functions/v1/send-push`;
+const MAX_ATTEMPTS = 3;
+const STUCK_SENDING_MIN = 5;
+
+function constantTimeEq(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+Deno.serve(async (req) => {
+  // C2: cron-trigger requests should carry the same webhook secret
+  const auth = req.headers.get('authorization') ?? '';
+  if (!constantTimeEq(auth, `Bearer ${WEBHOOK_SECRET}`)) {
+    return new Response('unauthorized', { status: 401 });
+  }
+
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+  // Unstick rows that have been in `sending` longer than STUCK_SENDING_MIN — the handler crashed mid-flight.
+  await sb.from('notifications')
+    .update({ push_status: 'failed', push_error: 'stuck_in_sending' })
+    .eq('push_status', 'sending')
+    .lt('push_last_attempt', new Date(Date.now() - STUCK_SENDING_MIN * 60_000).toISOString());
+
   const { data, error } = await sb.from('notifications')
     .select('*')
     .eq('push_status', 'failed')
-    .lt('push_attempts', 3)
+    .lt('push_attempts', MAX_ATTEMPTS)
     .gt('created_at', new Date(Date.now() - 24 * 3600_000).toISOString())
     .limit(100);
   if (error) return new Response('err', { status: 500 });
+
+  let retried = 0;
   for (const row of data ?? []) {
-    await sendPush({ type: 'INSERT', table: 'notifications', record: { ...row, push_status: 'pending' } } as never, sb);
+    const r = await fetch(SEND_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${WEBHOOK_SECRET}`,
+      },
+      body: JSON.stringify({ type: 'INSERT', table: 'notifications', record: row }),
+    });
+    if (r.ok) retried++;
   }
-  return new Response(`retried ${data?.length ?? 0}`, { status: 200 });
+  return new Response(`retried ${retried}/${data?.length ?? 0}`, { status: 200 });
 });
 ```
 
@@ -2739,17 +3215,22 @@ Cover: empty result → 200, calls send-push handler for each row.
 
 Append to `notifications.sql`:
 ```sql
--- Requires pg_cron + pg_net extensions enabled
+-- Requires pg_cron + pg_net extensions installed (verified in Step 0).
 SELECT cron.schedule(
   'retry-push',
   '*/5 * * * *',
   $$ SELECT net.http_post(
        url := current_setting('app.retry_push_url'),
-       headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.service_role_key'))
+       headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.webhook_secret'))
      ); $$
 );
 ```
-Document the two `ALTER DATABASE postgres SET app.retry_push_url = '...'` commands in `docs/SSOT/SETUP.md`.
+Document in `docs/SSOT/SETUP.md`:
+```sql
+ALTER DATABASE postgres SET app.retry_push_url = 'https://<project>.supabase.co/functions/v1/retry-push';
+ALTER DATABASE postgres SET app.webhook_secret = '<WEBHOOK_SHARED_SECRET>';
+```
+**Do not store the service role key in `app.webhook_secret`** — use the dedicated `WEBHOOK_SHARED_SECRET` so rotation doesn't require rotating the service role.
 
 - [ ] **Step 4: Deploy + commit**
 
@@ -2857,9 +3338,17 @@ git commit -m "test(e2e): Maestro flows for notifications"
 
 ### Task 23: Performance pass + feature flag
 
-- [ ] **Step 1: Add `notifications_enabled` flag**
+> **Council revisions:** B5 moved the kill-switch into Task 2 (it ships in Phase 1). What remains here is the perf pass + verifying the switch works as expected.
 
-Server side: a constant in a config table, or env var read by the Edge Function. Mobile: gated read from `profiles.notifications_enabled` (column added in this task with default `true`).
+- [ ] **Step 1: Verify kill switch end-to-end**
+
+The DB-level switch is `app.notifications_enabled` (see Task 2). To kill all fanout:
+```sql
+ALTER DATABASE postgres SET app.notifications_enabled = 'false';
+-- Existing sessions keep their cached GUC; new sessions pick up immediately.
+-- For an instant kill, force-reload via SELECT pg_reload_conf() or restart the connection pool.
+```
+Sanity-check by inserting an expense and confirming zero `notifications` rows are produced.
 
 - [ ] **Step 2: Review query plans**
 
@@ -2904,3 +3393,27 @@ git commit -m "feat(notifications): feature flag + perf-pass index validation"
 ---
 
 **Plan complete and saved to `docs/superpowers/plans/2026-05-20-notifications.md`.**
+
+---
+
+## Council Revision Log (2026-05-20)
+
+The plan was reviewed by a 5-agent council. Their findings produced the revisions documented in the "Council Review Revisions (2026-05-20)" section near the top of this file, plus per-task callouts in:
+
+- **Task 1** — package name `@cost-share/shared`; 4 targeted tests instead of 18 snapshots.
+- **Task 2** — kill-switch GUC; `idx_notif_push_retry`; column-level update guard (`notif_block_non_read_updates`); `ALTER PUBLICATION supabase_realtime ADD TABLE notifications`.
+- **Task 3** — STATEMENT-level trigger via transition tables; REVOKE EXECUTE on all fanout/_notif_ functions; kill-switch early-return; Phase 1 stops here (`expense_added` only).
+- **Task 4** — webhook auth via `WEBHOOK_SHARED_SECRET`; CAS claim step; `push_attempts + 1` (not constant `1`); Zod payload validation; handler/server split (`handler.ts` exports `handle`, `index.ts` is the entrypoint); vendored `content.ts` for Deno; `requireEnv()`.
+- **Task 5** — install `expo-haptics`.
+- **Task 6** — wire `unregisterCurrentDevice` into `auth.service.ts:signOut` BEFORE the auth session is dropped.
+- **Task 7** — drop AsyncStorage cooldown; in-memory session flag.
+- **Task 9** — SQL smoke as primary; two-device gold-standard but optional; record PII-on-lockscreen + token rotation gaps in `TECHNICAL_DEBT.md`.
+- **Tasks 10/11/12** — REVOKE EXECUTE; kill-switch; semantic dedup_key hash; `currency` in no-op guard; explicit NULL `auth.uid()` handling (no silent self-join misclassification).
+- **Task 13** — assertion that `anon`/`authenticated` cannot call `fanout_*`.
+- **Task 14** — `useAppStore` (not non-existent `useAuth`); `@cost-share/shared`; OS badge update on mark-read; `supabase.removeChannel`.
+- **Task 15** — `expo-haptics` install; LRU dedup against Realtime+push double-fire; `useRtlLayout()` instead of `I18nManager.isRTL`.
+- **Task 16** — nested-navigator routing (`{ screen: 'Groups', params: { screen: '...', params: {} } }`); cold-start replay via `getLastNotificationResponseAsync`; pending-intent queue; `<NavigationContainer ref={navigationRef}>` wired in `App.tsx`.
+- **Task 20** — `pg_cron`/`pg_net` verification gate; webhook auth; cross-function call via authenticated `fetch` (no Deno import across functions); stuck-in-`sending` sweep; dedicated `app.webhook_secret` GUC instead of service-role key.
+- **Task 23** — kill-switch moved to Phase 1; this task keeps perf pass.
+
+**Pre-flight blockers (B1–B5) MUST be resolved before starting Task 1**, especially EAS projectId and the package-name rename (`@cost-share/shared`).
