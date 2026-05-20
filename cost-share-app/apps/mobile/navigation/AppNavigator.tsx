@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useRtlLayout } from '../hooks/useRtlLayout';
 import { AppIcon, AppIconName } from '../components/AppIcon';
 import { APP_BRAND_TITLE, colors } from '../theme';
+import { useInviteRedemption } from '../hooks/useInviteRedemption';
 
 function HeaderBackButton({ onPress }: { onPress: () => void }) {
     return (
@@ -209,6 +210,7 @@ function ProfileStack() {
 
 export function AppNavigator() {
     const { t } = useTranslation();
+    useInviteRedemption();
 
     return (
         <Tab.Navigator
