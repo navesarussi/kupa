@@ -31,7 +31,7 @@ import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
 import { useGroupSettlementsRealtime } from '../../hooks/useGroupSettlementsRealtime';
 import { useAppStore } from '../../store';
 import { colors } from '../../theme';
-import { getAvatarUrl, getDisplayName } from '../../lib/userDisplay';
+import { getAvatarUrl, getAvatarUrlForMember, getDisplayName } from '../../lib/userDisplay';
 
 interface SortedDebts {
     youInvolved: PairwiseDebt[];
@@ -148,11 +148,8 @@ export function SettleUpListScreen() {
     );
 
     const memberAvatarFor = useCallback(
-        (userId: string): string | undefined => {
-            const m = memberLites.find(x => x.userId === userId);
-            if (!m) return undefined;
-            return getAvatarUrl({ id: m.userId, name: m.displayName, avatarUrl: m.avatarUrl, isActive: m.isActive }) ?? undefined;
-        },
+        (userId: string): string | undefined =>
+            getAvatarUrlForMember(memberLites.find(x => x.userId === userId)),
         [memberLites],
     );
 

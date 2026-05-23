@@ -8,7 +8,7 @@ import { AppIcon } from '../AppIcon';
 import { colors } from '../../theme';
 import { formatCurrencyAmount } from '../../lib/currencyDisplay';
 import { useRtlLayout, rtlRowStyle, rtlTrailingAlign } from '../../hooks/useRtlLayout';
-import { getAvatarUrl, getDisplayName } from '../../lib/userDisplay';
+import { getAvatarUrlForFriend, getDisplayNameForFriend } from '../../lib/userDisplay';
 
 interface Props {
     friend: FriendBalance;
@@ -23,10 +23,8 @@ export function FriendBalanceRow({ friend, display, onPress, testID, isLast = fa
     const isRtl = useRtlLayout();
     const isSettled = Math.abs(display.netBalance) < 0.01;
     const owesYou = display.netBalance > 0;
-    // FriendBalance uses `userId` (no `id`); adapt to UserLike for the display helpers.
-    const friendLike = { id: friend.userId, name: friend.name, avatarUrl: friend.avatarUrl };
-    const friendName = getDisplayName(friendLike, t);
-    const friendAvatar = getAvatarUrl(friendLike) ?? undefined;
+    const friendName = getDisplayNameForFriend(friend, t);
+    const friendAvatar = getAvatarUrlForFriend(friend);
 
     const amountText = isSettled
         ? formatCurrencyAmount(0, display.currency)
