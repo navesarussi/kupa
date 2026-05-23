@@ -27,9 +27,10 @@ export interface FetchRecentActivityOptions {
 interface ProfileSummary {
     name: string;
     avatarUrl?: string;
+    isActive?: boolean;
 }
 
-type ProfileEmbedRow = { name?: string; avatar_url?: string | null };
+type ProfileEmbedRow = { name?: string; avatar_url?: string | null; is_active?: boolean | null };
 type ProfileEmbed = ProfileEmbedRow | ProfileEmbedRow[] | null;
 
 async function getUserGroupIds(userId: string): Promise<string[]> {
@@ -48,6 +49,7 @@ function profileFromEmbed(embed: ProfileEmbed): ProfileSummary | undefined {
     return {
         name: row.name,
         avatarUrl: row.avatar_url ?? undefined,
+        isActive: row.is_active ?? undefined,
     };
 }
 
@@ -55,7 +57,7 @@ function buildExpenseQuery(groupIds: string[], limit: number, before?: string) {
     let query = supabase
         .from('expenses')
         .select(
-            'id, group_id, description, amount, currency, expense_date, created_at, created_by, creator:profiles!created_by(name, avatar_url)',
+            'id, group_id, description, amount, currency, expense_date, created_at, created_by, creator:profiles!created_by(name, avatar_url, is_active)',
         )
         .in('group_id', groupIds)
         .eq('is_deleted', false)
@@ -97,6 +99,7 @@ async function fetchProfiles(userIds: string[]): Promise<Map<string, ProfileSumm
         profiles.set(row.id as string, {
             name: row.name as string,
             avatarUrl: (row.avatar_url as string | null) ?? undefined,
+            isActive: (row.is_active as boolean | null) ?? undefined,
         });
     }
     return profiles;
@@ -106,7 +109,7 @@ function buildSettlementQuery(groupIds: string[], limit: number, before?: string
     let query = supabase
         .from('settlements')
         .select(
-            'id, group_id, amount, currency, settlement_date, created_at, from_user_id, to_user_id, from_user:profiles!from_user_id(name, avatar_url), to_user:profiles!to_user_id(name, avatar_url)',
+            'id, group_id, amount, currency, settlement_date, created_at, from_user_id, to_user_id, from_user:profiles!from_user_id(name, avatar_url, is_active), to_user:profiles!to_user_id(name, avatar_url, is_active)',
         )
         .in('group_id', groupIds)
         .is('deleted_at', null)

@@ -451,7 +451,7 @@ export async function getGroupSimplifiedDebtsByCurrency(
         if (userIds.length > 0) {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, name, is_active')
+                .select('id, name')
                 .in('id', userIds);
             if (error) throw error;
             (data ?? []).forEach(p => nameById.set(p.id as string, p.name as string));
