@@ -70,6 +70,7 @@ export const useAppStore = create<AppState>((set) => ({
                     inviteToken: '',
                     defaultCurrency: DEFAULT_CURRENCY,
                     language: 'en' as const,
+                    isActive: true,
                     createdAt: new Date(session.user.created_at),
                     updatedAt: new Date(session.user.updated_at ?? session.user.created_at),
                 }

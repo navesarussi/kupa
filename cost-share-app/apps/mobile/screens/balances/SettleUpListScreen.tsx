@@ -76,6 +76,7 @@ export function SettleUpListScreen() {
                 userId: m.id,
                 displayName: m.name,
                 avatarUrl: m.avatarUrl,
+                isActive: m.isActive,
             })),
         [members],
     );

@@ -92,6 +92,7 @@ beforeEach(() => {
             inviteToken: 'me123456789',
             defaultCurrency: 'USD',
             language: 'en',
+            isActive: true,
             createdAt: new Date(),
             updatedAt: new Date(),
         },

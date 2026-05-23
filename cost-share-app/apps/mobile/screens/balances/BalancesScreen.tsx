@@ -92,6 +92,7 @@ export function BalancesScreen() {
                 userId: u.id,
                 displayName: u.name,
                 avatarUrl: u.avatarUrl,
+                isActive: u.isActive,
             })),
         [allUsers],
     );

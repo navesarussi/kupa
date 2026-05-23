@@ -141,6 +141,7 @@ export function GroupDetailScreen() {
             userId: u.id,
             displayName: u.name ?? u.id.slice(0, 8),
             avatarUrl: u.avatarUrl,
+            isActive: u.isActive,
         }));
     }, [storeGroup?.members, groupUsers]);
     const [feedParticipants, setFeedParticipants] = useState<
