@@ -9,6 +9,11 @@ jest.mock('../../../i18n', () => ({
     changeLanguage: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../lib/openMailto', () => ({
+    getSupportEmail: () => 'sarussilberg@gmail.com',
+    openSupportContact: jest.fn(),
+}));
+
 import { LoginScreen } from '../../../screens/auth/LoginScreen';
 import { signInWithGoogle } from '../../../services/auth.service';
 import { changeLanguage } from '../../../i18n';
@@ -67,5 +72,26 @@ describe('LoginScreen', () => {
                 expect.objectContaining({ type: 'error' })
             )
         );
+    });
+
+    it('shows account-deleted Alert when signInWithGoogle returns code=account_deleted', async () => {
+        mockSignIn.mockResolvedValueOnce({
+            error: { code: 'account_deleted', message: 'email_was_deleted' },
+        });
+
+        const alertSpy = jest
+            .spyOn(require('react-native').Alert, 'alert')
+            .mockImplementation(() => {});
+
+        const { getByText } = render(<LoginScreen />);
+        fireEvent.press(getByText('auth.signInWithGoogle'));
+
+        await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+        const [titleArg] = alertSpy.mock.calls[0];
+        expect(titleArg).toBe('deleteAccount.reSignupBlockedTitle');
+        expect(Toast.show).not.toHaveBeenCalled();
+
+        alertSpy.mockRestore();
     });
 });

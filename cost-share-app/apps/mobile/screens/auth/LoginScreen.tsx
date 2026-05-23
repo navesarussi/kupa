@@ -19,6 +19,7 @@ import { Button } from '../../components/Button';
 import Toast from 'react-native-toast-message';
 import { changeLanguage } from '../../i18n';
 import { useAppStore } from '../../store';
+import { getSupportEmail, openSupportContact } from '../../lib/openMailto';
 
 export function LoginScreen() {
     const { t } = useTranslation();
@@ -45,6 +46,22 @@ export function LoginScreen() {
         try {
             const { error } = await signInWithGoogle();
             if (error) {
+                if (error.code === 'account_deleted') {
+                    Alert.alert(
+                        t('deleteAccount.reSignupBlockedTitle'),
+                        t('deleteAccount.reSignupBlocked', { email: getSupportEmail() }),
+                        [
+                            { text: t('common.close'), style: 'cancel' },
+                            {
+                                text: t('common.openMail'),
+                                onPress: () => {
+                                    void openSupportContact();
+                                },
+                            },
+                        ],
+                    );
+                    return;
+                }
                 Toast.show({
                     type: 'error',
                     text1: t('auth.signInError'),
