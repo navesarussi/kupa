@@ -28,6 +28,7 @@ export interface User {
     inviteToken: string;  // 10-char URL-safe slug; the value used to build https://kupa.pro/i/<token>
     defaultCurrency: string;  // 'USD', 'ILS', 'EUR', etc.
     language: Language;
+    isActive: boolean;  // Soft-delete flag — false means the user has deleted their account
     createdAt: Date;
     updatedAt: Date;
 }
@@ -445,6 +446,7 @@ export interface GroupMemberLite {
     userId: string;
     displayName: string;
     avatarUrl?: string;
+    isActive: boolean;
 }
 
 /** Group enriched with its active members. */
