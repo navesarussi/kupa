@@ -88,6 +88,31 @@ describe('auth.service', () => {
         });
     });
 
+    describe('handleAuthRedirectUrl — discriminated errors', () => {
+        it('returns code=account_deleted when underlying error mentions email_was_deleted', async () => {
+            mockExchangeCodeForSession.mockResolvedValue({
+                error: { message: 'AuthApiError: email_was_deleted' },
+            });
+
+            const { error } = await handleAuthRedirectUrl('com.kupa.mobile://auth/callback?code=abc');
+
+            expect(error).not.toBeNull();
+            expect(error!.code).toBe('account_deleted');
+            expect(error!.message).toContain('email_was_deleted');
+        });
+
+        it('returns code=generic for any other error', async () => {
+            mockExchangeCodeForSession.mockResolvedValue({
+                error: { message: 'invalid_grant' },
+            });
+
+            const { error } = await handleAuthRedirectUrl('com.kupa.mobile://auth/callback?code=xyz');
+
+            expect(error?.code).toBe('generic');
+            expect(error?.message).toContain('invalid_grant');
+        });
+    });
+
     describe('signInWithGoogle', () => {
         it('requests account selection and uses an ephemeral browser session', async () => {
             mockSignInWithOAuth.mockResolvedValue({

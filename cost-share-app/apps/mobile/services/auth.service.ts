@@ -9,6 +9,23 @@ import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
+export type AuthErrorCode = 'account_deleted' | 'generic';
+
+export interface AuthError {
+  code: AuthErrorCode;
+  message: string;
+}
+
+function toAuthError(err: unknown): AuthError {
+  const message = err instanceof Error ? err.message
+    : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as { message: unknown }).message)
+    : String(err ?? 'Unknown error');
+  if (message.includes('email_was_deleted')) {
+    return { code: 'account_deleted', message };
+  }
+  return { code: 'generic', message };
+}
+
 const NATIVE_SCHEME = 'com.kupa.mobile';
 const AUTH_CALLBACK_PATH = 'auth/callback';
 
@@ -56,13 +73,13 @@ function resolveWebOAuthRedirectUri(): string {
 }
 
 /** Prevents double exchange when WebBrowser and Linking both deliver the same callback URL. */
-const exchangeByCode = new Map<string, Promise<{ error: Error | null }>>();
+const exchangeByCode = new Map<string, Promise<{ error: AuthError | null }>>();
 
-export async function handleAuthRedirectUrl(url: string): Promise<{ error: Error | null }> {
+export async function handleAuthRedirectUrl(url: string): Promise<{ error: AuthError | null }> {
   const { params, errorCode } = QueryParams.getQueryParams(url);
 
   if (errorCode) {
-    return { error: new Error(errorCode) };
+    return { error: toAuthError(errorCode) };
   }
 
   const { code, access_token, refresh_token } = params;
@@ -73,7 +90,7 @@ export async function handleAuthRedirectUrl(url: string): Promise<{ error: Error
 
     const exchange = (async () => {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
-      return { error };
+      return { error: error ? toAuthError(error) : null };
     })();
 
     exchangeByCode.set(code, exchange);
@@ -86,10 +103,10 @@ export async function handleAuthRedirectUrl(url: string): Promise<{ error: Error
 
   if (access_token && refresh_token) {
     const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-    return { error };
+    return { error: error ? toAuthError(error) : null };
   }
 
-  return { error: new Error(`No auth params in redirect URL: ${url}`) };
+  return { error: toAuthError(`No auth params in redirect URL: ${url}`) };
 }
 
 export function getAuthRedirectUri(): string {
@@ -109,7 +126,7 @@ const googleOAuthOptions = (oauthRedirect: string) => ({
   queryParams: { prompt: 'select_account' },
 });
 
-export async function signInWithGoogle(): Promise<{ error: Error | null }> {
+export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
   const oauthRedirect = getAuthRedirectUri();
 
   if (Platform.OS === 'web') {
@@ -117,7 +134,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
       provider: 'google',
       options: googleOAuthOptions(oauthRedirect),
     });
-    return { error };
+    return { error: error ? toAuthError(error) : null };
   }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -129,7 +146,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   });
 
   if (error || !data.url) {
-    return { error: error ?? new Error('No OAuth URL returned') };
+    return { error: toAuthError(error ?? new Error('No OAuth URL returned')) };
   }
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirect, {
@@ -137,11 +154,11 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   });
 
   if (result.type === 'cancel' || result.type === 'dismiss') {
-    return { error: new Error('Sign-in was cancelled') };
+    return { error: toAuthError('Sign-in was cancelled') };
   }
 
   if (result.type !== 'success') {
-    return { error: new Error(`Unexpected browser result: ${result.type}`) };
+    return { error: toAuthError(`Unexpected browser result: ${result.type}`) };
   }
 
   return handleAuthRedirectUrl(result.url);

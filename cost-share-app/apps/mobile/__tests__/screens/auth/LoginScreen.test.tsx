@@ -59,7 +59,7 @@ describe('LoginScreen', () => {
     });
 
     it('shows an error toast when sign-in fails', async () => {
-        mockSignIn.mockResolvedValueOnce({ error: new Error('boom') });
+        mockSignIn.mockResolvedValueOnce({ error: { code: 'generic', message: 'boom' } });
         const { getByText } = render(<LoginScreen />);
         fireEvent.press(getByText('auth.signInWithGoogle'));
         await waitFor(() =>
