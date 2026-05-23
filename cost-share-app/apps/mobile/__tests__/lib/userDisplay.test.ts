@@ -1,4 +1,12 @@
-import { getAvatarUrl, getDisplayName, isDeleted } from '../../lib/userDisplay';
+import {
+    getAvatarUrl,
+    getAvatarUrlForFriend,
+    getAvatarUrlForMember,
+    getDisplayName,
+    getDisplayNameForFriend,
+    getDisplayNameForMember,
+    isDeleted,
+} from '../../lib/userDisplay';
 
 const t = (key: string) => key;
 
@@ -50,5 +58,46 @@ describe('userDisplay', () => {
         it('returns null when avatarUrl missing', () => {
             expect(getAvatarUrl({ id: 'x' })).toBeNull();
         });
+    });
+
+    describe('Member helpers', () => {
+        const member = { userId: 'u1', displayName: 'Alice', avatarUrl: 'x', isActive: true };
+        const deletedMember = { ...member, isActive: false };
+
+        it('getDisplayNameForMember returns name for active member', () =>
+            expect(getDisplayNameForMember(member, t as any)).toBe('Alice'));
+        it('getDisplayNameForMember returns deletedUser for inactive', () =>
+            expect(getDisplayNameForMember(deletedMember, t as any)).toBe('common.deletedUser'));
+        it('getDisplayNameForMember returns deletedUser for null', () =>
+            expect(getDisplayNameForMember(null, t as any)).toBe('common.deletedUser'));
+        it('getDisplayNameForMember returns deletedUser for undefined', () =>
+            expect(getDisplayNameForMember(undefined, t as any)).toBe('common.deletedUser'));
+        it('getAvatarUrlForMember returns avatar for active member', () =>
+            expect(getAvatarUrlForMember(member)).toBe('x'));
+        it('getAvatarUrlForMember returns undefined for inactive', () =>
+            expect(getAvatarUrlForMember(deletedMember)).toBeUndefined());
+        it('getAvatarUrlForMember returns undefined for null', () =>
+            expect(getAvatarUrlForMember(null)).toBeUndefined());
+    });
+
+    describe('Friend helpers', () => {
+        const friend = { userId: 'u1', name: 'Bob', avatarUrl: 'y', isActive: true };
+        const deletedFriend = { ...friend, isActive: false };
+
+        it('getDisplayNameForFriend returns name for active friend', () =>
+            expect(getDisplayNameForFriend(friend, t as any)).toBe('Bob'));
+        it('getDisplayNameForFriend returns deletedUser for inactive', () =>
+            expect(getDisplayNameForFriend(deletedFriend, t as any)).toBe('common.deletedUser'));
+        it('getDisplayNameForFriend returns deletedUser for null', () =>
+            expect(getDisplayNameForFriend(null, t as any)).toBe('common.deletedUser'));
+        it('getDisplayNameForFriend tolerates missing name/avatar fields', () =>
+            expect(getDisplayNameForFriend({ userId: 'u', isActive: true }, t as any))
+                .toBe('common.unknownUser'));
+        it('getAvatarUrlForFriend returns avatar for active friend', () =>
+            expect(getAvatarUrlForFriend(friend)).toBe('y'));
+        it('getAvatarUrlForFriend returns undefined for inactive', () =>
+            expect(getAvatarUrlForFriend(deletedFriend)).toBeUndefined());
+        it('getAvatarUrlForFriend returns undefined for null', () =>
+            expect(getAvatarUrlForFriend(null)).toBeUndefined());
     });
 });

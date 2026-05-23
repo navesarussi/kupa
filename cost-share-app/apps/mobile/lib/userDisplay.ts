@@ -26,3 +26,39 @@ export function getAvatarUrl(user: UserLike): string | null {
     if (!user || user.isActive === false) return null;
     return user.avatarUrl ?? null;
 }
+
+/** Display helpers for `GroupMemberLite` (shape: {userId, displayName, avatarUrl, isActive}). */
+export interface MemberLike {
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    isActive: boolean;
+}
+
+export function getDisplayNameForMember(m: MemberLike | undefined | null, t: TFunction): string {
+    if (!m) return t('common.deletedUser');
+    return getDisplayName({ id: m.userId, name: m.displayName, avatarUrl: m.avatarUrl, isActive: m.isActive }, t);
+}
+
+export function getAvatarUrlForMember(m: MemberLike | undefined | null): string | undefined {
+    if (!m) return undefined;
+    return getAvatarUrl({ id: m.userId, name: m.displayName, avatarUrl: m.avatarUrl, isActive: m.isActive }) ?? undefined;
+}
+
+/** Display helpers for `FriendBalance` (shape: {userId, name, avatarUrl, isActive}). */
+export interface FriendLike {
+    userId: string;
+    name?: string | null;
+    avatarUrl?: string | null;
+    isActive: boolean;
+}
+
+export function getDisplayNameForFriend(f: FriendLike | undefined | null, t: TFunction): string {
+    if (!f) return t('common.deletedUser');
+    return getDisplayName({ id: f.userId, name: f.name ?? null, avatarUrl: f.avatarUrl ?? null, isActive: f.isActive }, t);
+}
+
+export function getAvatarUrlForFriend(f: FriendLike | undefined | null): string | undefined {
+    if (!f) return undefined;
+    return getAvatarUrl({ id: f.userId, name: f.name ?? null, avatarUrl: f.avatarUrl ?? null, isActive: f.isActive }) ?? undefined;
+}
