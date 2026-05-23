@@ -89,6 +89,7 @@ beforeEach(() => {
             id: 'me',
             email: 'me@x.com',
             name: 'Me',
+            inviteToken: 'me123456789',
             defaultCurrency: 'USD',
             language: 'en',
             createdAt: new Date(),

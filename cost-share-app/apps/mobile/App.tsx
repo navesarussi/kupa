@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Alert, View, ActivityIndicator, Platform } from 'react-native';
+import { Alert, LogBox, View, ActivityIndicator, Platform } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import Toast from 'react-native-toast-message';
@@ -10,7 +10,12 @@ import { AppNavigator } from './navigation/AppNavigator';
 import { LoginScreen } from './screens/auth/LoginScreen';
 import { initializeLanguage } from './i18n';
 import i18n from './i18n';
-import { hydrateAuthSession } from './lib/authSessionLifecycle';
+import {
+  clearStaleAuthSession,
+  hydrateAuthSession,
+  isInvalidRefreshTokenError,
+  setupSupabaseAuthAutoRefresh,
+} from './lib/authSessionLifecycle';
 import { supabase } from './lib/supabase';
 import { assertProfileActive } from './lib/auth';
 import { hydrateCurrentUserProfile } from './services/users.service';
@@ -20,6 +25,9 @@ import { colors } from './theme';
 import { RtlLayoutProvider } from './hooks/useRtlLayout';
 import './i18n';
 import './global.css';
+
+// Benign when a persisted session was revoked server-side (global sign-out, token rotation, etc.).
+LogBox.ignoreLogs([/Invalid Refresh Token/i, /Refresh Token Not Found/i]);
 
 // On web, frame the app in a phone-shaped column so mobile screens don't stretch across the browser.
 function WebFrame({ children }: { children: React.ReactNode }) {
@@ -96,8 +104,15 @@ export default function App() {
           void hydrateCurrentUserProfile(session.user.id);
           void guardSession();
         }
+        setupSupabaseAuthAutoRefresh();
       } catch (e) {
-        console.error('Init error:', e);
+        if (isInvalidRefreshTokenError(e)) {
+          await clearStaleAuthSession();
+          if (mounted) setSession(null);
+        } else {
+          console.error('Init error:', e);
+        }
+        setupSupabaseAuthAutoRefresh();
       } finally {
         if (mounted) setIsReady(true);
       }

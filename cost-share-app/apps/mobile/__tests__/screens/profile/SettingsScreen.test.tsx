@@ -20,18 +20,31 @@ jest.mock('../../../services/users.service', () => ({
     updateUser: jest.fn(),
 }));
 
+jest.mock('expo-clipboard', () => ({
+    setStringAsync: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../lib/openMailto', () => ({
+    getSupportEmail: jest.fn(() => 'sarussilberg@gmail.com'),
+    getSupportMailtoUrl: jest.fn(() => 'mailto:sarussilberg@gmail.com?subject=Kupa%20Support'),
+    openSupportContact: jest.fn().mockResolvedValue(undefined),
+    DEFAULT_SUPPORT_EMAIL: 'sarussilberg@gmail.com',
+}));
+
 import { SettingsScreen } from '../../../screens/profile/SettingsScreen';
 import { useAppStore } from '../../../store';
 import { updateUser } from '../../../services/users.service';
+import { openSupportContact } from '../../../lib/openMailto';
+
+const mockOpenSupportContact = openSupportContact as jest.MockedFunction<typeof openSupportContact>;
 
 const mockUpdateUser = updateUser as jest.MockedFunction<typeof updateUser>;
 
 let mockOpenURL: jest.SpyInstance;
-let mockCanOpen: jest.SpyInstance;
 
 beforeEach(() => {
     mockOpenURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    mockCanOpen = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    mockOpenSupportContact.mockReset();
+    mockOpenSupportContact.mockResolvedValue(undefined);
     mockUpdateUser.mockReset();
     mockUpdateUser.mockResolvedValue({ id: 'u1' } as any);
     useAppStore.setState({
@@ -42,7 +55,6 @@ beforeEach(() => {
 
 afterEach(() => {
     mockOpenURL.mockRestore();
-    mockCanOpen.mockRestore();
 });
 
 describe('SettingsScreen (grouped, no notifications)', () => {
@@ -54,19 +66,10 @@ describe('SettingsScreen (grouped, no notifications)', () => {
         expect(getByText('settings.account')).toBeTruthy();
     });
 
-    it('opens WhatsApp deeplink when canOpenURL is true', async () => {
-        const { getByText } = render(<SettingsScreen />);
-        fireEvent.press(getByText('settings.contactWhatsApp'));
-        await waitFor(() => expect(mockOpenURL).toHaveBeenCalled());
-        expect(mockOpenURL).toHaveBeenCalledWith('whatsapp://send?phone=972528616878');
-    });
-
-    it('falls back to wa.me when WhatsApp not installed', async () => {
-        mockCanOpen.mockResolvedValueOnce(false);
-        const { getByText } = render(<SettingsScreen />);
-        fireEvent.press(getByText('settings.contactWhatsApp'));
-        await waitFor(() => expect(mockOpenURL).toHaveBeenCalled());
-        expect(mockOpenURL).toHaveBeenCalledWith('https://wa.me/972528616878');
+    it('opens support contact when Contact us is pressed', async () => {
+        const { getByTestId } = render(<SettingsScreen />);
+        fireEvent.press(getByTestId('settings-contact-row'));
+        await waitFor(() => expect(mockOpenSupportContact).toHaveBeenCalled());
     });
 
     it('renders version footer', () => {

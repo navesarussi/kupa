@@ -1,5 +1,6 @@
 export const queryKeys = {
     dashboard: ['dashboard'] as const,
+    groups: ['groups'] as const,
     activity: ['activity'] as const,
     activityFeed: (groupIds: string[]) => ['activity', groupIds.join(',')] as const,
     groupUsers: (groupId: string) => ['groupUsers', groupId] as const,

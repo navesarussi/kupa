@@ -12,6 +12,7 @@ import { updateUser } from '../../services/users.service';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { SettingsSection } from '../../components/settings/SettingsSection';
 import { SettingsRow } from '../../components/settings/SettingsRow';
+import { ContactSupportRow } from '../../components/settings/ContactSupportRow';
 import { LegalSheet } from '../../components/settings/LegalSheet';
 import { LanguageSheet } from '../../components/settings/LanguageSheet';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
@@ -24,7 +25,6 @@ import { getCurrencyDisplayName } from '../../lib/currencyDisplay';
 import { InviteLinkBlock } from '../../components/InviteLinkBlock';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
-const WHATSAPP_NUMBER = (process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER || '+972528616878').replace(/[^\d]/g, '');
 const APP_STORE_URL = process.env.EXPO_PUBLIC_APP_STORE_URL;
 const PLAY_STORE_URL = process.env.EXPO_PUBLIC_PLAY_STORE_URL;
 
@@ -87,17 +87,6 @@ export function SettingsScreen() {
         if (url) await Linking.openURL(url);
     }, []);
 
-    const handleWhatsApp = useCallback(async () => {
-        const deepLink = `whatsapp://send?phone=${WHATSAPP_NUMBER}`;
-        const webLink = `https://wa.me/${WHATSAPP_NUMBER}`;
-        try {
-            const can = await Linking.canOpenURL(deepLink);
-            await Linking.openURL(can ? deepLink : webLink);
-        } catch {
-            Alert.alert(t('common.error'), t('settings.whatsappOpenFailed'));
-        }
-    }, [t]);
-
     const handleLogout = useCallback(async () => {
         setShowLogout(false);
         await signOut();
@@ -143,7 +132,7 @@ export function SettingsScreen() {
 
                 <SettingsSection title={t('settings.support')}>
                     <SettingsRow iconName="star-outline" label={t('settings.rateUs')} variant="chevron" onPress={handleRate} />
-                    <SettingsRow iconName="logo-whatsapp" label={t('settings.contactWhatsApp')} variant="chevron" onPress={handleWhatsApp} />
+                    <ContactSupportRow />
                 </SettingsSection>
 
                 <SettingsSection title={t('settings.legal')}>

@@ -24,7 +24,7 @@ export function FriendBalanceRow({ friend, display, onPress, testID, isLast = fa
     const owesYou = display.netBalance > 0;
 
     const amountText = isSettled
-        ? t('dashboard.settled')
+        ? formatCurrencyAmount(0, display.currency)
         : formatCurrencyAmount(Math.abs(display.netBalance), display.currency);
     const amountClass = isSettled ? 'text-slate-400' : owesYou ? 'text-emerald-600' : 'text-red-600';
     const subtitle = isSettled

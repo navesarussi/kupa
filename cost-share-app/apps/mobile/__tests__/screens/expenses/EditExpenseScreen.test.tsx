@@ -109,6 +109,31 @@ describe('AddExpenseScreen edit mode', () => {
         );
     });
 
+    it('sends equal splits without amounts when switching from unequal to equal', async () => {
+        mockGet.mockResolvedValue({
+            expense: { ...expense, amount: 100 },
+            splits: [
+                { id: 's1', expenseId: 'e1', userId: 'u1', amount: 60, createdAt: new Date() },
+                { id: 's2', expenseId: 'e1', userId: 'u2', amount: 40, createdAt: new Date() },
+            ],
+        });
+        mockUpdate.mockResolvedValueOnce({ ...expense, amount: 100 });
+
+        const { findByTestId, findByText } = renderWithQuery(<AddExpenseScreen />);
+        await findByTestId('split-type-unequal');
+        fireEvent.press(await findByTestId('split-type-equal'));
+        fireEvent.press(await findByText('common.save'));
+
+        await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+        expect(mockUpdate).toHaveBeenCalledWith(
+            'e1',
+            expect.objectContaining({
+                amount: 100,
+                splits: [{ userId: 'u1' }, { userId: 'u2' }],
+            }),
+        );
+    });
+
     it('does not show cancel-only button in edit mode', async () => {
         const { queryByText } = renderWithQuery(<AddExpenseScreen />);
         await waitFor(() => expect(mockGet).toHaveBeenCalled());

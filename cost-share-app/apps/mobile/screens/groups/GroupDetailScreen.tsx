@@ -26,6 +26,9 @@ import {
     GroupMemberLite,
     GroupMessage,
     Settlement,
+    calculateGroupTotalSpent,
+    calculateGroupTotalUnsettled,
+    sortCurrencyAmounts,
 } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { useLoading } from '../../hooks/useLoading';
@@ -184,6 +187,20 @@ export function GroupDetailScreen() {
         () => expenses.filter(e => e.groupId === groupId),
         [expenses, groupId],
     );
+
+    const heroStats = useMemo(() => {
+        const defaultCurrency = displayGroup?.defaultCurrency ?? 'USD';
+        return {
+            totalSpent: sortCurrencyAmounts(
+                calculateGroupTotalSpent(groupExpenses),
+                defaultCurrency,
+            ),
+            totalUnsettled: sortCurrencyAmounts(
+                calculateGroupTotalUnsettled(pairwiseDebts),
+                defaultCurrency,
+            ),
+        };
+    }, [groupExpenses, pairwiseDebts, displayGroup?.defaultCurrency]);
 
     const feedUserIds = useMemo(
         () => collectFeedUserIds(groupExpenses, messages, settlements),
@@ -573,6 +590,7 @@ export function GroupDetailScreen() {
                         <GroupHero
                             group={displayGroup}
                             memberCount={memberLites.length}
+                            stats={heroStats}
                             onBack={handleBack}
                             onMenu={handleOpenGroupMenu}
                             onShare={handleShare}

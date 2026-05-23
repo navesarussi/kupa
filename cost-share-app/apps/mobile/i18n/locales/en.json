@@ -159,6 +159,10 @@
             "youAreOwed": "You are owed {{amount}}",
             "youOwe": "You owe {{amount}}"
         },
+        "hero": {
+            "spentTogether": "Spent together",
+            "leftToSettle": "Left to settle"
+        },
         "card": {
             "matchedMembers": "incl. {{names}}",
             "settled": "Settled"
@@ -389,14 +393,16 @@
         "defaultCurrency": "Default Currency",
         "support": "Support",
         "rateUs": "Rate us",
-        "contactWhatsApp": "Contact us on WhatsApp",
+        "contactUs": "Contact us",
         "legal": "Legal",
         "terms": "Terms of Service",
         "privacy": "Privacy Policy",
         "account": "Account",
         "logout": "Log out",
         "version": "Version {{version}}",
-        "whatsappOpenFailed": "Could not open WhatsApp",
+        "emailOpenFailed": "Could not open email app",
+        "copyEmail": "Copy address",
+        "contactEmailCopied": "Email address copied",
         "deleteAccount": "Delete account"
     },
     "profile": {
@@ -499,7 +505,8 @@
         "notInvolved": "You're not in this debt"
     },
     "feed": {
-        "settlement": "{{from}} paid {{to}} {{amount}}"
+        "settlement": "{{from}} paid {{to}} {{amount}}",
+        "settlementRow": "{{from}} paid {{to}}"
     },
     "history": {
         "title": "History",

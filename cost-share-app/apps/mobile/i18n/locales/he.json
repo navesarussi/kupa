@@ -159,6 +159,10 @@
             "youAreOwed": "חייבים לך {{amount}}",
             "youOwe": "אתה חייב {{amount}}"
         },
+        "hero": {
+            "spentTogether": "הוציאו ביחד",
+            "leftToSettle": "נשאר לסגור"
+        },
         "card": {
             "matchedMembers": "כולל {{names}}",
             "settled": "מסודר"
@@ -391,14 +395,16 @@
         "defaultCurrency": "מטבע ברירת מחדל",
         "support": "תמיכה",
         "rateUs": "דרגו אותנו",
-        "contactWhatsApp": "פנו אלינו בוואטסאפ",
+        "contactUs": "צור קשר",
         "legal": "משפטי",
         "terms": "תנאי שירות",
         "privacy": "מדיניות פרטיות",
         "account": "חשבון",
         "logout": "התנתק",
         "version": "גרסה {{version}}",
-        "whatsappOpenFailed": "לא ניתן לפתוח את וואטסאפ",
+        "emailOpenFailed": "לא ניתן לפתוח את אפליקציית המייל",
+        "copyEmail": "העתק כתובת",
+        "contactEmailCopied": "כתובת המייל הועתקה",
         "deleteAccount": "מחק חשבון"
     },
     "profile": {
@@ -501,7 +507,8 @@
         "notInvolved": "אינך מעורב/ת בחוב הזה"
     },
     "feed": {
-        "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}"
+        "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}",
+        "settlementRow": "{{from}} שילם/ה ל-{{to}}"
     },
     "history": {
         "title": "היסטוריה",

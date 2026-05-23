@@ -1,35 +1,59 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
-import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { clearGroupFeedHydration } from '../lib/groupFeedCache';
+import { queryClient } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const NATIVE_SCHEME = 'com.kupa.mobile';
+const AUTH_CALLBACK_PATH = 'auth/callback';
+
 /**
- * Expo Go on iOS simulator often resolves Metro as `localhost`, which points at the
- * simulator itself — not the Mac running Metro. Use the LAN host from Expo config instead.
+ * Expo Go on a physical device often resolves Metro as `localhost`, which is unreachable
+ * from the phone. Prefer the LAN host from Expo config, and never use localhost on native.
  */
-function resolveOAuthRedirectUri(): string {
+function resolveNativeOAuthRedirectUri(): string {
   const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-  let uri = isExpoGo
-    ? Linking.createURL('auth/callback')
-    : Linking.createURL('auth/callback', { scheme: 'com.kupa.mobile' });
+  let uri = makeRedirectUri({
+    scheme: isExpoGo ? undefined : NATIVE_SCHEME,
+    path: AUTH_CALLBACK_PATH,
+    preferLocalhost: false,
+  });
 
   const hostUri = Constants.expoConfig?.hostUri;
   if (uri.includes('localhost') && hostUri && !hostUri.includes('localhost')) {
     uri = uri.replace(/localhost(?=:\d+)?/, hostUri.split(':')[0]);
   }
 
+  if (uri.includes('localhost')) {
+    uri = `${NATIVE_SCHEME}://${AUTH_CALLBACK_PATH}`;
+  }
+
   return uri;
 }
 
-const redirectTo = resolveOAuthRedirectUri();
+function resolveWebOAuthRedirectUri(): string {
+  const origin = globalThis.location?.origin;
+  if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    return `${origin}/${AUTH_CALLBACK_PATH}`;
+  }
 
-console.log('[Auth] redirectTo =', redirectTo);
+  const configured = process.env.EXPO_PUBLIC_WEB_APP_URL?.replace(/\/$/, '');
+  if (configured) {
+    return `${configured}/${AUTH_CALLBACK_PATH}`;
+  }
+
+  if (origin) {
+    return `${origin}/${AUTH_CALLBACK_PATH}`;
+  }
+
+  return `https://kupa.pro/${AUTH_CALLBACK_PATH}`;
+}
 
 /** Prevents double exchange when WebBrowser and Linking both deliver the same callback URL. */
 const exchangeByCode = new Map<string, Promise<{ error: Error | null }>>();
@@ -48,9 +72,6 @@ export async function handleAuthRedirectUrl(url: string): Promise<{ error: Error
     if (existing) return existing;
 
     const exchange = (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) return { error: null };
-
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       return { error };
     })();
@@ -72,17 +93,21 @@ export async function handleAuthRedirectUrl(url: string): Promise<{ error: Error
 }
 
 export function getAuthRedirectUri(): string {
-  if (Platform.OS === 'web' && typeof globalThis.location?.origin === 'string') {
-    return `${globalThis.location.origin}/auth/callback`;
-  }
-  return redirectTo;
+  return Platform.OS === 'web'
+    ? resolveWebOAuthRedirectUri()
+    : resolveNativeOAuthRedirectUri();
 }
 
 export function isAuthCallbackUrl(url: string): boolean {
-  if (!url.includes('auth/callback')) return false;
+  if (!url.includes(AUTH_CALLBACK_PATH)) return false;
   const { params } = QueryParams.getQueryParams(url);
   return Boolean(params.code || params.access_token || params.error || params.error_description);
 }
+
+const googleOAuthOptions = (oauthRedirect: string) => ({
+  redirectTo: oauthRedirect,
+  queryParams: { prompt: 'select_account' },
+});
 
 export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   const oauthRedirect = getAuthRedirectUri();
@@ -90,7 +115,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   if (Platform.OS === 'web') {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: oauthRedirect },
+      options: googleOAuthOptions(oauthRedirect),
     });
     return { error };
   }
@@ -98,7 +123,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: oauthRedirect,
+      ...googleOAuthOptions(oauthRedirect),
       skipBrowserRedirect: true,
     },
   });
@@ -107,10 +132,8 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
     return { error: error ?? new Error('No OAuth URL returned') };
   }
 
-  console.log('[Auth] OAuth URL redirect_to =', oauthRedirect);
-
   const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirect, {
-    preferEphemeralSession: false,
+    preferEphemeralSession: true,
   });
 
   if (result.type === 'cancel' || result.type === 'dismiss') {
@@ -126,5 +149,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
 
 export async function signOut(): Promise<void> {
   clearGroupFeedHydration();
-  await supabase.auth.signOut();
+  exchangeByCode.clear();
+  queryClient.clear();
+  await supabase.auth.signOut({ scope: 'global' });
 }
