@@ -173,3 +173,17 @@ DROP TRIGGER IF EXISTS block_deleted_email_signup ON auth.users;
 CREATE TRIGGER block_deleted_email_signup
     BEFORE INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.check_email_not_deleted();
+
+-- ============================================
+-- get_my_open_balances() — pre-deletion warning data
+-- Thin wrapper around get_user_balance_summary using auth.uid().
+-- ============================================
+CREATE OR REPLACE FUNCTION get_my_open_balances()
+RETURNS JSONB
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT get_user_balance_summary(auth.uid());
+$$;
+GRANT EXECUTE ON FUNCTION get_my_open_balances() TO authenticated;
