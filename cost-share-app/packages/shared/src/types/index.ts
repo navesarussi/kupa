@@ -279,6 +279,31 @@ export type Language = 'en' | 'he';
 export type Currency = 'USD' | 'ILS' | 'EUR' | 'GBP' | 'JPY';
 
 // ============================================
+// LEGAL DOCUMENTS
+// ============================================
+
+/**
+ * Legal document kind.
+ * Maps to: legal_documents.slug
+ */
+export type LegalSlug = 'terms' | 'privacy';
+
+/**
+ * Legal document fetched from server.
+ * Maps to: legal_documents table
+ */
+export interface LegalDocument {
+    id: string;
+    slug: LegalSlug;
+    locale: Language;
+    version: string;
+    title: string;
+    contentMd: string;
+    effectiveDate: string;  // ISO date YYYY-MM-DD
+    updatedAt: string;      // ISO timestamp
+}
+
+// ============================================
 // 4. DTOs (Data Transfer Objects)
 // ============================================
 
