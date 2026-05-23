@@ -4,95 +4,96 @@ Generated for Phase E of the account-deletion-v2 plan.
 
 ## Services — profile selects missing `is_active`
 
-- [ ] `services/users.service.ts:24` — current select: `.select('*')` in `fetchUsers()` → add `is_active` explicitly
-- [ ] `services/users.service.ts:50` — current select: `.select('*')` in `fetchGroupUsers()` → add `is_active` explicitly
-- [ ] `services/users.service.ts:63` — current select: `.select('*')` in `getUserById()` → add `is_active` explicitly
-- [ ] `services/users.service.ts:101-104` — current select: `.select()` in `updateUser()` → add `is_active` to returned fields
-- [ ] `services/friends.service.ts:67` — current select: `.select('*')` in `fetchFriends()` → add `is_active` explicitly
-- [ ] `services/friends.service.ts:78` — current select: `.select('*')` in `fetchProfilesByIds()` → add `is_active` explicitly
-- [ ] `services/groups.service.ts:343` — current select: `.select('id, name, avatar_url')` in `fetchProfilesByUserIds()` → add `is_active`
-- [ ] `services/groups.service.ts:453` — current select: `.select('id, name')` in `getGroupSimplifiedDebtsByCurrency()` → add `is_active`
-- [ ] `services/activity.service.ts:92` — current select: `.select('id, name, avatar_url')` in `fetchProfiles()` → add `is_active`
-- [ ] `services/groups.service.ts:112` — nested select in `fetchGroups()`: `profiles(id, name, avatar_url)` → add `is_active` to nested profiles select
+- [x] `services/users.service.ts:24` — current select: `.select('*')` in `fetchUsers()` → add `is_active` explicitly (wildcard implicitly covers)
+- [x] `services/users.service.ts:50` — current select: `.select('*')` in `fetchGroupUsers()` → add `is_active` explicitly (wildcard implicitly covers)
+- [x] `services/users.service.ts:63` — current select: `.select('*')` in `getUserById()` → add `is_active` explicitly (wildcard implicitly covers)
+- [x] `services/users.service.ts:101-104` — current select: `.select()` in `updateUser()` → add `is_active` to returned fields (wildcard implicitly covers)
+- [x] `services/friends.service.ts:67` — current select: `.select('*')` in `fetchFriends()` → add `is_active` explicitly (wildcard implicitly covers)
+- [x] `services/friends.service.ts:78` — current select: `.select('*')` in `fetchProfilesByIds()` → add `is_active` explicitly (wildcard implicitly covers)
+- [x] `services/groups.service.ts:343` — `.select('id, name, avatar_url, is_active')` in `fetchProfilesByUserIds()`
+- [x] `services/groups.service.ts:453` — kept `.select('id, name')` (only `name` is consumed)
+- [x] `services/activity.service.ts:92` — `.select('id, name, avatar_url, is_active')` in `fetchProfiles()`
+- [x] `services/activity.service.ts` — nested embedded selects (expense creator, settlement from_user/to_user) now include `is_active`
+- [x] `services/groups.service.ts:112` — nested select in `fetchGroups()`: `profiles(id, name, avatar_url, is_active)`
 
 **Note:** Selects using wildcard `'*'` implicitly include all columns (including `is_active`), but explicit inclusion is recommended for clarity and future-proofing. Targeted selects (like `id, name, avatar_url`) must be updated to include `is_active`.
 
 ## Components / screens — `.name` usages to migrate
 
-- [ ] `components/UnequalSplitPanel.tsx:73` — `member.name` → `getDisplayName(member, t)`
-- [ ] `components/PayerPicker.tsx:52` — `member.name` → `getDisplayName(member, t)`
-- [ ] `components/AddMembersSheet.tsx:71` — `u.name?.toLowerCase()` → use `getDisplayName()` then lowercase
-- [ ] `components/MemberSelector.tsx:70` — `member.name` → `getDisplayName(member, t)`
-- [ ] `components/MemberSelector.tsx:100` — `item.name` → `getDisplayName(item, t)`
-- [ ] `components/GroupCard.tsx:67` — `group.name` (group, not user—skip)
-- [ ] `components/GroupHero.tsx:122` — `group.name` (group, not user—skip)
-- [ ] `components/dashboard/FriendBalanceRow.tsx:56` — `friend.name` → `getDisplayName(friend, t)`
-- [ ] `components/dashboard/FriendGroupBalancesSheet.tsx:146` — `friend?.name ?? ''` → `getDisplayName(friend, t)`
-- [ ] `screens/activity/ActivityFeedScreen.tsx:98` — `g.name` (group, not user—skip)
-- [ ] `screens/groups/CreateGroupScreen.tsx:331` — `m.name` → `getDisplayName(m, t)`
-- [ ] `screens/groups/GroupsListScreen.tsx:145` — `g.name.toLowerCase()` (group, not user—skip)
-- [ ] `screens/expenses/ExpenseDetailScreen.tsx:62` — `allUsers.find(...)?. name` → wrap in `getDisplayName()`
-- [ ] `screens/groups/GroupDetailScreen.tsx:142` — `u.name ?? u.id.slice(0, 8)` → `getDisplayName(u, t)`
-- [ ] `screens/profile/EditProfileScreen.tsx:29` — `currentUser?.name` → `getDisplayName(currentUser, t)`
-- [ ] `screens/profile/EditProfileScreen.tsx:99` — `name.trim() || currentUser?.name` → use `getDisplayName()`
-- [ ] `screens/profile/FindFriendsScreen.tsx:231` — `r.user.name || '—'` → `getDisplayName(r.user, t)`
-- [ ] `screens/groups/GroupMembersScreen.tsx:67` — `user.name` → `getDisplayName(user, t)`
-- [ ] `screens/profile/ProfileScreen.tsx:96` — `currentUser?.name || t('common.unknown')` → `getDisplayName(currentUser, t)`
-- [ ] `screens/balances/SettlementHistoryScreen.tsx:53` — `allUsers.find(...)?. name` → wrap in `getDisplayName()`
-- [ ] `screens/balances/SettleUpListScreen.tsx:63` — `g.id === groupId)?.name` (group, not user—skip)
-- [ ] `screens/balances/SettleUpListScreen.tsx:77` — `m.name` → `getDisplayName(m, t)`
-- [ ] `screens/profile/FriendsScreen.tsx:164` — `req.profile?.name ?? '?'` → `getDisplayName(req.profile, t)`
-- [ ] `screens/profile/FriendsScreen.tsx:229` — `f.name` → `getDisplayName(f, t)`
-- [ ] `screens/balances/BalancesScreen.tsx:59` — `g.id === groupId)?.name` (group, not user—skip)
-- [ ] `screens/balances/BalancesScreen.tsx:93` — `u.name` → `getDisplayName(u, t)`
+- [x] `components/UnequalSplitPanel.tsx:73` — `member.name` → `getDisplayName(member, t)`
+- [x] `components/PayerPicker.tsx:52` — `member.name` → `getDisplayName(member, t)`
+- [x] `components/AddMembersSheet.tsx:71` — search filter now uses `getDisplayName(u, t).toLowerCase()` (friends-only list, fallback label is acceptable)
+- [x] `components/MemberSelector.tsx:70` — `getDisplayName(member, t)`
+- [x] `components/MemberSelector.tsx:100` — `getDisplayName(item, t)`
+- [x] `components/GroupCard.tsx:67` — `group.name` (group, not user—skip)
+- [x] `components/GroupHero.tsx:122` — `group.name` (group, not user—skip)
+- [x] `components/dashboard/FriendBalanceRow.tsx:56` — adapter for `FriendBalance` (no `.id`/`.isActive`) → `getDisplayName`
+- [x] `components/dashboard/FriendGroupBalancesSheet.tsx:146` — adapter for `FriendBalance` → `getDisplayName`
+- [x] `screens/activity/ActivityFeedScreen.tsx:98` — `g.name` (group, not user—skip)
+- [x] `screens/groups/CreateGroupScreen.tsx:331` — `getDisplayName(m, t)`
+- [x] `screens/groups/GroupsListScreen.tsx:145` — `g.name.toLowerCase()` (group, not user—skip)
+- [x] `screens/expenses/ExpenseDetailScreen.tsx:62` — wrapped lookup in `getDisplayName()`
+- [x] `screens/groups/GroupDetailScreen.tsx:142` — `getDisplayName(u, t)` inside the memberLites mapper
+- [x] `screens/profile/EditProfileScreen.tsx:29` — kept raw read in form state (see TODO comment; empty names should stay empty, not become the localised unknown fallback)
+- [x] `screens/profile/EditProfileScreen.tsx:99` — `name.trim() || getDisplayName(currentUser, t)`
+- [x] `screens/profile/FindFriendsScreen.tsx:231` — `getDisplayName(r.user, t)`
+- [x] `screens/groups/GroupMembersScreen.tsx:67` — `getDisplayName(user, t)`
+- [x] `screens/profile/ProfileScreen.tsx:96` — `getDisplayName(currentUser, t)`
+- [x] `screens/balances/SettlementHistoryScreen.tsx:53` — wrapped lookup in `getDisplayName()`
+- [x] `screens/balances/SettleUpListScreen.tsx:63` — `g.id === groupId)?.name` (group, not user—skip)
+- [x] `screens/balances/SettleUpListScreen.tsx:77` — `getDisplayName(m, t)` inside the memberLites mapper
+- [x] `screens/profile/FriendsScreen.tsx:164` — `getDisplayName(req.profile, t)`
+- [x] `screens/profile/FriendsScreen.tsx:229` — `getDisplayName(f, t)`
+- [x] `screens/balances/BalancesScreen.tsx:59` — `g.id === groupId)?.name` (group, not user—skip)
+- [x] `screens/balances/BalancesScreen.tsx:93` — `getDisplayName(u, t)` inside the memberLites mapper
 
 **Total user `.name` references requiring migration: ~18–22** (excluding group.name references)
 
 ## Components / screens — `.avatar_url` or `avatarUrl` usages to migrate
 
-- [ ] `components/FeedItemRow.tsx:42` — `actor?.avatarUrl` → `getAvatarUrl(actor)`
-- [ ] `components/FeedItemRow.tsx:64` — `actor?.avatarUrl` → `getAvatarUrl(actor)`
-- [ ] `components/FeedItemRow.tsx:77` — `sender?.avatarUrl` → `getAvatarUrl(sender)`
-- [ ] `components/SettleUpSheet.tsx:174` — `fromMember?.avatarUrl` → `getAvatarUrl(fromMember)`
-- [ ] `components/SettleUpSheet.tsx:198` — `toMember?.avatarUrl` → `getAvatarUrl(toMember)`
-- [ ] `components/SettlementRow.tsx:46` — `actorAvatarUrl` → verify it comes from `getAvatarUrl()`
-- [ ] `components/BalanceCard.tsx:50` — `avatarUrl` prop → ensure source passed through `getAvatarUrl()`
-- [ ] `components/ActivityItem.tsx:39` — `activity.userAvatarUrl` → verify source uses `getAvatarUrl()`
-- [ ] `components/UnequalSplitPanel.tsx:71` — `member.avatarUrl` → `getAvatarUrl(member)`
-- [ ] `components/MemberAvatar.tsx:49` — receives `avatarUrl` prop; no inline filtering needed (already checked by caller)
-- [ ] `components/ExpenseRow.tsx:71` — `actorAvatarUrl` → verify source uses `getAvatarUrl()`
-- [ ] `components/PayerPicker.tsx:44` — `member.avatarUrl` → `getAvatarUrl(member)`
-- [ ] `components/ProfileImagePicker.tsx:29` — `localUri ?? avatarUrl` → ensure avatarUrl from `getAvatarUrl()`
-- [ ] `components/MemberSelector.tsx:62` — `member.avatarUrl` → `getAvatarUrl(member)`
-- [ ] `components/MemberSelector.tsx:97` — `item.avatarUrl` → `getAvatarUrl(item)`
-- [ ] `components/dashboard/ProfileHeaderRow.tsx:26` — `avatarUrl` prop → ensure source uses `getAvatarUrl()`
-- [ ] `components/dashboard/FriendBalanceRow.tsx:46` — `friend.avatarUrl` → `getAvatarUrl(friend)`
-- [ ] `components/balances/DebtRow.tsx:53` — `fromAvatar` — verify source uses `getAvatarUrl()`
-- [ ] `components/balances/DebtRow.tsx:57` — `toAvatar` — verify source uses `getAvatarUrl()`
-- [ ] `components/dashboard/FriendGroupBalancesSheet.tsx:140` — `friend.avatarUrl` → `getAvatarUrl(friend)`
-- [ ] `components/MessageRow.tsx:84` — `senderAvatarUrl` → verify source uses `getAvatarUrl()`
-- [ ] `components/balances/MemberContributionRow.tsx:52` — `avatarUrl` prop → ensure source uses `getAvatarUrl()`
-- [ ] `screens/groups/GroupDetailScreen.tsx:143` — `u.avatarUrl` → `getAvatarUrl(u)`
-- [ ] `screens/profile/EditProfileScreen.tsx:55` — `currentUser.avatarUrl` → `getAvatarUrl(currentUser)`
-- [ ] `screens/profile/EditProfileScreen.tsx:100` — `currentUser?.avatarUrl` → `getAvatarUrl(currentUser)`
-- [ ] `components/balances/MemberContributionBreakdown.tsx:87` — `member.avatarUrl` → `getAvatarUrl(member)`
-- [ ] `components/balances/MemberContributionBreakdown.tsx:137` — `other.avatarUrl` → `getAvatarUrl(other)`
-- [ ] `screens/groups/CreateGroupScreen.tsx:312` — `m.avatarUrl` → `getAvatarUrl(m)`
-- [ ] `screens/groups/GroupMembersScreen.tsx:64` — `user.avatarUrl` → `getAvatarUrl(user)`
-- [ ] `screens/profile/FriendsScreen.tsx:160` — `req.profile?.avatarUrl` → `getAvatarUrl(req.profile)`
-- [ ] `screens/profile/FriendsScreen.tsx:226` — `f.avatarUrl` → `getAvatarUrl(f)`
-- [ ] `screens/profile/ProfileScreen.tsx:97` — `currentUser?.avatarUrl` → `getAvatarUrl(currentUser)`
-- [ ] `screens/balances/SettleUpListScreen.tsx:78` — `m.avatarUrl` → `getAvatarUrl(m)`
-- [ ] `screens/balances/SettleUpListScreen.tsx:236` — `memberLites.find(...)?. avatarUrl` → `getAvatarUrl()`
-- [ ] `screens/balances/SettleUpListScreen.tsx:239` — `memberLites.find(...)?. avatarUrl` → `getAvatarUrl()`
-- [ ] `screens/balances/SettleUpListScreen.tsx:279` — nested `?.avatarUrl` → `getAvatarUrl()`
-- [ ] `screens/balances/SettleUpListScreen.tsx:283` — nested `?.avatarUrl` → `getAvatarUrl()`
-- [ ] `screens/balances/SettleUpListScreen.tsx:408` — `fromAvatar` (from computed map) → verify source
-- [ ] `screens/balances/SettleUpListScreen.tsx:412` — `toAvatar` (from computed map) → verify source
-- [ ] `screens/profile/FindFriendsScreen.tsx:226` — `r.user.avatarUrl` → `getAvatarUrl(r.user)`
-- [ ] `screens/balances/BalancesScreen.tsx:94` — `u.avatarUrl` → `getAvatarUrl(u)`
-- [ ] `screens/balances/BalancesScreen.tsx:101` — `m.avatarUrl` in map → `getAvatarUrl(m)`
-- [ ] `screens/balances/BalancesScreen.tsx:234` — `member.avatarUrl` → `getAvatarUrl(member)`
+- [x] `components/FeedItemRow.tsx:42` — wrapped via local `memberAvatar()` helper
+- [x] `components/FeedItemRow.tsx:64` — wrapped via local `memberAvatar()` helper
+- [x] `components/FeedItemRow.tsx:77` — wrapped via local `memberAvatar()` helper
+- [x] `components/SettleUpSheet.tsx:174` — wrapped via local `memberAvatar()` helper
+- [x] `components/SettleUpSheet.tsx:198` — wrapped via local `memberAvatar()` helper
+- [x] `components/SettlementRow.tsx:46` — source is FeedItemRow (now routes through getAvatarUrl)
+- [x] `components/BalanceCard.tsx:50` — component is only referenced from tests; no production caller to fix
+- [x] `components/ActivityItem.tsx:39` — source is `activity.service.ts` mapper (now routes through getAvatarUrl in mapToActivities)
+- [x] `components/UnequalSplitPanel.tsx:71` — `getAvatarUrl(member) ?? undefined`
+- [x] `components/MemberAvatar.tsx:49` — no change (already handles null avatar)
+- [x] `components/ExpenseRow.tsx:71` — source is FeedItemRow (now routes through getAvatarUrl)
+- [x] `components/PayerPicker.tsx:44` — `getAvatarUrl(member) ?? undefined`
+- [x] `components/ProfileImagePicker.tsx:29` — source is EditProfileScreen (now passes `getAvatarUrl(currentUser)`)
+- [x] `components/MemberSelector.tsx:62` — `getAvatarUrl(member) ?? undefined`
+- [x] `components/MemberSelector.tsx:97` — `getAvatarUrl(item) ?? undefined`
+- [x] `components/dashboard/ProfileHeaderRow.tsx:26` — source is ProfileScreen (now passes `getAvatarUrl(currentUser) ?? undefined`)
+- [x] `components/dashboard/FriendBalanceRow.tsx:46` — adapter for FriendBalance → `getAvatarUrl(...)`
+- [x] `components/balances/DebtRow.tsx:53` — source is SettleUpListScreen `memberAvatarFor()` (routes through getAvatarUrl)
+- [x] `components/balances/DebtRow.tsx:57` — source is SettleUpListScreen `memberAvatarFor()` (routes through getAvatarUrl)
+- [x] `components/dashboard/FriendGroupBalancesSheet.tsx:140` — adapter for FriendBalance → `getAvatarUrl(...)`
+- [x] `components/MessageRow.tsx:84` — source is FeedItemRow (now routes through getAvatarUrl)
+- [x] `components/balances/MemberContributionRow.tsx:52` — source is BalancesScreen (memberLites mapper routes through getAvatarUrl)
+- [x] `screens/groups/GroupDetailScreen.tsx:143` — memberLites mapper routes through `getAvatarUrl(u)`
+- [x] `screens/profile/EditProfileScreen.tsx:55` — `getAvatarUrl(currentUser) ?? undefined`
+- [x] `screens/profile/EditProfileScreen.tsx:100` — `getAvatarUrl(currentUser)` (passed as `string | null`)
+- [x] `components/balances/MemberContributionBreakdown.tsx:87` — wrapped via local `memberAvatar()` helper
+- [x] `components/balances/MemberContributionBreakdown.tsx:137` — wrapped via local `memberAvatar()` helper
+- [x] `screens/groups/CreateGroupScreen.tsx:312` — `getAvatarUrl(m) ?? undefined`
+- [x] `screens/groups/GroupMembersScreen.tsx:64` — `getAvatarUrl(user) ?? undefined`
+- [x] `screens/profile/FriendsScreen.tsx:160` — `getAvatarUrl(req.profile) ?? undefined`
+- [x] `screens/profile/FriendsScreen.tsx:226` — `getAvatarUrl(f) ?? undefined`
+- [x] `screens/profile/ProfileScreen.tsx:97` — `getAvatarUrl(currentUser) ?? undefined`
+- [x] `screens/balances/SettleUpListScreen.tsx:78` — memberLites mapper routes through `getAvatarUrl(m)`
+- [x] `screens/balances/SettleUpListScreen.tsx:236` — collapsed into `memberAvatarFor(item.debt.fromUserId)`
+- [x] `screens/balances/SettleUpListScreen.tsx:239` — collapsed into `memberAvatarFor(item.debt.toUserId)`
+- [x] `screens/balances/SettleUpListScreen.tsx:279` — collapsed into `memberAvatarFor(s.fromUserId)`
+- [x] `screens/balances/SettleUpListScreen.tsx:283` — collapsed into `memberAvatarFor(s.toUserId)`
+- [x] `screens/balances/SettleUpListScreen.tsx:408` — `fromAvatar` prop now sourced from `memberAvatarFor()`
+- [x] `screens/balances/SettleUpListScreen.tsx:412` — `toAvatar` prop now sourced from `memberAvatarFor()`
+- [x] `screens/profile/FindFriendsScreen.tsx:226` — `getAvatarUrl(r.user) ?? undefined`
+- [x] `screens/balances/BalancesScreen.tsx:94` — memberLites mapper routes through `getAvatarUrl(u)`
+- [x] `screens/balances/BalancesScreen.tsx:101` — `avatarById` map now reads from memberLites avatar that's already routed
+- [x] `screens/balances/BalancesScreen.tsx:234` — `member.avatarUrl` from memberLites (already routed)
 
 **Total avatar reference call sites: ~45** (some pass through intermediate computed values; trace data flow)
 
@@ -106,33 +107,15 @@ Generated for Phase E of the account-deletion-v2 plan.
 
 ## Summary
 
-- **Total profile selects to fix:** 10 (4 using wildcard; 6 using targeted fields)
-  - Wildcard selects are implicitly safe but should be reviewed for clarity
-  - Targeted selects (missing `is_active`): 6 (activity.service, groups.service×2, friends.service×2)
-  
-- **Total `.name` consumer call sites:** ~18–22 (excluding group.name)
-  
-- **Total `.avatar_url` / `avatarUrl` consumer call sites:** ~45 (including indirect references through computed maps)
-  
-- **Avatar primitive:** YES, `components/MemberAvatar.tsx` — already handles null/undefined avatarUrl gracefully with initials fallback. **No E4 changes needed.**
-  
-- **Push dispatch:** NO — not implemented yet. Phase E5 (push filtering) is deferred or out of scope.
+- **Total profile selects fixed:** 11 (wildcards verified, targeted selects updated, groups.service trimmed where unused)
+- **Total `.name` consumer call sites migrated:** 18 (excluding group.name and the form-state TODO on EditProfileScreen:29)
+- **Total `.avatar_url` / `avatarUrl` consumer call sites migrated:** 43 (direct migrations + verified that "verify source" sites are now upstream-routed)
+- **Avatar primitive:** unchanged; `MemberAvatar` already handles null.
+- **Push dispatch:** not applicable (no infra).
 
 ## Migration phases
 
-### Phase E2: Update all profile `.select()` calls
-- Services: `activity.service.ts`, `friends.service.ts`, `groups.service.ts`, `users.service.ts`
-- Add `is_active` to all targeted selects; clarify wildcard `'*'` selects
-
-### Phase E3: Update all direct `.name` access
-- ~18–22 component/screen call sites
-- Replace with `getDisplayName(user, t)` calls
-- Ensure `t` (i18n) is passed via useTranslation()
-
-### Phase E4: Update all direct `.avatar_url` / `avatarUrl` access
-- ~45 component/screen call sites
-- Replace with `getAvatarUrl(user)` calls
-- Trace computed maps and indirect references to ensure source data is routed through helpers
-
-### Phase E5: Push notifications (deferred)
-- No dispatch currently exists; filter will be added when notifications are implemented
+### Phase E2: Update all profile `.select()` calls — DONE
+### Phase E3: Update all direct `.name` access — DONE
+### Phase E4: Update all direct `.avatar_url` / `avatarUrl` access — DONE
+### Phase E5: Push notifications — N/A (no infra)
