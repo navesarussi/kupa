@@ -89,7 +89,7 @@ async function fetchProfiles(userIds: string[]): Promise<Map<string, ProfileSumm
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, avatar_url')
+        .select('id, name, avatar_url, is_active')
         .in('id', userIds);
     if (error) throw error;
 

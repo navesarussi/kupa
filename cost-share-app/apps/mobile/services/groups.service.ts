@@ -109,7 +109,7 @@ export async function fetchGroups(): Promise<GroupWithMembers[]> {
             supabase
                 .from('groups')
                 .select(
-                    '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url))',
+                    '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url, is_active))',
                 )
                 .in('id', groupIds)
                 .eq('is_active', true)
@@ -340,7 +340,7 @@ export async function fetchProfilesByUserIds(
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, avatar_url')
+        .select('id, name, avatar_url, is_active')
         .in('id', unique);
 
     if (error) {
@@ -355,6 +355,7 @@ export async function fetchProfilesByUserIds(
             userId: id,
             displayName: (p.name as string) ?? '',
             avatarUrl: (p.avatar_url as string | undefined) ?? undefined,
+            isActive: p.is_active === undefined ? true : Boolean(p.is_active),
         };
     });
     return map;
@@ -450,7 +451,7 @@ export async function getGroupSimplifiedDebtsByCurrency(
         if (userIds.length > 0) {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, name')
+                .select('id, name, is_active')
                 .in('id', userIds);
             if (error) throw error;
             (data ?? []).forEach(p => nameById.set(p.id as string, p.name as string));
