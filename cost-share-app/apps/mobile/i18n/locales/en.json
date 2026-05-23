@@ -21,7 +21,10 @@
         "submit": "Submit",
         "done": "Done",
         "close": "Close",
-        "you": "You"
+        "you": "You",
+        "deletedUser": "Deleted user",
+        "unknownUser": "Unknown user",
+        "openMail": "Open mail"
     },
     "tabs": {
         "groups": "Groups",
@@ -629,7 +632,7 @@
         "warningBullet1": "You will no longer be able to sign in.",
         "warningBullet2": "Your name and history remain visible to friends you shared groups with.",
         "warningBullet3": "Open balances stay open — settle them first if you don't want them to remain.",
-        "warningBullet4": "This cannot be undone. Contact support via WhatsApp to restore.",
+        "warningBullet4": "This action is irreversible. Contact us at {{email}} to restore.",
         "continueBtn": "Continue",
         "confirmTitle": "Type your email to confirm",
         "typeEmailHint": "To confirm deletion, type:",
@@ -637,6 +640,11 @@
         "deletedToast": "Account deleted",
         "deleteFailed": "Could not delete account. Please try again.",
         "deactivatedTitle": "Account deactivated",
-        "deactivatedMessage": "This account has been deleted. Contact support via WhatsApp to restore it."
+        "deactivatedMessage": "This account was deleted. Contact {{email}} to restore.",
+        "openBalancesWarningTitle": "You have open balances",
+        "openBalancesWarningBody": "Friends will see these owed against 'Deleted user'.",
+        "openBalancesCta": "Settle up now",
+        "reSignupBlockedTitle": "Account deleted",
+        "reSignupBlocked": "This account was deleted. Contact {{email}} to restore it."
     }
 }
