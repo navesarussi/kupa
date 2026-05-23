@@ -1,0 +1,121 @@
+import React from 'react';
+import { View, Modal, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import Markdown from 'react-native-markdown-display';
+import { Text } from '../AppText';
+import { AppIcon } from '../AppIcon';
+import { useLegalDocument } from '../../hooks/queries/useLegalDocument';
+import type { LegalSlug } from '@cost-share/shared';
+
+interface Props {
+    visible: boolean;
+    slug: LegalSlug;
+    onClose: () => void;
+}
+
+export function LegalDocumentSheet({ visible, slug, onClose }: Props) {
+    const { t, i18n } = useTranslation();
+    const query = useLegalDocument(slug);
+
+    if (!visible) return null;
+
+    const formattedDate = query.data
+        ? new Intl.DateTimeFormat(i18n.language === 'he' ? 'he-IL' : 'en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+          }).format(new Date(query.data.effectiveDate))
+        : '';
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <Pressable className="flex-1 bg-black/40" onPress={onClose}>
+                <Pressable
+                    onPress={(e) => e.stopPropagation()}
+                    testID="legal-sheet"
+                    className="bg-white rounded-t-2xl absolute bottom-0 inset-x-0"
+                    style={{ maxHeight: '92%' }}
+                >
+                    <View className="items-center pt-2 pb-1">
+                        <View className="w-10 h-1 bg-gray-300 rounded-full" />
+                    </View>
+
+                    <View className="px-5 pt-2 pb-3 border-b border-gray-100 flex-row items-start justify-between">
+                        <View className="flex-1 pe-3">
+                            <Text className="text-xl font-bold text-gray-900">
+                                {query.data?.title ?? t(slug === 'terms' ? 'legal.termsTitle' : 'legal.privacyTitle')}
+                            </Text>
+                            {query.data && (
+                                <Text className="text-xs text-gray-500 mt-1">
+                                    {t('legal.lastUpdated', { date: formattedDate })} · {t('legal.versionLabel', { version: query.data.version })}
+                                </Text>
+                            )}
+                        </View>
+                        <TouchableOpacity onPress={onClose} accessibilityLabel={t('legal.close')}>
+                            <AppIcon name="close" size={24} color="#1f2937" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {query.isLoading && <SkeletonBody />}
+                    {query.isError && !query.data && (
+                        <ErrorBody onRetry={() => void query.refetch()} />
+                    )}
+                    {query.data && (
+                        <ScrollView className="px-5 pt-3" showsVerticalScrollIndicator={true}>
+                            <Markdown style={markdownStyles}>{query.data.contentMd}</Markdown>
+                            <View className="h-6" />
+                        </ScrollView>
+                    )}
+
+                    <View className="px-5 pb-5 pt-3 border-t border-gray-100">
+                        <TouchableOpacity onPress={onClose} className="bg-primary py-4 rounded-xl">
+                            <Text className="text-white text-center font-semibold">{t('legal.understood')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Pressable>
+            </Pressable>
+        </Modal>
+    );
+}
+
+function SkeletonBody() {
+    return (
+        <View testID="legal-sheet-skeleton" className="px-5 pt-4 pb-6">
+            <View className="h-5 bg-gray-200 rounded mb-3 w-3/4" />
+            <View className="h-4 bg-gray-200 rounded mb-2" />
+            <View className="h-4 bg-gray-200 rounded mb-2" />
+            <View className="h-4 bg-gray-200 rounded w-5/6" />
+        </View>
+    );
+}
+
+function ErrorBody({ onRetry }: { onRetry: () => void }) {
+    const { t } = useTranslation();
+    return (
+        <View testID="legal-sheet-error" className="px-5 pt-6 pb-2 items-center">
+            <AppIcon name="cloud-offline-outline" size={48} color="#9ca3af" />
+            <Text className="text-base font-semibold text-gray-900 mt-3">{t('legal.errorTitle')}</Text>
+            <Text className="text-sm text-gray-500 mt-1 text-center">{t('legal.errorBody')}</Text>
+            <TouchableOpacity onPress={onRetry} className="mt-4 px-5 py-2 bg-gray-100 rounded-full">
+                <Text className="text-gray-700 font-medium">{t('legal.retry')}</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+const markdownStyles = {
+    body: { color: '#374151', fontSize: 16, lineHeight: 24 },
+    heading1: { fontSize: 22, fontWeight: '700' as const, color: '#111827', marginTop: 16, marginBottom: 8 },
+    heading2: { fontSize: 18, fontWeight: '700' as const, color: '#111827', marginTop: 14, marginBottom: 6 },
+    heading3: { fontSize: 16, fontWeight: '700' as const, color: '#111827', marginTop: 12, marginBottom: 4 },
+    strong: { fontWeight: '700' as const, color: '#111827' },
+    em: { fontStyle: 'italic' as const },
+    link: { color: '#2563eb', textDecorationLine: 'underline' as const },
+    bullet_list: { marginBottom: 8 },
+    ordered_list: { marginBottom: 8 },
+    list_item: { marginBottom: 4 },
+    blockquote: { backgroundColor: '#f9fafb', borderLeftWidth: 4, borderLeftColor: '#d1d5db', paddingHorizontal: 12, paddingVertical: 6, marginVertical: 8 },
+    table: { borderWidth: 1, borderColor: '#e5e7eb', marginVertical: 8 },
+    th: { padding: 6, fontWeight: '700' as const, backgroundColor: '#f9fafb' },
+    td: { padding: 6, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
+};
