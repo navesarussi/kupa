@@ -160,8 +160,8 @@
             }
         },
         "summary": {
-            "youAreOwed": "You have {{amount}} to your credit",
-            "youOwe": "You owe {{amount}}",
+            "youAreOwed": "You have <1>{{amount}}</1> to your credit",
+            "youOwe": "You owe <1>{{amount}}</1>",
             "noOpenPayments": "No open payments"
         },
         "hero": {
