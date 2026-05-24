@@ -75,8 +75,8 @@ export function SummaryBalanceStrip({
                         }}
                     >
                         {owed
-                            ? `You have ${amount} to your credit`
-                            : `You owe ${amount}`}
+                            ? `You have <1>${amount}</1> to your credit`
+                            : `You owe <1>${amount}</1>`}
                     </Trans>
                 )}
             </Text>
