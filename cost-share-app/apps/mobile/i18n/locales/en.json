@@ -230,10 +230,20 @@
         "expense": {
             "youLent": "You lent {{amount}}",
             "youBorrowed": "You borrowed {{amount}}",
-            "settled": "Settled"
+            "settled": "Settled",
+            "fromPayer": "From {{name}}",
+            "toNPeople_one": "To {{count}} person",
+            "toNPeople_other": "To {{count}} people",
+            "splitLent": "Lent {{amount}}",
+            "splitOwes": "Owes {{name}}",
+            "paidBadge": "PAID",
+            "totalLabel": "Total",
+            "splitBetweenCount_one": "Split between · {{count}} person",
+            "splitBetweenCount_other": "Split between · {{count}} people"
         },
         "feedDetail": {
             "expenseTitle": "Expense details",
+            "expenseHeaderLabel": "Expense",
             "settlementTitle": "Settlement details",
             "yourShare": "Your share"
         },
