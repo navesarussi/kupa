@@ -26,9 +26,6 @@ import {
     GroupMemberLite,
     GroupMessage,
     Settlement,
-    calculateGroupTotalSpent,
-    calculateGroupTotalUnsettled,
-    sortCurrencyAmounts,
 } from '@cost-share/shared';
 import { useAppStore } from '../../store';
 import { useLoading } from '../../hooks/useLoading';
@@ -66,8 +63,8 @@ import { prefetchAddExpense } from '../../hooks/queries/prefetchAddExpense';
 import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
-import { GroupHero } from '../../components/GroupHero';
-import { QuickActionsRow } from '../../components/QuickActionsRow';
+import { GroupDetailAppBar } from '../../components/groupDetail/GroupDetailAppBar';
+import { GroupSummaryCard } from '../../components/groupDetail/GroupSummaryCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FeedItemRow } from '../../components/FeedItemRow';
 import {
@@ -190,19 +187,18 @@ export function GroupDetailScreen() {
         [expenses, groupId],
     );
 
-    const heroStats = useMemo(() => {
-        const defaultCurrency = displayGroup?.defaultCurrency ?? 'USD';
+    const groupBalance = useAppStore(s => s.groupBalances[groupId]);
+    const balance = useMemo(() => {
+        const net = groupBalance?.net ?? 0;
         return {
-            totalSpent: sortCurrencyAmounts(
-                calculateGroupTotalSpent(groupExpenses),
-                defaultCurrency,
-            ),
-            totalUnsettled: sortCurrencyAmounts(
-                calculateGroupTotalUnsettled(pairwiseDebts),
-                defaultCurrency,
-            ),
+            net,
+            currency: groupBalance?.currency ?? displayGroup?.defaultCurrency ?? 'USD',
+            isSettled: Math.abs(net) < 0.01,
         };
-    }, [groupExpenses, pairwiseDebts, displayGroup?.defaultCurrency]);
+    }, [groupBalance, displayGroup?.defaultCurrency]);
+
+    const noteHasContent = Boolean(displayGroup?.note?.trim());
+    const settlementCount = pairwiseDebts.length;
 
     const feedUserIds = useMemo(
         () => collectFeedUserIds(groupExpenses, messages, settlements),
@@ -589,18 +585,20 @@ export function GroupDetailScreen() {
                 )}
                 ListHeaderComponent={
                     <>
-                        <GroupHero
-                            group={displayGroup}
-                            memberCount={memberLites.length}
-                            stats={heroStats}
+                        <GroupDetailAppBar
                             onBack={handleBack}
-                            onMenu={handleOpenGroupMenu}
                             onShare={handleShare}
+                            onMenu={handleOpenGroupMenu}
                         />
-                        <QuickActionsRow
-                            onSettleUp={handleSettleUp}
-                            onBalances={handleBalances}
-                            onNote={handleNote}
+                        <GroupSummaryCard
+                            group={displayGroup}
+                            members={memberLites}
+                            balance={balance}
+                            settlementCount={settlementCount}
+                            noteHasContent={noteHasContent}
+                            onOpenBalances={handleBalances}
+                            onOpenNote={handleNote}
+                            onOpenSettleUp={handleSettleUp}
                         />
                         <View className="px-4 mt-3 mb-2 flex-row items-center">
                             <View className="flex-1 flex-row items-center rounded-full bg-gray-100 px-3 h-9">
