@@ -46,14 +46,14 @@ export function FeedRowCard({
             <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                 <Text
                     className="text-[15px] font-bold text-gray-900"
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                    style={{ fontVariant: ['tabular-nums'] }}
                 >
                     {amount}
                 </Text>
                 {subLine && (
                     <Text
                         className="text-[11px] font-medium text-gray-500 mt-0.5"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                        style={{ fontVariant: ['tabular-nums'] }}
                     >
                         {subLine}
                     </Text>

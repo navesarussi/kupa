@@ -68,7 +68,7 @@ export function SummaryBalanceStrip({
                                     className="font-bold"
                                     style={{
                                         color: amountColor,
-                                        fontVariantNumeric: 'tabular-nums',
+                                        fontVariant: ['tabular-nums'],
                                     }}
                                 />
                             ),
