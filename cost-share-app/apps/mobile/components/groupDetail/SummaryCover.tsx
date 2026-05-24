@@ -1,32 +1,99 @@
 /**
  * SummaryCover — top region of GroupSummaryCard.
- * Image background OR type gradient + icon, with scrim, type chip,
- * title block, and member stack overlaid.
+ * Image OR type-gradient background, scrim, type chip, title block,
+ * member stack, and the three top-bar buttons (back · share · menu)
+ * overlaid on the cover.
  */
 
 import React from 'react';
-import { View, ImageBackground, StyleSheet } from 'react-native';
+import { View, ImageBackground, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { Group, GroupMemberLite } from '@cost-share/shared';
 import { Text } from '../AppText';
 import { AppIcon } from '../AppIcon';
 import { MemberStack } from './MemberStack';
+import { useRtlLayout } from '../../hooks/useRtlLayout';
 import { getGroupTypeVisual } from '../../lib/groupTypeVisuals';
 
-const COVER_HEIGHT = 150;
+const COVER_BODY_HEIGHT = 150;
+const BUTTON_TOP_OFFSET = 8;
 
 interface SummaryCoverProps {
     group: Group;
     members: GroupMemberLite[];
+    topInset: number;
+    onBack: () => void;
+    onShare: () => void;
+    onMenu: () => void;
 }
 
-export function SummaryCover({ group, members }: SummaryCoverProps) {
+export function SummaryCover({
+    group,
+    members,
+    topInset,
+    onBack,
+    onShare,
+    onMenu,
+}: SummaryCoverProps) {
     const { t } = useTranslation();
+    const isRtl = useRtlLayout();
     const visual = getGroupTypeVisual(group.groupType);
     const typeLabel = t(`groups.types.${group.groupType}`, {
         defaultValue: group.groupType,
     });
+    const totalHeight = COVER_BODY_HEIGHT + topInset;
+
+    const buttons = (
+        <View
+            style={{
+                position: 'absolute',
+                top: topInset + BUTTON_TOP_OFFSET,
+                left: 12,
+                right: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                zIndex: 20,
+                elevation: 20,
+            }}
+        >
+            <TouchableOpacity
+                onPress={onBack}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="appbar-back"
+                style={styles.circleButton}
+            >
+                <AppIcon
+                    name={isRtl ? 'chevron-forward' : 'chevron-back'}
+                    size={22}
+                    color="#fff"
+                />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                    onPress={onShare}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    testID="appbar-share"
+                    style={styles.circleButton}
+                >
+                    <AppIcon name="share-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={onMenu}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    testID="appbar-menu"
+                    style={styles.circleButton}
+                >
+                    <AppIcon name="ellipsis-vertical" size={20} color="#fff" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 
     const overlay = (
         <>
@@ -39,7 +106,10 @@ export function SummaryCover({ group, members }: SummaryCoverProps) {
 
             <View style={styles.typeChip}>
                 <AppIcon name={visual.icon} size={12} color="#fff" />
-                <Text className="text-[11px] font-semibold text-white">
+                <Text
+                    className="text-[11px] font-semibold text-white"
+                    style={{ textTransform: 'capitalize' }}
+                >
                     {typeLabel}
                 </Text>
             </View>
@@ -63,6 +133,8 @@ export function SummaryCover({ group, members }: SummaryCoverProps) {
                 </View>
                 <MemberStack members={members} />
             </View>
+
+            {buttons}
         </>
     );
 
@@ -71,7 +143,7 @@ export function SummaryCover({ group, members }: SummaryCoverProps) {
             <ImageBackground
                 source={{ uri: group.imageUrl }}
                 resizeMode="cover"
-                style={styles.cover}
+                style={[styles.cover, { height: totalHeight }]}
                 testID="summary-cover-image"
             >
                 {overlay}
@@ -84,10 +156,15 @@ export function SummaryCover({ group, members }: SummaryCoverProps) {
             colors={visual.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.cover}
+            style={[styles.cover, { height: totalHeight }]}
             testID="summary-cover-gradient"
         >
-            <View style={styles.centeredIcon}>
+            <View
+                style={[
+                    styles.centeredIcon,
+                    { paddingTop: topInset / 2 },
+                ]}
+            >
                 <AppIcon
                     name={visual.icon}
                     size={72}
@@ -100,7 +177,7 @@ export function SummaryCover({ group, members }: SummaryCoverProps) {
 }
 
 const styles = StyleSheet.create({
-    cover: { width: '100%', height: COVER_HEIGHT },
+    cover: { width: '100%' },
     centeredIcon: {
         ...StyleSheet.absoluteFillObject,
         alignItems: 'center',
@@ -109,6 +186,9 @@ const styles = StyleSheet.create({
     typeChip: {
         position: 'absolute',
         top: 10,
+        // Note: 'left' here is fine — RTL handling is via the buttons row above
+        // (which uses left/right + RTL-flipped row order). Keeping the chip in
+        // the visual top-left even under RTL is consistent with the old hero.
         left: 10,
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -138,5 +218,13 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0,0,0,0.5)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
+    },
+    circleButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 9999,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

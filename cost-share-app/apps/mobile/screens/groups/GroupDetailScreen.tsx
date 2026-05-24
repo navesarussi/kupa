@@ -63,7 +63,6 @@ import { prefetchAddExpense } from '../../hooks/queries/prefetchAddExpense';
 import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { EmptyState } from '../../components/EmptyState';
-import { GroupDetailAppBar } from '../../components/groupDetail/GroupDetailAppBar';
 import { GroupSummaryCard } from '../../components/groupDetail/GroupSummaryCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FeedItemRow } from '../../components/FeedItemRow';
@@ -585,17 +584,15 @@ export function GroupDetailScreen() {
                 )}
                 ListHeaderComponent={
                     <>
-                        <GroupDetailAppBar
-                            onBack={handleBack}
-                            onShare={handleShare}
-                            onMenu={handleOpenGroupMenu}
-                        />
                         <GroupSummaryCard
                             group={displayGroup}
                             members={memberLites}
                             balance={balance}
                             settlementCount={settlementCount}
                             noteHasContent={noteHasContent}
+                            onBack={handleBack}
+                            onShare={handleShare}
+                            onMenu={handleOpenGroupMenu}
                             onOpenBalances={handleBalances}
                             onOpenNote={handleNote}
                             onOpenSettleUp={handleSettleUp}
