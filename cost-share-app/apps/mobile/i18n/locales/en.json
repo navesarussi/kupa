@@ -592,6 +592,7 @@
         "closedGroups": "Settled groups",
         "activeGroups": "Unsettled groups",
         "friends": "Friends",
+        "friendsCount": "{{count}} friends",
         "loadError": "Failed to load dashboard",
         "settled": "Settled up",
         "owesYou": "owes you",

@@ -600,6 +600,7 @@
         "closedGroups": "קופות ללא יתרה",
         "activeGroups": "קופות עם יתרה",
         "friends": "חברים",
+        "friendsCount": "{{count}} חברים",
         "loadError": "טעינת לוח הבקרה נכשלה",
         "settled": "מסולק",
         "owesYou": "חייב לך",
