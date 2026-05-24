@@ -20,7 +20,7 @@ export function FeedRowThumbnail({
     imageUrl,
     iconName,
     iconColor = colors.primaryDark,
-    iconBgColor = colors.border.light,
+    iconBgColor = colors.primaryExtraLight,
     testID,
 }: FeedRowThumbnailProps) {
     if (imageUrl) {
@@ -32,7 +32,8 @@ export function FeedRowThumbnail({
                     height: 44,
                     borderRadius: 10,
                     borderWidth: 1,
-                    borderColor: colors.border.light,
+                    // slate-100 / design "border.soft"; no matching theme token exists
+                    borderColor: '#F1F5F9',
                 }}
                 resizeMode="cover"
                 testID={testID ? `${testID}-image` : undefined}
