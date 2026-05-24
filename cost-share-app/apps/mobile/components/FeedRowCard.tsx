@@ -26,17 +26,8 @@ export function FeedRowCard({
     onPress,
     testID,
 }: FeedRowCardProps) {
-    const Container: any = onPress ? TouchableOpacity : View;
-    const containerProps = onPress
-        ? { onPress, activeOpacity: 0.7, testID }
-        : { testID };
-
-    return (
-        <Container
-            {...containerProps}
-            className="bg-white rounded-2xl border border-gray-100 px-3.5 py-3 mb-2 flex-row items-center"
-            style={{ gap: 12 }}
-        >
+    const body = (
+        <>
             {thumbnail}
             <View className="flex-1 min-w-0">
                 <Text
@@ -68,6 +59,29 @@ export function FeedRowCard({
                     </Text>
                 )}
             </View>
-        </Container>
+        </>
+    );
+
+    const className = "bg-white rounded-2xl border border-gray-100 px-3.5 py-3 mb-2 flex-row items-center";
+    const style = { gap: 12 };
+
+    if (onPress) {
+        return (
+            <TouchableOpacity
+                onPress={onPress}
+                activeOpacity={0.7}
+                testID={testID}
+                className={className}
+                style={style}
+            >
+                {body}
+            </TouchableOpacity>
+        );
+    }
+
+    return (
+        <View testID={testID} className={className} style={style}>
+            {body}
+        </View>
     );
 }
