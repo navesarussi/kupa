@@ -160,8 +160,9 @@
             }
         },
         "summary": {
-            "youAreOwed": "You are owed {{amount}}",
-            "youOwe": "You owe {{amount}}"
+            "youAreOwed": "You have {{amount}} to your credit",
+            "youOwe": "You owe {{amount}}",
+            "noOpenPayments": "No open payments"
         },
         "hero": {
             "spentTogether": "Spent together",
@@ -173,6 +174,9 @@
         },
         "bigCreateCta": "Create a group",
         "settings": "Group settings",
+        "detail": {
+            "title": "Group"
+        },
         "menu": {
             "title": "Group options"
         },
