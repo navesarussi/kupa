@@ -1,6 +1,14 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { waitFor, fireEvent } from '@testing-library/react-native';
 import { renderWithQuery } from '../../helpers/renderWithQuery';
+
+// Auto-confirm any Alert.alert popup by invoking the first destructive
+// button's onPress (used for expense/settlement delete confirmation).
+jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const destructive = buttons?.find(b => b.style === 'destructive');
+    destructive?.onPress?.();
+});
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -259,10 +267,10 @@ describe('GroupDetailScreen', () => {
         useAppStore.setState({ currentUser: { id: 'me', name: 'Me' } as never });
         mockFetchSettlements.mockResolvedValue([settlement]);
 
-        const { findByTestId, findByText } = renderWithQuery(<GroupDetailScreen />);
+        const { findByTestId } = renderWithQuery(<GroupDetailScreen />);
         fireEvent.press(await findByTestId('settlement-press-st1'));
         fireEvent.press(await findByTestId('detail-delete-btn'));
-        fireEvent.press(await findByText('common.delete'));
+        // Alert.alert is auto-confirmed by the mock at the top of this file.
 
         await waitFor(() => {
             expect(mockDeleteSettlement).toHaveBeenCalledWith('st1');
