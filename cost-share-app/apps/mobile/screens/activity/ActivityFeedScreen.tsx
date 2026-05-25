@@ -14,11 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
     ExpenseWithDelta,
     GroupMemberLite,
     RecentActivity,
+    Settlement,
 } from '@cost-share/shared';
 import { useActivityQuery } from '../../hooks/queries/useActivityQuery';
 import { ACTIVITY_INITIAL_SKELETON_COUNT } from '../../services/activity.service';
@@ -26,6 +27,7 @@ import {
     deleteExpense,
     getExpenseWithSplitsById,
 } from '../../services/expenses.service';
+import { getSettlementById } from '../../services/settlements.service';
 import { decorateExpense } from '../../services/expense-delta';
 import { fetchProfilesByUserIds } from '../../services/groups.service';
 import { resolveAutoTextInputStyle, rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
@@ -47,10 +49,15 @@ import {
 } from '../../lib/activityFilters';
 import { useAppStore } from '../../store';
 import { colors } from '../../theme';
+import type { GroupDetailFocusFeedItem } from '../../lib/groupDetailFocus';
 
 function unique<T>(values: T[]): T[] {
     return Array.from(new Set(values));
 }
+
+type FeedDetailItem =
+    | { kind: 'expense'; expense: ExpenseWithDelta }
+    | { kind: 'settlement'; settlement: Settlement };
 
 export function ActivityFeedScreen() {
     const { t } = useTranslation();
@@ -73,9 +80,7 @@ export function ActivityFeedScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filters, setFilters] = useState<ActivityFilters>(DEFAULT_ACTIVITY_FILTERS);
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [detailExpense, setDetailExpense] = useState<ExpenseWithDelta | null>(
-        null,
-    );
+    const [detailItem, setDetailItem] = useState<FeedDetailItem | null>(null);
     const [detailMembers, setDetailMembers] = useState<
         Record<string, GroupMemberLite>
     >({});
@@ -91,6 +96,12 @@ export function ActivityFeedScreen() {
         canLoadMoreRef.current = false;
         await refetch();
     }, [refetch]);
+
+    useFocusEffect(
+        useCallback(() => {
+            void refetch();
+        }, [refetch]),
+    );
 
     const handleLoadMore = useCallback(() => {
         if (!canLoadMoreRef.current || !hasNextPage || isFetchingNextPage) {
@@ -124,6 +135,11 @@ export function ActivityFeedScreen() {
         [groups],
     );
 
+    const groupNameById = useMemo(
+        () => Object.fromEntries(groups.map((g) => [g.id, g.name])),
+        [groups],
+    );
+
     const displayedActivities = useMemo(() => {
         const filtered = filterAndSortActivities(
             activities,
@@ -136,6 +152,36 @@ export function ActivityFeedScreen() {
 
     const filterActive = isAnyActivityFilterActive(filters);
     const showInitialSkeleton = isLoading && activities.length === 0;
+
+    const navigateToGroupWithFocus = useCallback(
+        (groupId: string, focusFeedItem: GroupDetailFocusFeedItem) => {
+            setDetailItem(null);
+            navigation.navigate('Groups', {
+                screen: 'GroupDetail',
+                params: { groupId, focusFeedItem },
+                merge: true,
+            });
+        },
+        [navigation],
+    );
+
+    const detailOpenInGroup = useMemo(() => {
+        if (!detailItem) return undefined;
+        const groupId =
+            detailItem.kind === 'expense'
+                ? detailItem.expense.groupId
+                : detailItem.settlement.groupId;
+        const groupName = groupNameById[groupId];
+        if (!groupName) return undefined;
+        const focusFeedItem: GroupDetailFocusFeedItem =
+            detailItem.kind === 'expense'
+                ? { kind: 'expense', id: detailItem.expense.id }
+                : { kind: 'settlement', id: detailItem.settlement.id };
+        return {
+            label: t('activity.openInGroup', { group: groupName }),
+            onPress: () => navigateToGroupWithFocus(groupId, focusFeedItem),
+        };
+    }, [detailItem, groupNameById, navigateToGroupWithFocus, t]);
 
     const openExpenseDetail = useCallback(
         async (expenseId: string) => {
@@ -151,63 +197,99 @@ export function ActivityFeedScreen() {
             );
             const profiles = await fetchProfilesByUserIds(userIds);
             setDetailMembers(profiles);
-            setDetailExpense(decorated);
+            setDetailItem({ kind: 'expense', expense: decorated });
         },
         [currentUser?.id],
     );
 
+    const openSettlementDetail = useCallback(async (settlementId: string) => {
+        const settlement = await getSettlementById(settlementId);
+        if (!settlement) return;
+        const userIds = Array.from(
+            new Set(
+                [
+                    settlement.fromUserId,
+                    settlement.toUserId,
+                    settlement.createdBy,
+                ].filter(Boolean),
+            ),
+        );
+        const profiles = await fetchProfilesByUserIds(userIds);
+        setDetailMembers(profiles);
+        setDetailItem({ kind: 'settlement', settlement });
+    }, []);
+
     const handleActivityPress = useCallback(
         (activity: RecentActivity) => {
+            if (activity.activityType === 'friend_request') {
+                navigation.navigate('Profile', { screen: 'Friends' });
+                return;
+            }
             if (activity.activityType === 'expense') {
                 void openExpenseDetail(activity.id);
                 return;
             }
-            if (
-                activity.activityType === 'message' ||
-                activity.activityType === 'settlement'
-            ) {
+            if (activity.activityType === 'settlement') {
+                void openSettlementDetail(activity.id);
+                return;
+            }
+            if (activity.groupId) {
                 navigation.navigate('Groups', {
                     screen: 'GroupDetail',
                     params: { groupId: activity.groupId },
                 });
             }
         },
-        [navigation, openExpenseDetail],
+        [navigation, openExpenseDetail, openSettlementDetail],
     );
 
     const handleDetailEdit = useCallback(() => {
-        if (!detailExpense) return;
-        const { id: expenseId, groupId } = detailExpense;
-        setDetailExpense(null);
-        navigation.navigate('Groups', {
-            screen: 'AddExpense',
-            params: { expenseId, groupId },
-        });
-    }, [detailExpense, navigation]);
+        if (!detailItem) return;
+        if (detailItem.kind === 'expense') {
+            const { id: expenseId, groupId } = detailItem.expense;
+            setDetailItem(null);
+            navigation.navigate('Groups', {
+                screen: 'AddExpense',
+                params: { expenseId, groupId },
+            });
+            return;
+        }
+        const { groupId, id } = detailItem.settlement;
+        navigateToGroupWithFocus(groupId, { kind: 'settlement', id });
+    }, [detailItem, navigateToGroupWithFocus]);
 
     const handleDetailDeleteRequest = useCallback(() => {
-        if (!detailExpense) return;
+        if (!detailItem) return;
+        if (detailItem.kind === 'settlement') {
+            const { groupId, id } = detailItem.settlement;
+            navigateToGroupWithFocus(groupId, { kind: 'settlement', id });
+            return;
+        }
         setPendingDelete(true);
-    }, [detailExpense]);
+    }, [detailItem, navigateToGroupWithFocus]);
 
     const handleConfirmDelete = useCallback(async () => {
-        if (!detailExpense) {
+        if (!detailItem || detailItem.kind !== 'expense') {
             setPendingDelete(false);
             return;
         }
-        const ok = await deleteExpense(detailExpense.id);
+        const ok = await deleteExpense(detailItem.expense.id);
         setPendingDelete(false);
         if (ok) {
-            setDetailExpense(null);
+            setDetailItem(null);
             void refetch();
         }
-    }, [detailExpense, refetch]);
+    }, [detailItem, refetch]);
 
     const renderActivity = useCallback(
         ({ item }: { item: RecentActivity }) => (
-            <ActivityItem activity={item} onPress={handleActivityPress} />
+            <ActivityItem
+                activity={item}
+                groupName={groupNameById[item.groupId]}
+                onPress={handleActivityPress}
+            />
         ),
-        [handleActivityPress],
+        [handleActivityPress, groupNameById],
     );
 
     const keyExtractor = useCallback(
@@ -315,7 +397,7 @@ export function ActivityFeedScreen() {
                 data={displayedActivities}
                 keyExtractor={keyExtractor}
                 renderItem={renderActivity}
-                contentContainerClassName="px-2 pb-4"
+                contentContainerClassName="px-3 pb-4"
                 initialNumToRender={10}
                 maxToRenderPerBatch={10}
                 windowSize={5}
@@ -348,14 +430,14 @@ export function ActivityFeedScreen() {
             />
 
             <FeedItemDetailSheet
-                item={
-                    detailExpense ? { kind: 'expense', expense: detailExpense } : null
-                }
+                item={detailItem}
                 memberMap={detailMembers}
                 currentUserId={currentUser?.id ?? ''}
-                onClose={() => setDetailExpense(null)}
+                onClose={() => setDetailItem(null)}
                 onEdit={handleDetailEdit}
                 onDelete={handleDetailDeleteRequest}
+                onOpenInGroup={detailOpenInGroup?.onPress}
+                openInGroupLabel={detailOpenInGroup?.label}
             />
 
             <ConfirmDialog

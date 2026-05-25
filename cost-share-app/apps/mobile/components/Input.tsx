@@ -26,11 +26,11 @@ export function Input({
 
     return (
         <View className={`mb-4 ${containerClassName}`}>
-            {label && (
+            {label ? (
                 <Text className="text-sm font-medium text-gray-700 mb-2">
                     {label}
                 </Text>
-            )}
+            ) : null}
             <TextInput
                 className={[
                     'bg-white border rounded-xl px-4 py-3 text-base text-gray-900',
@@ -43,9 +43,9 @@ export function Input({
                 placeholderTextColor="#9CA3AF"
                 {...textInputProps}
             />
-            {error && (
+            {error ? (
                 <Text className="text-sm text-red-500 mt-1">{error}</Text>
-            )}
+            ) : null}
         </View>
     );
 }

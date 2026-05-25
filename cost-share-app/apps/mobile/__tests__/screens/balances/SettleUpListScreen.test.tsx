@@ -28,9 +28,7 @@ jest.mock('../../../components/SettleUpSheet', () => {
     };
 });
 
-const mockPairwiseQuery = jest.fn();
 jest.mock('../../../hooks/queries/useSettlementQueries', () => ({
-    useGroupPairwiseDebtsQuery: (...args: any[]) => mockPairwiseQuery(...args),
     useGroupSettlementsQuery: () => ({ data: [], refetch: jest.fn() }),
     useCreateSettlementMutation: () => ({
         mutateAsync: jest.fn().mockResolvedValue(undefined),
@@ -44,6 +42,12 @@ jest.mock('../../../hooks/queries/useSettlementQueries', () => ({
         mutateAsync: jest.fn().mockResolvedValue(undefined),
         isPending: false,
     }),
+}));
+
+const mockSimplifiedQuery = jest.fn();
+jest.mock('../../../hooks/queries/useGroupBalancesQueries', () => ({
+    useGroupSimplifiedDebtsByCurrencyQuery: (...args: any[]) =>
+        mockSimplifiedQuery(...args),
 }));
 
 jest.mock('../../../hooks/useGroupSettlementsRealtime', () => ({
@@ -65,14 +69,42 @@ const members = [
     { id: 'dan', name: 'Dan', email: 'dan@x.com', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date() },
 ];
 
-function setPairwiseQueryResult(partial: {
-    data?: any[];
+type FlatDebt = {
+    fromUserId: string;
+    toUserId: string;
+    currency: string;
+    amount: number;
+};
+
+function setSimplifiedQueryResult(partial: {
+    data?: FlatDebt[];
     isLoading?: boolean;
     isFetching?: boolean;
     isRefetching?: boolean;
 }) {
-    mockPairwiseQuery.mockReturnValue({
-        data: partial.data ?? [],
+    const grouped = new Map<string, FlatDebt[]>();
+    for (const d of partial.data ?? []) {
+        const bucket = grouped.get(d.currency) ?? [];
+        bucket.push(d);
+        grouped.set(d.currency, bucket);
+    }
+    const data = Array.from(grouped.entries()).map(([currency, debts]) => ({
+        currency,
+        result: {
+            debts: debts.map(d => ({
+                fromUserId: d.fromUserId,
+                fromUserName: d.fromUserId,
+                toUserId: d.toUserId,
+                toUserName: d.toUserId,
+                amount: d.amount,
+                currency: d.currency,
+            })),
+            transactionCount: debts.length,
+            algorithm: 'exact' as const,
+        },
+    }));
+    mockSimplifiedQuery.mockReturnValue({
+        data,
         isLoading: partial.isLoading ?? false,
         isFetching: partial.isFetching ?? false,
         isRefetching: partial.isRefetching ?? false,
@@ -81,7 +113,7 @@ function setPairwiseQueryResult(partial: {
 }
 
 beforeEach(() => {
-    mockPairwiseQuery.mockReset();
+    mockSimplifiedQuery.mockReset();
     mockGroupUsers.mockReset();
     mockGroupUsers.mockReturnValue({ data: members });
     useAppStore.setState({
@@ -101,27 +133,27 @@ beforeEach(() => {
 
 describe('SettleUpListScreen', () => {
     it('shows the loading indicator while the initial fetch is in flight', () => {
-        setPairwiseQueryResult({ isLoading: true, isFetching: true, data: [] });
+        setSimplifiedQueryResult({ isLoading: true, isFetching: true, data: [] });
         const { getByText } = renderWithQuery(<SettleUpListScreen />);
         expect(getByText('common.loading')).toBeTruthy();
     });
 
     it('keeps the loading indicator visible during a background refetch over empty cache', () => {
         // Regression: stale empty cache + background refetch must NOT flash "everyone is settled".
-        setPairwiseQueryResult({ isLoading: false, isFetching: true, data: [] });
+        setSimplifiedQueryResult({ isLoading: false, isFetching: true, data: [] });
         const { queryByText, getByText } = renderWithQuery(<SettleUpListScreen />);
         expect(getByText('common.loading')).toBeTruthy();
         expect(queryByText('settleUp.empty')).toBeNull();
     });
 
     it('shows the "everyone is settled" empty state when fetching settles with no debts', () => {
-        setPairwiseQueryResult({ isLoading: false, isFetching: false, data: [] });
+        setSimplifiedQueryResult({ isLoading: false, isFetching: false, data: [] });
         const { getByText } = renderWithQuery(<SettleUpListScreen />);
         expect(getByText('settleUp.empty')).toBeTruthy();
     });
 
     it('renders one row per pairwise debt, including multiple rows for the same pair with different currencies', () => {
-        setPairwiseQueryResult({
+        setSimplifiedQueryResult({
             data: [
                 { fromUserId: 'me', toUserId: 'bob', currency: 'USD', amount: 10 },
                 { fromUserId: 'me', toUserId: 'bob', currency: 'EUR', amount: 7 },
@@ -135,7 +167,7 @@ describe('SettleUpListScreen', () => {
     });
 
     it('pins debts the current user is involved in before unrelated debts', () => {
-        setPairwiseQueryResult({
+        setSimplifiedQueryResult({
             data: [
                 { fromUserId: 'carol', toUserId: 'dan', currency: 'USD', amount: 30 },
                 { fromUserId: 'me', toUserId: 'bob', currency: 'USD', amount: 5 },
@@ -149,7 +181,7 @@ describe('SettleUpListScreen', () => {
     });
 
     it('opens the settle-up sheet pre-filled with the tapped debt', () => {
-        setPairwiseQueryResult({
+        setSimplifiedQueryResult({
             data: [
                 { fromUserId: 'me', toUserId: 'bob', currency: 'EUR', amount: 7 },
             ],

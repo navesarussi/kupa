@@ -5,20 +5,19 @@ import { SummaryFooter } from '../../components/groupDetail/SummaryFooter';
 describe('SummaryFooter', () => {
   const base = {
     settlementCount: 1,
-    isSettled: false,
     noteHasContent: false,
     onOpenNote: jest.fn(),
     onOpenSettleUp: jest.fn(),
   };
 
-  it('shows pluralized "payments to settle" text when not settled', () => {
+  it('shows pluralized "payments to settle" text when there are open payments', () => {
     const { getByText } = render(<SummaryFooter {...base} settlementCount={1} />);
     expect(getByText(/balances\.paymentsToSettle/i)).toBeTruthy();
   });
 
-  it('shows "No open payments" when settled', () => {
+  it('shows "No open payments" when there are no open payments', () => {
     const { getByText } = render(
-      <SummaryFooter {...base} isSettled settlementCount={0} />,
+      <SummaryFooter {...base} settlementCount={0} />,
     );
     expect(getByText(/groups\.summary\.noOpenPayments/i)).toBeTruthy();
   });
@@ -35,13 +34,13 @@ describe('SummaryFooter', () => {
     expect(queryByTestId('summary-note-dot')).toBeNull();
   });
 
-  it('disables the settle-up pill when settled', () => {
+  it('keeps the settle-up pill enabled when there are no open payments', () => {
     const onOpenSettleUp = jest.fn();
     const { getByTestId } = render(
-      <SummaryFooter {...base} isSettled onOpenSettleUp={onOpenSettleUp} />,
+      <SummaryFooter {...base} settlementCount={0} onOpenSettleUp={onOpenSettleUp} />,
     );
     fireEvent.press(getByTestId('summary-settle-pill'));
-    expect(onOpenSettleUp).not.toHaveBeenCalled();
+    expect(onOpenSettleUp).toHaveBeenCalledTimes(1);
   });
 
   it('calls onOpenNote / onOpenSettleUp on tap', () => {

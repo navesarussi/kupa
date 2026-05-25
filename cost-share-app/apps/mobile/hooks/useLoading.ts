@@ -4,7 +4,7 @@
  * Replaces global loading state to prevent conflicts between screens
  */
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 interface UseLoadingReturn {
     isLoading: boolean;
@@ -33,13 +33,13 @@ interface UseLoadingReturn {
 export function useLoading(): UseLoadingReturn {
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    const startLoading = (): void => {
+    const startLoading = useCallback((): void => {
         setIsLoading(true);
-    };
+    }, []);
 
-    const stopLoading = (): void => {
+    const stopLoading = useCallback((): void => {
         setIsLoading(false);
-    };
+    }, []);
 
     const setLoading = (loading: boolean): void => {
         setIsLoading(loading);

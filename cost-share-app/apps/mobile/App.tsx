@@ -21,6 +21,7 @@ import { signalDeactivatedAccount } from './lib/signalDeactivatedAccount';
 import { hydrateCurrentUserProfile } from './services/users.service';
 import { queryClient } from './lib/queryClient';
 import { useAppStore } from './store';
+import { useAppRealtime } from './hooks/useAppRealtime';
 import { colors } from './theme';
 import { RtlLayoutProvider } from './hooks/useRtlLayout';
 import type { Session } from '@supabase/supabase-js';
@@ -54,6 +55,8 @@ function WebFrame({ children }: { children: React.ReactNode }) {
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const { session, setSession } = useAppStore();
+  const currentUserId = useAppStore((s) => s.currentUser?.id ?? null);
+  useAppRealtime(currentUserId);
   const setPendingDeactivationNotice = useAppStore((s) => s.setPendingDeactivationNotice);
   const incomingUrl = Linking.useURL();
 

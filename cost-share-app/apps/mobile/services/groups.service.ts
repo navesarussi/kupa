@@ -30,6 +30,9 @@ import {
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
 import { useAppStore } from '../store';
+import { queryClient } from '../lib/queryClient';
+import { queryKeys } from '../hooks/queries/keys';
+import { fetchBalanceSummary } from './users.service';
 import Toast from 'react-native-toast-message';
 import i18n from '../i18n';
 
@@ -183,7 +186,7 @@ async function fetchGroupsInternal(): Promise<GroupWithMembers[]> {
         const { data, error: groupsErr } = await supabase
             .from('groups')
             .select(
-                '*, group_members!inner(user_id, is_active, profiles(id, name, is_active))',
+                '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url, is_active))',
             )
             .in('id', groupIds)
             .eq('is_active', true)
@@ -435,10 +438,45 @@ export async function fetchProfilesByUserIds(
     return map;
 }
 
+async function syncGroupMembershipState(groupId: string): Promise<void> {
+    const { data, error } = await supabase
+        .from('groups')
+        .select(
+            '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url, is_active))',
+        )
+        .eq('id', groupId)
+        .eq('is_active', true)
+        .eq('group_members.is_active', true)
+        .maybeSingle();
+
+    if (!error && data) {
+        const refreshed = groupWithMembersFromRow(data);
+        const existing = useAppStore.getState().groups.find(g => g.id === groupId);
+        useAppStore.getState().updateGroup({
+            ...refreshed,
+            isArchivedByMe: existing?.isArchivedByMe ?? refreshed.isArchivedByMe,
+            isAutoArchived: existing?.isAutoArchived ?? refreshed.isAutoArchived,
+        });
+    }
+
+    void queryClient.invalidateQueries({ queryKey: queryKeys.groupUsers(groupId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.groupMembers(groupId) });
+    void fetchBalanceSummary();
+}
+
 export async function addGroupMember(groupId: string, userId: string): Promise<GroupMember | null> {
     const { data, error } = await supabase
         .from('group_members')
-        .insert({ group_id: groupId, user_id: userId })
+        .upsert(
+            {
+                group_id: groupId,
+                user_id: userId,
+                is_active: true,
+                left_at: null,
+                joined_at: new Date().toISOString(),
+            },
+            { onConflict: 'group_id,user_id' },
+        )
         .select()
         .single();
 
@@ -451,6 +489,7 @@ export async function addGroupMember(groupId: string, userId: string): Promise<G
         return null;
     }
 
+    await syncGroupMembershipState(groupId);
     Toast.show({ type: 'success', text1: 'Member added' });
     return groupMemberFromRow(data);
 }
@@ -474,6 +513,7 @@ export async function removeGroupMember(groupId: string, userId: string): Promis
         return false;
     }
 
+    await syncGroupMembershipState(groupId);
     Toast.show({ type: 'success', text1: 'Member removed' });
     return true;
 }

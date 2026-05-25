@@ -21,6 +21,7 @@ export async function fetchMessages(groupId: string): Promise<GroupMessage[]> {
         return messages;
     } catch (error) {
         console.error('Failed to fetch messages:', error);
+        useAppStore.getState().setGroupMessages(groupId, []);
         return [];
     }
 }

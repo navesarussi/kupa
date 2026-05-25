@@ -236,7 +236,11 @@ export function calculateUserBalancesByCurrencyFromData(args: {
         const perCurrency = acc.get(userId) ?? new Map();
         const rows: UserBalanceByCurrencyRow[] = [];
         for (const [currency, t] of perCurrency) {
-            const netCents = t.paid - t.owed + t.settledReceived - t.settledPaid;
+            // Net contribution = cash in (expenses you paid + settlements you
+            // paid out) minus cash out (your share of expenses + settlements you
+            // received). Positive = creditor, negative = debtor — matches the
+            // convention `simplifyDebts` and the SQL RPC use.
+            const netCents = t.paid - t.owed + t.settledPaid - t.settledReceived;
             if (
                 t.paid === 0 &&
                 t.owed === 0 &&

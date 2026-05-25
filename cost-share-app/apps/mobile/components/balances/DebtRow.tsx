@@ -12,6 +12,7 @@ import { TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '../AppText';
 import { MemberAvatar } from '../MemberAvatar';
+import { useRtlLayout } from '../../hooks/useRtlLayout';
 
 export interface DebtRowDebt {
     fromUserId: string;
@@ -40,6 +41,7 @@ export function DebtRow({
     onPress,
 }: DebtRowProps) {
     const { t } = useTranslation();
+    const isRtl = useRtlLayout();
     return (
         <TouchableOpacity
             onPress={onPress}
@@ -52,7 +54,7 @@ export function DebtRow({
         >
             <MemberAvatar name={fromName} avatarUrl={fromAvatar} size="sm" />
             <View className="mx-2">
-                <Text className="text-gray-400">→</Text>
+                <Text className="text-gray-400">{isRtl ? '←' : '→'}</Text>
             </View>
             <MemberAvatar name={toName} avatarUrl={toAvatar} size="sm" />
 

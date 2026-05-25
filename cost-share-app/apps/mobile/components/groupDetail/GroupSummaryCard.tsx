@@ -81,7 +81,6 @@ export function GroupSummaryCard({
             />
             <SummaryFooter
                 settlementCount={settlementCount}
-                isSettled={balance.isSettled}
                 noteHasContent={noteHasContent}
                 onOpenNote={onOpenNote}
                 onOpenSettleUp={onOpenSettleUp}

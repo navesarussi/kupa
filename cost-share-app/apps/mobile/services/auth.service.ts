@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { clearGroupFeedHydration } from '../lib/groupFeedCache';
 import { queryClient } from '../lib/queryClient';
 import { clearStaleAuthSession } from '../lib/authSessionLifecycle';
+import { clearNavigationState } from '../lib/navigationPersistence';
 import { isAuthSessionAllowed } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store';
@@ -199,6 +200,7 @@ export async function clearLocalAuthSession(): Promise<void> {
   clearGroupFeedHydration();
   exchangeByCode.clear();
   queryClient.clear();
+  await clearNavigationState();
   await clearStaleAuthSession();
   useAppStore.getState().setSession(null);
 }

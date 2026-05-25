@@ -96,6 +96,26 @@ else
   FAILED=1
 fi
 
+MSG_RPC_HTTP_CODE="$(curl -s -o "$PROBE_FILE" -w "%{http_code}" \
+  -X POST \
+  -H "apikey: $API_KEY" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_group_id":"00000000-0000-0000-0000-000000000000","p_limit":1}' \
+  "$SUPABASE_URL/rest/v1/rpc/get_group_messages")"
+if [[ "$MSG_RPC_HTTP_CODE" == "404" ]]; then
+  echo "✗ get_group_messages RPC missing (HTTP 404)"
+  echo "  → Apply cost-share-app/supabase/group-messages.sql (or: bash scripts/supabase-apply-patches.sh)"
+  FAILED=1
+elif [[ "$MSG_RPC_HTTP_CODE" =~ ^[245] ]]; then
+  echo "✓ get_group_messages RPC reachable (HTTP $MSG_RPC_HTTP_CODE)"
+else
+  echo "✗ get_group_messages RPC probe failed (HTTP $MSG_RPC_HTTP_CODE)"
+  cat "$PROBE_FILE" 2>/dev/null || true
+  echo ""
+  FAILED=1
+fi
+
 if [[ "$FAILED" -eq 0 ]]; then
   echo ""
   echo "✓ Supabase schema OK [source: $ENV_SOURCE]"

@@ -3,7 +3,6 @@ import { Session } from '@supabase/supabase-js';
 import {
     User,
     ExpenseWithSplits,
-    DEFAULT_CURRENCY,
     GroupWithMembers,
     GroupMessage,
     BalanceSummaryRow,
@@ -64,24 +63,16 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
     // Auth state
     session: null,
+    // currentUser is owned by hydrateCurrentUserProfile (real profile row from DB).
+    // setSession used to also derive a session-payload placeholder here, but that
+    // clobbered the hydrated row in App.acceptSessionIfAllowed (hydrate-then-setSession
+    // order) and on every TOKEN_REFRESHED event — making Settings show ILS while the
+    // dashboard RPC returned the real currency. Sign-out (session=null) still clears both.
     setSession: (session) =>
-        set({
+        set((state) => ({
             session,
-            currentUser: session
-                ? {
-                    id: session.user.id,
-                    email: session.user.email ?? '',
-                    name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
-                    avatarUrl: session.user.user_metadata?.avatar_url ?? undefined,
-                    inviteToken: '',
-                    defaultCurrency: DEFAULT_CURRENCY,
-                    language: 'en' as const,
-                    isActive: true,
-                    createdAt: new Date(session.user.created_at),
-                    updatedAt: new Date(session.user.updated_at ?? session.user.created_at),
-                }
-                : null,
-        }),
+            currentUser: session ? state.currentUser : null,
+        })),
 
     // User state
     currentUser: null,

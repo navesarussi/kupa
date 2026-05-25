@@ -59,7 +59,7 @@ export function BalanceModeToggle({
                         testID={`${testID}-${opt.value}`}
                     >
                         <Text
-                            className={`text-sm font-semibold ${
+                            className={`text-sm font-semibold text-center ${
                                 selected ? 'text-primary-dark' : 'text-gray-600'
                             }`}
                         >
