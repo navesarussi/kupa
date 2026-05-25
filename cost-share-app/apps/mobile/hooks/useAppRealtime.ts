@@ -33,6 +33,17 @@ function snapshotRefetch(): void {
     void queryClient.invalidateQueries({ queryKey: queryKeys.friends });
     void queryClient.invalidateQueries({ queryKey: queryKeys.friendRequestsIncoming });
     void queryClient.invalidateQueries({ queryKey: queryKeys.friendRequestsOutgoing });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.activity });
+}
+
+const ACTIVITY_INVALIDATE_DEBOUNCE_MS = 500;
+let activityInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
+function invalidateActivityDebounced(): void {
+    if (activityInvalidateTimer) clearTimeout(activityInvalidateTimer);
+    activityInvalidateTimer = setTimeout(() => {
+        activityInvalidateTimer = null;
+        void queryClient.invalidateQueries({ queryKey: queryKeys.activity });
+    }, ACTIVITY_INVALIDATE_DEBOUNCE_MS);
 }
 
 function handleGroupsEvent(payload: RealtimePayload): void {
@@ -200,6 +211,39 @@ export function useAppRealtime(userId: string | undefined | null): void {
                         handleArchiveEvent(payload);
                     } catch (err) {
                         console.error('app realtime: archive payload error:', err);
+                    }
+                },
+            )
+            .on(
+                'postgres_changes' as never,
+                { event: '*', schema: 'public', table: 'expenses' },
+                () => {
+                    try {
+                        invalidateActivityDebounced();
+                    } catch (err) {
+                        console.error('app realtime: expenses activity-feed payload error:', err);
+                    }
+                },
+            )
+            .on(
+                'postgres_changes' as never,
+                { event: '*', schema: 'public', table: 'settlements' },
+                () => {
+                    try {
+                        invalidateActivityDebounced();
+                    } catch (err) {
+                        console.error('app realtime: settlements activity-feed payload error:', err);
+                    }
+                },
+            )
+            .on(
+                'postgres_changes' as never,
+                { event: '*', schema: 'public', table: 'group_messages' },
+                () => {
+                    try {
+                        invalidateActivityDebounced();
+                    } catch (err) {
+                        console.error('app realtime: group_messages activity-feed payload error:', err);
                     }
                 },
             )
