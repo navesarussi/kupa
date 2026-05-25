@@ -18,12 +18,15 @@ import { EmptyState } from '../../components/EmptyState';
 import { MemberAvatar } from '../../components/MemberAvatar';
 import { colors } from '../../theme';
 import { getDisplayName } from '../../lib/userDisplay';
+import { useRtlLayout } from '../../hooks/useRtlLayout';
 
 export function SettlementHistoryScreen() {
     const { t } = useTranslation();
     const route = useRoute<any>();
     const { groupId } = route.params;
     const { isLoading, startLoading, stopLoading } = useLoading();
+    const isRtl = useRtlLayout();
+    const arrow = isRtl ? '←' : '→';
 
     const [settlements, setSettlements] = useState<Settlement[]>([]);
     const [refreshing, setRefreshing] = useState(false);
@@ -63,12 +66,12 @@ export function SettlementHistoryScreen() {
                     <View className="flex-row items-center flex-1">
                         <MemberAvatar name={getUserName(item.fromUserId)} size="sm" />
                         <View className="mx-2">
-                            <Text className="text-gray-400">→</Text>
+                            <Text className="text-gray-400">{arrow}</Text>
                         </View>
                         <MemberAvatar name={getUserName(item.toUserId)} size="sm" />
                         <View className="ml-3 flex-1">
                             <Text className="text-sm font-medium text-gray-900">
-                                {getUserName(item.fromUserId)} → {getUserName(item.toUserId)}
+                                {getUserName(item.fromUserId)} {arrow} {getUserName(item.toUserId)}
                             </Text>
                             <Text className="text-xs text-gray-400 mt-0.5">
                                 {formattedDate}

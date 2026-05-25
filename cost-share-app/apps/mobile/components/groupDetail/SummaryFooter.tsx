@@ -2,7 +2,6 @@
  * SummaryFooter — bottom region of GroupSummaryCard.
  * "N payments to settle" on the left; Note + Settle-up pills on the right.
  * Note pill is always rendered; the amber dot toggles on noteHasContent.
- * Settle-up is disabled in the settled state.
  */
 
 import React from 'react';
@@ -19,7 +18,6 @@ const BORDER_SOFT = '#F1F5F9'; // slate-100; design "border.soft"
 
 interface SummaryFooterProps {
     settlementCount: number;
-    isSettled: boolean;
     noteHasContent: boolean;
     onOpenNote: () => void;
     onOpenSettleUp: () => void;
@@ -27,7 +25,6 @@ interface SummaryFooterProps {
 
 export function SummaryFooter({
     settlementCount,
-    isSettled,
     noteHasContent,
     onOpenNote,
     onOpenSettleUp,
@@ -41,7 +38,7 @@ export function SummaryFooter({
                 className="text-[12px] text-gray-500 flex-1"
                 numberOfLines={1}
             >
-                {isSettled
+                {settlementCount === 0
                     ? t('groups.summary.noOpenPayments')
                     : t('balances.paymentsToSettle', { count: settlementCount })}
             </Text>
@@ -70,33 +67,24 @@ export function SummaryFooter({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    onPress={isSettled ? undefined : onOpenSettleUp}
-                    activeOpacity={isSettled ? 1 : 0.7}
-                    disabled={isSettled}
+                    onPress={onOpenSettleUp}
+                    activeOpacity={0.7}
                     testID="summary-settle-pill"
                     style={[
                         styles.settlePill,
-                        {
-                            backgroundColor: isSettled
-                                ? colors.gray100
-                                : colors.primaryExtraLight,
-                        },
+                        { backgroundColor: colors.primaryExtraLight },
                     ]}
                 >
                     <Text
                         className="text-[12px] font-semibold"
-                        style={{
-                            color: isSettled
-                                ? colors.gray400
-                                : colors.primaryDark,
-                        }}
+                        style={{ color: colors.primaryDark }}
                     >
                         {t('groups.actions.settleUp')}
                     </Text>
                     <AppIcon
                         name={isRtl ? 'arrow-back' : 'arrow-forward'}
                         size={12}
-                        color={isSettled ? colors.gray400 : colors.primaryDark}
+                        color={colors.primaryDark}
                     />
                 </TouchableOpacity>
             </View>
