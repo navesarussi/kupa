@@ -24,7 +24,6 @@ import { Text } from './AppText';
 import { AppIcon, AppIconName } from './AppIcon';
 import { MemberAvatar } from './MemberAvatar';
 import { DetailSheetHeader } from './DetailSheetHeader';
-import { formatFeedDateTime } from '../lib/formatFeedDateTime';
 import { useAppLanguage } from '../hooks/useRtlLayout';
 import { colors } from '../theme';
 import { shadows } from '../theme/shadows';
@@ -477,6 +476,306 @@ function InvolvementStrip({
     );
 }
 
+function SettlementHero({
+    fromName,
+    toName,
+    amountText,
+    heroDate,
+    isRtl,
+}: {
+    fromName: string;
+    toName: string;
+    amountText: string;
+    heroDate: string;
+    isRtl: boolean;
+}) {
+    const { t } = useTranslation();
+    const chevronName: AppIconName = isRtl
+        ? 'chevron-back'
+        : 'chevron-forward';
+
+    return (
+        <View className="px-4 pt-1">
+            <View
+                className="rounded-2xl overflow-hidden border"
+                style={{
+                    height: 180,
+                    borderColor: '#A7F3D0',
+                    position: 'relative',
+                }}
+            >
+                <LinearGradient
+                    colors={['#10B981', '#047857']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                />
+
+                {/* Top + bottom legibility scrim */}
+                <View
+                    pointerEvents="none"
+                    style={[StyleSheet.absoluteFill, { zIndex: 0 }]}
+                >
+                    <LinearGradient
+                        colors={[
+                            'rgba(0,0,0,0.18)',
+                            'rgba(0,0,0,0)',
+                            'rgba(0,0,0,0)',
+                            'rgba(0,0,0,0.18)',
+                        ]}
+                        locations={[0, 0.3, 0.7, 1]}
+                        style={StyleSheet.absoluteFill}
+                    />
+                </View>
+
+                {/* Payment chip — top-left */}
+                <View
+                    className="flex-row items-center rounded-full"
+                    style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        backgroundColor: 'rgba(0,0,0,0.45)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        zIndex: 2,
+                    }}
+                >
+                    <AppIcon
+                        name="checkmark-circle"
+                        size={12}
+                        color="#FFFFFF"
+                    />
+                    <Text
+                        className="text-white font-semibold ml-1"
+                        style={{ fontSize: 11 }}
+                    >
+                        {t('settleUp.payment')}
+                    </Text>
+                </View>
+
+                {/* Date — top-right */}
+                <Text
+                    style={{
+                        position: 'absolute',
+                        top: 12,
+                        right: 14,
+                        fontSize: 11,
+                        color: 'rgba(255,255,255,0.92)',
+                        textShadowColor: 'rgba(0,0,0,0.4)',
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                        zIndex: 2,
+                    }}
+                >
+                    {heroDate}
+                </Text>
+
+                {/* Center payment flow */}
+                <View
+                    style={{
+                        flex: 1,
+                        flexDirection: isRtl ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 14,
+                        zIndex: 2,
+                    }}
+                >
+                    <FlowPerson name={fromName} label={t('settleUp.paid')} />
+
+                    <View
+                        style={{
+                            flex: 1,
+                            minWidth: 0,
+                            paddingHorizontal: 6,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                fontSize: 20,
+                                fontWeight: '700',
+                                color: '#FFFFFF',
+                                fontVariant: ['tabular-nums'],
+                                letterSpacing: -0.2,
+                                textShadowColor: 'rgba(0,0,0,0.35)',
+                                textShadowOffset: { width: 0, height: 1 },
+                                textShadowRadius: 3,
+                            }}
+                            numberOfLines={1}
+                        >
+                            {amountText}
+                        </Text>
+                        <View
+                            style={{
+                                flexDirection: isRtl ? 'row-reverse' : 'row',
+                                alignItems: 'center',
+                                width: '100%',
+                                marginTop: 4,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    flex: 1,
+                                    height: 2,
+                                    backgroundColor: 'rgba(255,255,255,0.85)',
+                                    borderRadius: 9999,
+                                }}
+                            />
+                            <AppIcon
+                                name={chevronName}
+                                size={18}
+                                color="rgba(255,255,255,0.95)"
+                            />
+                        </View>
+                    </View>
+
+                    <FlowPerson name={toName} label={t('settleUp.received')} />
+                </View>
+            </View>
+        </View>
+    );
+}
+
+function FlowPerson({ name, label }: { name: string; label: string }) {
+    return (
+        <View style={{ width: 96, alignItems: 'center' }}>
+            <View
+                style={{
+                    padding: 3,
+                    backgroundColor: 'rgba(255,255,255,0.25)',
+                    borderRadius: 9999,
+                }}
+            >
+                <View
+                    style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 9999,
+                    }}
+                >
+                    <MemberAvatar name={name} size="md" />
+                </View>
+            </View>
+            <Text
+                style={{
+                    marginTop: 6,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                    width: 96,
+                    textAlign: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.35)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 3,
+                }}
+                numberOfLines={1}
+            >
+                {name}
+            </Text>
+            <Text
+                style={{
+                    fontSize: 9,
+                    fontWeight: '700',
+                    color: 'rgba(255,255,255,0.8)',
+                    letterSpacing: 0.8,
+                    marginTop: 2,
+                }}
+            >
+                {label}
+            </Text>
+        </View>
+    );
+}
+
+function SettlementInvolvementStrip({
+    settlement,
+    currentUserId,
+    fromName,
+    toName,
+    amountText,
+    methodLabel,
+}: {
+    settlement: Settlement;
+    currentUserId: string;
+    fromName: string;
+    toName: string;
+    amountText: string;
+    methodLabel: string | null;
+}) {
+    const { t } = useTranslation();
+
+    const isRecipient = settlement.toUserId === currentUserId;
+    const isPayer = settlement.fromUserId === currentUserId;
+
+    let iconName: AppIconName;
+    let heading: string;
+    let sub: string | null;
+
+    if (isRecipient) {
+        iconName = 'arrow-down-circle-outline';
+        heading = t('settleUp.youReceivedAmount', { amount: amountText });
+        sub = methodLabel
+            ? t('settleUp.fromVia', { name: fromName, method: methodLabel })
+            : t('settleUp.fromName', { name: fromName });
+    } else if (isPayer) {
+        iconName = 'arrow-up-circle-outline';
+        heading = t('settleUp.youPaidAmount', { amount: amountText });
+        sub = methodLabel
+            ? t('settleUp.toVia', { name: toName, method: methodLabel })
+            : t('settleUp.toName', { name: toName });
+    } else {
+        iconName = 'swap-horizontal-outline';
+        heading = t('settleUp.someonePaid', { from: fromName, to: toName });
+        sub = methodLabel
+            ? t('settleUp.via', { method: methodLabel })
+            : null;
+    }
+
+    return (
+        <View
+            className="flex-row items-center mx-4 mt-3.5 mb-6 rounded-xl"
+            style={{
+                backgroundColor: '#ECFDF5',
+                borderColor: '#A7F3D0',
+                borderWidth: 1,
+                paddingVertical: 14,
+                paddingHorizontal: 14,
+            }}
+        >
+            <View
+                className="items-center justify-center bg-white"
+                style={{ width: 36, height: 36, borderRadius: 9999 }}
+            >
+                <AppIcon name={iconName} size={20} color={colors.success} />
+            </View>
+            <View className="flex-1 mx-3 min-w-0">
+                <Text
+                    style={{
+                        fontSize: 15,
+                        fontWeight: '700',
+                        color: '#047857',
+                    }}
+                >
+                    {heading}
+                </Text>
+                {sub && (
+                    <Text
+                        style={{
+                            fontSize: 12,
+                            color: '#047857',
+                            opacity: 0.8,
+                            marginTop: 2,
+                        }}
+                    >
+                        {sub}
+                    </Text>
+                )}
+            </View>
+        </View>
+    );
+}
+
 function SettlementDetailBody({
     settlement,
     memberMap,
@@ -504,72 +803,31 @@ function SettlementDetailBody({
         t('common.unknown'),
     );
     const amountText = `${settlement.currency} ${settlement.amount.toFixed(2)}`;
-    const timestamp = formatFeedDateTime(
-        new Date(settlement.createdAt),
+    const heroDate = formatHeroDate(
+        new Date(settlement.settlementDate ?? settlement.createdAt),
         language,
     );
+    const methodLabel = settlement.paymentMethod
+        ? t(`balances.paymentMethods.${settlement.paymentMethod}`)
+        : null;
 
     return (
-        <View className="px-5">
-            <View className="items-center py-4">
-                <View className="mb-3">
-                    <AppIcon
-                        name="swap-horizontal-outline"
-                        size={28}
-                        color={colors.success}
-                    />
-                </View>
-                <Text className="text-2xl font-bold text-green-600">{amountText}</Text>
-                <Text className="text-base text-gray-800 mt-2 text-center px-4">
-                    {t('feed.settlement', {
-                        from: fromName,
-                        to: toName,
-                        amount: amountText,
-                    })}
-                </Text>
-                <Text className="text-sm text-gray-400 mt-2">{timestamp}</Text>
-            </View>
-
-            <DetailSection label={t('balances.fromUser')}>
-                <View className="flex-row items-center">
-                    <MemberAvatar name={fromName} size="md" />
-                    <Text className="text-base font-medium text-gray-900 ml-3">
-                        {fromName}
-                    </Text>
-                </View>
-            </DetailSection>
-
-            <DetailSection label={t('balances.toUser')}>
-                <View className="flex-row items-center">
-                    <MemberAvatar name={toName} size="md" />
-                    <Text className="text-base font-medium text-gray-900 ml-3">
-                        {toName}
-                    </Text>
-                </View>
-            </DetailSection>
-
-            {settlement.paymentMethod && (
-                <DetailSection label={t('balances.paymentMethod')}>
-                    <Text className="text-base text-gray-900">
-                        {t(`balances.paymentMethods.${settlement.paymentMethod}`)}
-                    </Text>
-                </DetailSection>
-            )}
-        </View>
-    );
-}
-
-function DetailSection({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <View className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
-            <Text className="text-sm font-medium text-gray-500 mb-2">{label}</Text>
-            {children}
+        <View>
+            <SettlementHero
+                fromName={fromName}
+                toName={toName}
+                amountText={amountText}
+                heroDate={heroDate}
+                isRtl={language === 'he'}
+            />
+            <SettlementInvolvementStrip
+                settlement={settlement}
+                currentUserId={currentUserId}
+                fromName={fromName}
+                toName={toName}
+                amountText={amountText}
+                methodLabel={methodLabel}
+            />
         </View>
     );
 }
