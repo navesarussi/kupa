@@ -90,6 +90,7 @@ import {
     useGroupSettlementsQuery,
     useUpdateSettlementMutation,
 } from '../../hooks/queries/useSettlementQueries';
+import { useGroupSimplifiedDebtsByCurrencyQuery } from '../../hooks/queries/useGroupBalancesQueries';
 import { AppIcon } from '../../components/AppIcon';
 import { FeedItemDetailSheet } from '../../components/FeedItemDetailSheet';
 import { colors } from '../../theme';
@@ -163,6 +164,8 @@ export function GroupDetailScreen() {
 
     const { data: settlements = [] } = useGroupSettlementsQuery(groupId);
     const { data: pairwiseDebts = [] } = useGroupPairwiseDebtsQuery(groupId);
+    const { data: simplifiedEntries = [] } =
+        useGroupSimplifiedDebtsByCurrencyQuery(groupId);
     const updateSettlementMutation = useUpdateSettlementMutation(groupId);
     const deleteSettlementMutation = useDeleteSettlementMutation(groupId);
 
@@ -193,7 +196,10 @@ export function GroupDetailScreen() {
     }, [groupBalance, displayGroup?.defaultCurrency]);
 
     const noteHasContent = Boolean(displayGroup?.note?.trim());
-    const settlementCount = pairwiseDebts.length;
+    const settlementCount = simplifiedEntries.reduce(
+        (n, e) => n + e.result.debts.length,
+        0,
+    );
 
     const feedUserIds = useMemo(
         () => collectFeedUserIds(groupExpenses, messages, settlements),

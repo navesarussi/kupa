@@ -107,7 +107,7 @@ export function calculateUserBalancesFromData(
             .filter(s => s.toUserId === uid)
             .reduce((sum, s) => sum + s.amount, 0);
 
-        const netBalance = totalPaid - totalOwed + totalSettledReceived - totalSettledPaid;
+        const netBalance = totalPaid - totalOwed + totalSettledPaid - totalSettledReceived;
 
         return {
             groupId,

@@ -47,11 +47,10 @@ export function SimplifiedDebtsSection({
     if (!anyDebts) {
         return (
             <View className="bg-green-50 rounded-xl p-6 items-center">
-                <Text className="text-2xl mb-2">✅</Text>
-                <Text className="text-base font-medium text-green-700">
+                <Text className="text-base font-medium text-green-700 text-center">
                     {t('balances.allSettled')}
                 </Text>
-                <Text className="text-sm text-green-600 mt-1">
+                <Text className="text-sm text-green-600 mt-1 text-center">
                     {t('balances.noDebts')}
                 </Text>
             </View>

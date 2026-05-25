@@ -1,6 +1,7 @@
 /**
  * SettleUpListScreen
- * Lists every pairwise debt in a group (per currency).
+ * Lists the simplified settle-up plan in a group (per currency) — the same
+ * set of transfers that the Balances screen's simplified-debts section shows.
  * Rows where the current user is involved are pinned at the top with "you" labels.
  * Rows where the current user is not involved are visible but disabled.
  */
@@ -23,10 +24,10 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
     useCreateSettlementMutation,
     useDeleteSettlementMutation,
-    useGroupPairwiseDebtsQuery,
     useGroupSettlementsQuery,
     useUpdateSettlementMutation,
 } from '../../hooks/queries/useSettlementQueries';
+import { useGroupSimplifiedDebtsByCurrencyQuery } from '../../hooks/queries/useGroupBalancesQueries';
 import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
 import { useGroupSettlementsRealtime } from '../../hooks/useGroupSettlementsRealtime';
 import { useAppStore } from '../../store';
@@ -83,12 +84,24 @@ export function SettleUpListScreen() {
     );
 
     const {
-        data: debts = [],
+        data: simplifiedEntries = [],
         isLoading,
         isFetching,
         isRefetching,
         refetch,
-    } = useGroupPairwiseDebtsQuery(groupId);
+    } = useGroupSimplifiedDebtsByCurrencyQuery(groupId);
+    const debts = useMemo<PairwiseDebt[]>(
+        () =>
+            simplifiedEntries.flatMap(entry =>
+                entry.result.debts.map(d => ({
+                    fromUserId: d.fromUserId,
+                    toUserId: d.toUserId,
+                    currency: d.currency,
+                    amount: d.amount,
+                })),
+            ),
+        [simplifiedEntries],
+    );
     const { data: settlements = [], refetch: refetchSettlements } =
         useGroupSettlementsQuery(groupId);
     const createMutation = useCreateSettlementMutation(groupId);
@@ -383,7 +396,8 @@ function SettlementHistoryRow({
     onPress,
 }: SettlementHistoryRowProps) {
     const { t, i18n } = useTranslation();
-    const locale = i18n.language?.startsWith('he') ? 'he-IL' : undefined;
+    const isRtl = i18n.language?.startsWith('he') ?? false;
+    const locale = isRtl ? 'he-IL' : undefined;
     const dateText = new Date(settlement.settlementDate).toLocaleDateString(locale, {
         year: 'numeric',
         month: 'short',
@@ -405,7 +419,7 @@ function SettlementHistoryRow({
             </View>
             <MemberAvatar name={fromName} avatarUrl={fromAvatar} size="xs" />
             <View className="mx-1.5">
-                <Text className="text-gray-400 text-xs">→</Text>
+                <Text className="text-gray-400 text-xs">{isRtl ? '←' : '→'}</Text>
             </View>
             <MemberAvatar name={toName} avatarUrl={toAvatar} size="xs" />
 

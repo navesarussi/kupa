@@ -32,6 +32,7 @@ jest.mock('expo-linear-gradient', () => {
 jest.mock('../../../services/groups.service', () => ({
     getGroupById: jest.fn(),
     fetchProfilesByUserIds: jest.fn().mockResolvedValue({}),
+    getGroupSimplifiedDebtsByCurrency: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../../../services/expenses.service', () => ({

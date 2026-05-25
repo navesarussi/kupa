@@ -153,24 +153,45 @@ describe('calculateUserBalancesByCurrencyFromData', () => {
         const a = result.find(r => r.userId === 'A')!.byCurrency[0];
         const b = result.find(r => r.userId === 'B')!.byCurrency[0];
 
-        // A: paid 100, owed 50, received 20 → net = 100 - 50 + 20 = 70
+        // A: paid 100, owed 50, received 20 from B → net = (100 - 50) - 20 = 30
         expect(a).toMatchObject({
             currency: 'USD',
             totalPaid: 100,
             totalOwed: 50,
             totalSettledReceived: 20,
             totalSettledPaid: 0,
-            netBalance: 70,
+            netBalance: 30,
         });
-        // B: paid 0, owed 50, paid-settled 20 → net = 0 - 50 - 20 = -70
+        // B: paid 0, owed 50, paid 20 to A → net = (0 - 50) + 20 = -30
         expect(b).toMatchObject({
             currency: 'USD',
             totalPaid: 0,
             totalOwed: 50,
             totalSettledPaid: 20,
             totalSettledReceived: 0,
-            netBalance: -70,
+            netBalance: -30,
         });
+    });
+
+    it('treats a standalone settlement as the payer advancing cash', () => {
+        // No expenses; A simply pays B $50. A advanced cash, so A is the
+        // creditor (+50) and B has been overpaid (-50). Before the fix this
+        // returned the opposite sign and `simplifyDebts` produced a transfer
+        // in the wrong direction.
+        const result = calculateUserBalancesByCurrencyFromData({
+            groupId: 'g1',
+            userIds: ['A', 'B'],
+            expenses: [],
+            splits: [],
+            settlements: [
+                { fromUserId: 'A', toUserId: 'B', amount: 50, currency: 'USD' },
+            ],
+        });
+
+        const a = result.find(r => r.userId === 'A')!.byCurrency[0];
+        const b = result.find(r => r.userId === 'B')!.byCurrency[0];
+        expect(a.netBalance).toBe(50);
+        expect(b.netBalance).toBe(-50);
     });
 
     it('separates ledgers across currencies', () => {
@@ -214,7 +235,7 @@ describe('calculateUserBalancesByCurrencyFromData', () => {
         });
         const a = result.find(r => r.userId === 'A')!.byCurrency[0];
         const b = result.find(r => r.userId === 'B')!.byCurrency[0];
-        expect(a).toMatchObject({ currency: 'EUR', netBalance: -25 });
-        expect(b).toMatchObject({ currency: 'EUR', netBalance: 25 });
+        expect(a).toMatchObject({ currency: 'EUR', netBalance: 25 });
+        expect(b).toMatchObject({ currency: 'EUR', netBalance: -25 });
     });
 });
