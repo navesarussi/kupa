@@ -17,6 +17,8 @@ dist/
 .env
 .env*.local
 !.env.example
+supabase/.env.production
+apps/mobile/.env.production
 
 # Debug
 npm-debug.log*
