@@ -25,7 +25,9 @@ const settlementActivity: RecentActivity = {
 
 describe('ActivityItem', () => {
     it('renders the description and user name', () => {
-        const { getByText } = render(<ActivityItem activity={expenseActivity} />);
+        const { getByText } = render(
+            <ActivityItem activity={expenseActivity} groupName="Trip" />,
+        );
         expect(getByText('Coffee')).toBeTruthy();
         expect(getByText(/Alice/)).toBeTruthy();
     });
@@ -35,14 +37,17 @@ describe('ActivityItem', () => {
         expect(getByText(/\$5\.50/)).toBeTruthy();
     });
 
-    it('renders the actor avatar for expense activities', () => {
+    it('renders the actor avatar on the leading edge', () => {
         const { getByTestId } = render(<ActivityItem activity={expenseActivity} />);
         expect(getByTestId('activity-avatar')).toBeTruthy();
+        expect(getByTestId('activity-card-thumbnail-icon')).toBeTruthy();
     });
 
-    it('renders the actor avatar for settlement activities', () => {
-        const { getByTestId } = render(<ActivityItem activity={settlementActivity} />);
-        expect(getByTestId('activity-avatar')).toBeTruthy();
+    it('includes group name in meta when provided', () => {
+        const { getByText } = render(
+            <ActivityItem activity={expenseActivity} groupName="Weekend trip" />,
+        );
+        expect(getByText(/Weekend trip/)).toBeTruthy();
     });
 
     it('renders profile image when avatar url is provided', () => {
@@ -57,12 +62,12 @@ describe('ActivityItem', () => {
         expect(getByTestId('activity-avatar-image')).toBeTruthy();
     });
 
-    it('calls onPress with the activity when pressed', () => {
+    it('calls onPress with the activity when the card is pressed', () => {
         const onPress = jest.fn();
-        const { getByText } = render(
-            <ActivityItem activity={expenseActivity} onPress={onPress} />
+        const { getByTestId } = render(
+            <ActivityItem activity={expenseActivity} onPress={onPress} />,
         );
-        fireEvent.press(getByText('Coffee'));
+        fireEvent.press(getByTestId('activity-card-a1'));
         expect(onPress).toHaveBeenCalledWith(expenseActivity);
     });
 
@@ -81,5 +86,28 @@ describe('ActivityItem', () => {
         expect(getByText('See you tonight')).toBeTruthy();
         expect(getByTestId('activity-avatar')).toBeTruthy();
         expect(queryByText(/USD/)).toBeNull();
+    });
+
+    it('renders friend request variant with distinct styling', () => {
+        const friendActivity: RecentActivity = {
+            ...expenseActivity,
+            id: 'fr1',
+            activityType: 'friend_request',
+            description: '',
+            amount: 0,
+            currency: '',
+        };
+        const { getByTestId } = render(
+            <ActivityItem activity={friendActivity} groupName="Friends" />,
+        );
+        expect(getByTestId('activity-card-fr1')).toBeTruthy();
+    });
+
+    it('renders settlement amount on its own line', () => {
+        const { getByTestId } = render(
+            <ActivityItem activity={settlementActivity} />,
+        );
+        expect(getByTestId('activity-card-s1')).toBeTruthy();
+        expect(getByTestId('activity-card-amount')).toBeTruthy();
     });
 });

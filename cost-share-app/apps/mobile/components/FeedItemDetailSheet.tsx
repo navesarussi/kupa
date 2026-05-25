@@ -3,7 +3,7 @@
  * and edit / delete icon actions (used from GroupDetailScreen feed).
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Modal,
@@ -11,6 +11,7 @@ import {
     ScrollView,
     StyleSheet,
     Image,
+    TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +25,15 @@ import { Text } from './AppText';
 import { AppIcon, AppIconName } from './AppIcon';
 import { MemberAvatar } from './MemberAvatar';
 import { DetailSheetHeader } from './DetailSheetHeader';
-import { useAppLanguage } from '../hooks/useRtlLayout';
+import { MemberStack } from './groupDetail/MemberStack';
+import { getAvatarUrlForMember } from '../lib/userDisplay';
+import {
+    resolveExpenseFeedPerspective,
+    expenseFeedSummaryKey,
+    expenseFeedSummaryCount,
+} from '../lib/feedExpensePerspective';
+import { buildSettlementFeedCopy } from '../lib/feedSettlementPerspective';
+import { useAppLanguage, useRtlLayout } from '../hooks/useRtlLayout';
 import { colors } from '../theme';
 import { shadows } from '../theme/shadows';
 
@@ -61,6 +70,9 @@ export interface FeedItemDetailSheetProps {
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    /** When set (e.g. from Activity feed), shows a link to open this item in the group. */
+    onOpenInGroup?: () => void;
+    openInGroupLabel?: string;
 }
 
 function memberName(
@@ -74,6 +86,60 @@ function memberName(
     return map[userId]?.displayName ?? fallback;
 }
 
+function memberAvatarUrl(
+    map: Record<string, GroupMemberLite>,
+    userId: string,
+): string | undefined {
+    return getAvatarUrlForMember(map[userId]) ?? undefined;
+}
+
+function OpenInGroupButton({
+    label,
+    onPress,
+}: {
+    label: string;
+    onPress: () => void;
+}) {
+    const isRtl = useRtlLayout();
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            testID="feed-detail-open-in-group"
+            style={openInGroupStyles.button}
+        >
+            <AppIcon name="people-outline" size={16} color={colors.primaryDark} />
+            <Text
+                className="text-[13px] font-semibold text-primary ml-2 flex-1"
+                numberOfLines={1}
+            >
+                {label}
+            </Text>
+            <AppIcon
+                name={isRtl ? 'chevron-back' : 'chevron-forward'}
+                size={16}
+                color={colors.primary}
+            />
+        </TouchableOpacity>
+    );
+}
+
+const openInGroupStyles = StyleSheet.create({
+    button: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        backgroundColor: colors.primaryExtraLight,
+    },
+});
+
 export function FeedItemDetailSheet({
     item,
     memberMap,
@@ -81,6 +147,8 @@ export function FeedItemDetailSheet({
     onClose,
     onEdit,
     onDelete,
+    onOpenInGroup,
+    openInGroupLabel,
 }: FeedItemDetailSheetProps) {
     const { t } = useTranslation();
     const language = useAppLanguage();
@@ -136,6 +204,12 @@ export function FeedItemDetailSheet({
                         }}
                         showsVerticalScrollIndicator
                     >
+                        {onOpenInGroup && openInGroupLabel ? (
+                            <OpenInGroupButton
+                                label={openInGroupLabel}
+                                onPress={onOpenInGroup}
+                            />
+                        ) : null}
                         {item?.kind === 'expense' && (
                             <ExpenseDetailBody
                                 expense={item.expense}
@@ -180,8 +254,8 @@ function ExpenseDetailBody({
     language: 'en' | 'he';
 }) {
     const { t } = useTranslation();
+    const [breakdownOpen, setBreakdownOpen] = useState(false);
 
-    const categoryKey = expense.category ?? 'other';
     const heroDate = formatHeroDate(
         new Date(expense.expenseDate ?? expense.createdAt),
         language,
@@ -194,122 +268,38 @@ function ExpenseDetailBody({
         t('common.unknown'),
     );
     const payerFirstName = payerName.split(' ')[0];
-
     const amountFmt = (n: number) => `${expense.currency} ${n.toFixed(2)}`;
-
     const involvement: 'borrowed' | 'lent' | 'settled' = expense.myDeltaState;
+
+    const splitMembers: GroupMemberLite[] = expense.splits.map(s => {
+            const existing = memberMap[s.userId];
+            if (existing) return existing;
+            return {
+                userId: s.userId,
+                displayName: memberName(
+                    memberMap,
+                    s.userId,
+                    currentUserId,
+                    t('settleUp.you'),
+                    t('common.unknown'),
+                ),
+                isActive: true,
+            };
+        });
 
     return (
         <View>
-            {/* Hero card */}
-            <View className="px-4 pt-1">
-                <View
-                    className="rounded-2xl overflow-hidden border border-slate-200"
-                    style={{ height: 140, position: 'relative' }}
-                >
-                    {expense.receiptUrl ? (
-                        <Image
-                            source={{ uri: expense.receiptUrl }}
-                            style={StyleSheet.absoluteFill}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <View
-                            style={[
-                                StyleSheet.absoluteFill,
-                                {
-                                    backgroundColor: categoryBg[categoryKey] ?? categoryBg.other,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                },
-                            ]}
-                        >
-                            <AppIcon
-                                name={categoryIcon[categoryKey] ?? 'pricetag-outline'}
-                                size={64}
-                                color="rgba(255,255,255,0.55)"
-                            />
-                        </View>
-                    )}
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
-                        locations={[0.4, 1]}
-                        style={StyleSheet.absoluteFill}
-                    />
-                    <View
-                        style={{
-                            position: 'absolute',
-                            left: 14,
-                            right: 14,
-                            bottom: 12,
-                        }}
-                    >
-                        {expense.category && (
-                            <View
-                                className="self-start flex-row items-center rounded-full"
-                                style={{
-                                    backgroundColor: 'rgba(0,0,0,0.55)',
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 4,
-                                }}
-                            >
-                                <AppIcon
-                                    name={categoryIcon[categoryKey] ?? 'pricetag-outline'}
-                                    size={12}
-                                    color="#FFFFFF"
-                                />
-                                <Text
-                                    className="text-white font-semibold ml-1"
-                                    style={{ fontSize: 11 }}
-                                >
-                                    {t(`expenses.categories.${categoryKey}`)}
-                                </Text>
-                            </View>
-                        )}
-                        <Text
-                            className="font-bold text-white mt-1"
-                            style={{
-                                fontSize: 20,
-                                textShadowColor: 'rgba(0,0,0,0.5)',
-                                textShadowOffset: { width: 0, height: 1 },
-                                textShadowRadius: 4,
-                            }}
-                        >
-                            {expense.description}
-                        </Text>
-                        <Text
-                            style={{
-                                fontSize: 12,
-                                color: 'rgba(255,255,255,0.92)',
-                                textShadowColor: 'rgba(0,0,0,0.5)',
-                                textShadowOffset: { width: 0, height: 1 },
-                                textShadowRadius: 2,
-                                marginTop: 2,
-                            }}
-                        >
-                            {heroDate}
-                        </Text>
-                    </View>
-                </View>
-            </View>
+            <ExpenseHero
+                expense={expense}
+                currentUserId={currentUserId}
+                payerName={payerName}
+                payerAvatarUrl={memberAvatarUrl(memberMap, expense.paidBy)}
+                splitMembers={splitMembers}
+                amountText={amountFmt(expense.amount)}
+                heroDate={heroDate}
+                language={language}
+            />
 
-            {/* Total amount */}
-            <View className="px-4 pt-3 pb-1.5">
-                <Text
-                    className="font-semibold text-gray-400 uppercase"
-                    style={{ fontSize: 10, letterSpacing: 0.6 }}
-                >
-                    {t('groups.expense.totalLabel')}
-                </Text>
-                <Text
-                    className="font-bold text-gray-900"
-                    style={{ fontSize: 28, marginTop: 2 }}
-                >
-                    {amountFmt(expense.amount)}
-                </Text>
-            </View>
-
-            {/* Involvement strip */}
             {involvement !== 'settled' && (
                 <InvolvementStrip
                     state={involvement}
@@ -318,98 +308,555 @@ function ExpenseDetailBody({
                         involvement === 'borrowed'
                             ? t('groups.expense.fromPayer', { name: payerName })
                             : t('groups.expense.toNPeople', {
-                                  count: Math.max(0, expense.splits.length - 1),
+                                  count: expense.splits.length,
                               })
                     }
                 />
             )}
 
-            {/* Splits */}
             {expense.splits.length > 0 && (
-                <View className="px-4 pt-4 pb-6">
-                    <View className="flex-row items-end justify-between mb-2.5">
+                <View className="px-4 pt-3 pb-6">
+                    <Pressable
+                        onPress={() => setBreakdownOpen(open => !open)}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: breakdownOpen }}
+                        testID="expense-breakdown-toggle"
+                        className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"
+                    >
                         <Text
-                            className="font-semibold uppercase text-gray-400"
-                            style={{ fontSize: 11, letterSpacing: 0.6 }}
+                            className="font-semibold text-gray-700"
+                            style={{ fontSize: 14 }}
                         >
-                            {t('groups.expense.splitBetweenCount', {
-                                count: expense.splits.length,
-                            })}
+                            {breakdownOpen
+                                ? t('groups.feedDetail.hideFullBreakdown')
+                                : t('groups.feedDetail.showFullBreakdown')}
                         </Text>
-                        <Text className="text-gray-500" style={{ fontSize: 11 }}>
-                            {t('expenses.equalSplit')}
-                        </Text>
-                    </View>
-                    <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        {expense.splits.map((split, idx) => {
-                            const name = memberName(
-                                memberMap,
-                                split.userId,
-                                currentUserId,
-                                t('settleUp.you'),
-                                t('common.unknown'),
-                            );
-                            const isPayer = split.userId === expense.paidBy;
-                            const isLast = idx === expense.splits.length - 1;
-                            const sub = isPayer
-                                ? t('groups.expense.splitLent', {
-                                      amount: amountFmt(expense.amount - split.amount),
-                                  })
-                                : t('groups.expense.splitOwes', {
-                                      name: payerFirstName,
-                                  });
-                            return (
-                                <View
-                                    key={split.id}
-                                    className={`flex-row items-center px-3.5 py-3 ${isLast ? '' : 'border-b border-slate-100'}`}
+                        <AppIcon
+                            name={
+                                breakdownOpen
+                                    ? 'chevron-up-outline'
+                                    : 'chevron-down-outline'
+                            }
+                            size={20}
+                            color={colors.gray500}
+                        />
+                    </Pressable>
+
+                    {breakdownOpen && (
+                        <View className="mt-3" testID="expense-breakdown-list">
+                            <View className="flex-row items-end justify-between mb-2.5">
+                                <Text
+                                    className="font-semibold uppercase text-gray-400"
+                                    style={{ fontSize: 11, letterSpacing: 0.6 }}
                                 >
-                                    <MemberAvatar name={name} size="sm" />
-                                    <View className="flex-1 mx-3 min-w-0">
-                                        <View className="flex-row items-center">
-                                            <Text className="text-sm font-semibold text-gray-900">
-                                                {name}
-                                            </Text>
-                                            {isPayer && (
-                                                <View
-                                                    className="ml-2 rounded"
-                                                    style={{
-                                                        backgroundColor: colors.primaryExtraLight,
-                                                        paddingHorizontal: 6,
-                                                        paddingVertical: 2,
-                                                    }}
-                                                >
-                                                    <Text
-                                                        className="font-bold"
-                                                        style={{
-                                                            fontSize: 9,
-                                                            color: colors.primaryDark,
-                                                            letterSpacing: 0.4,
-                                                        }}
-                                                    >
-                                                        {t('groups.expense.paidBadge')}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <Text
-                                            className="text-gray-400 mt-0.5"
-                                            style={{ fontSize: 11 }}
+                                    {t('groups.expense.splitBetweenCount', {
+                                        count: expense.splits.length,
+                                    })}
+                                </Text>
+                                <Text
+                                    className="text-gray-500"
+                                    style={{ fontSize: 11 }}
+                                >
+                                    {t('expenses.equalSplit')}
+                                </Text>
+                            </View>
+                            <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                {expense.splits.map((split, idx) => {
+                                    const name = memberName(
+                                        memberMap,
+                                        split.userId,
+                                        currentUserId,
+                                        t('settleUp.you'),
+                                        t('common.unknown'),
+                                    );
+                                    const isPayer =
+                                        split.userId === expense.paidBy;
+                                    const isLast =
+                                        idx === expense.splits.length - 1;
+                                    const sub = isPayer
+                                        ? t('groups.expense.splitLent', {
+                                              amount: amountFmt(
+                                                  expense.amount - split.amount,
+                                              ),
+                                          })
+                                        : t('groups.expense.splitOwes', {
+                                              name: payerFirstName,
+                                          });
+                                    return (
+                                        <View
+                                            key={split.id}
+                                            className={`flex-row items-center px-3.5 py-3 ${isLast ? '' : 'border-b border-slate-100'}`}
                                         >
-                                            {sub}
-                                        </Text>
-                                    </View>
-                                    <Text
-                                        className="text-sm font-bold text-gray-900"
-                                        style={{ fontVariant: ['tabular-nums'] }}
-                                    >
-                                        {amountFmt(split.amount)}
-                                    </Text>
-                                </View>
-                            );
-                        })}
-                    </View>
+                                            <MemberAvatar
+                                                name={name}
+                                                avatarUrl={memberAvatarUrl(
+                                                    memberMap,
+                                                    split.userId,
+                                                )}
+                                                size="sm"
+                                            />
+                                            <View className="flex-1 mx-3 min-w-0">
+                                                <View className="flex-row items-center">
+                                                    <Text className="text-sm font-semibold text-gray-900">
+                                                        {name}
+                                                    </Text>
+                                                    {isPayer && (
+                                                        <View
+                                                            className="ml-2 rounded"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    colors.primaryExtraLight,
+                                                                paddingHorizontal: 6,
+                                                                paddingVertical: 2,
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                className="font-bold"
+                                                                style={{
+                                                                    fontSize: 9,
+                                                                    color: colors.primaryDark,
+                                                                    letterSpacing: 0.4,
+                                                                }}
+                                                            >
+                                                                {t(
+                                                                    'groups.expense.paidBadge',
+                                                                )}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text
+                                                    className="text-gray-400 mt-0.5"
+                                                    style={{ fontSize: 11 }}
+                                                >
+                                                    {sub}
+                                                </Text>
+                                            </View>
+                                            <Text
+                                                className="text-sm font-bold text-gray-900"
+                                                style={{
+                                                    fontVariant: ['tabular-nums'],
+                                                }}
+                                            >
+                                                {amountFmt(split.amount)}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    )}
                 </View>
             )}
+        </View>
+    );
+}
+
+const FLOW_SIDE_WIDTH = 96;
+
+function FlowAmountCenter({
+    amountText,
+    isRtl,
+    flowCaption,
+}: {
+    amountText: string;
+    isRtl: boolean;
+    flowCaption?: string;
+}) {
+    const chevronName: AppIconName = isRtl
+        ? 'chevron-back'
+        : 'chevron-forward';
+
+    return (
+        <View
+            style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                paddingHorizontal: 4,
+            }}
+        >
+            <Text
+                style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                    fontVariant: ['tabular-nums'],
+                    letterSpacing: -0.2,
+                    textAlign: 'center',
+                    width: '100%',
+                    textShadowColor: 'rgba(0,0,0,0.35)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 3,
+                }}
+                numberOfLines={1}
+            >
+                {amountText}
+            </Text>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    width: '100%',
+                    marginTop: 4,
+                }}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        height: 2,
+                        backgroundColor: 'rgba(255,255,255,0.85)',
+                        borderRadius: 9999,
+                    }}
+                />
+                <AppIcon
+                    name={chevronName}
+                    size={18}
+                    color="rgba(255,255,255,0.95)"
+                />
+                <View
+                    style={{
+                        flex: 1,
+                        height: 2,
+                        backgroundColor: 'rgba(255,255,255,0.85)',
+                        borderRadius: 9999,
+                    }}
+                />
+            </View>
+            {flowCaption ? (
+                <Text
+                    style={{
+                        fontSize: 10,
+                        fontWeight: '600',
+                        color: 'rgba(255,255,255,0.9)',
+                        textAlign: 'center',
+                        marginTop: 4,
+                        width: '100%',
+                        textShadowColor: 'rgba(0,0,0,0.3)',
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                    }}
+                    numberOfLines={2}
+                >
+                    {flowCaption}
+                </Text>
+            ) : null}
+        </View>
+    );
+}
+
+function FlowPerson({
+    name,
+    label,
+    avatarUrl,
+}: {
+    name: string;
+    label?: string;
+    avatarUrl?: string;
+}) {
+    return (
+        <View style={{ width: FLOW_SIDE_WIDTH, alignItems: 'center' }}>
+            <View
+                style={{
+                    padding: 3,
+                    backgroundColor: 'rgba(255,255,255,0.25)',
+                    borderRadius: 9999,
+                }}
+            >
+                <View
+                    style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 9999,
+                    }}
+                >
+                    <MemberAvatar
+                        name={name}
+                        avatarUrl={avatarUrl}
+                        size="md"
+                    />
+                </View>
+            </View>
+            <Text
+                style={{
+                    marginTop: 6,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                    width: 96,
+                    textAlign: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.35)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 3,
+                }}
+                numberOfLines={1}
+            >
+                {name}
+            </Text>
+            {label ? (
+                <Text
+                    style={{
+                        fontSize: 9,
+                        fontWeight: '700',
+                        color: 'rgba(255,255,255,0.8)',
+                        letterSpacing: 0.8,
+                        marginTop: 2,
+                        width: 96,
+                        textAlign: 'center',
+                    }}
+                >
+                    {label}
+                </Text>
+            ) : null}
+        </View>
+    );
+}
+
+function FlowSplitParty({
+    members,
+    singleName,
+    singleAvatarUrl,
+}: {
+    members: GroupMemberLite[];
+    singleName?: string;
+    singleAvatarUrl?: string;
+}) {
+    if (members.length === 1 && singleName) {
+        return (
+            <FlowPerson
+                name={singleName}
+                avatarUrl={singleAvatarUrl}
+            />
+        );
+    }
+
+    return (
+        <View style={{ width: FLOW_SIDE_WIDTH, alignItems: 'center' }}>
+            <View
+                style={{
+                    padding: 3,
+                    backgroundColor: 'rgba(255,255,255,0.25)',
+                    borderRadius: 9999,
+                }}
+            >
+                <MemberStack members={members} maxWidth={84} />
+            </View>
+        </View>
+    );
+}
+
+function FlowHeroRow({
+    start,
+    center,
+    end,
+    paddingTop = 0,
+}: {
+    start: React.ReactNode;
+    center: React.ReactNode;
+    end: React.ReactNode;
+    paddingTop?: number;
+}) {
+    return (
+        <View
+            style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingTop,
+                zIndex: 2,
+            }}
+        >
+            <View style={{ width: FLOW_SIDE_WIDTH, alignItems: 'center' }}>
+                {start}
+            </View>
+            <View
+                style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                {center}
+            </View>
+            <View style={{ width: FLOW_SIDE_WIDTH, alignItems: 'center' }}>
+                {end}
+            </View>
+        </View>
+    );
+}
+
+function ExpenseHero({
+    expense,
+    currentUserId,
+    payerName,
+    payerAvatarUrl,
+    splitMembers,
+    amountText,
+    heroDate,
+    language,
+}: {
+    expense: ExpenseWithDelta;
+    currentUserId: string;
+    payerName: string;
+    payerAvatarUrl?: string;
+    splitMembers: GroupMemberLite[];
+    amountText: string;
+    heroDate: string;
+    language: 'en' | 'he';
+}) {
+    const { t } = useTranslation();
+    const perspective = resolveExpenseFeedPerspective(expense, currentUserId);
+    const flowCaption =
+        splitMembers.length > 0
+            ? t(expenseFeedSummaryKey(perspective.perspective), {
+                  count: expenseFeedSummaryCount(perspective),
+              })
+            : undefined;
+    const categoryKey = expense.category ?? 'other';
+    const baseColor = categoryBg[categoryKey] ?? categoryBg.other;
+    const isRtl = language === 'he';
+
+    const heroScrim = (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
+            <LinearGradient
+                colors={[
+                    'rgba(0,0,0,0.22)',
+                    'rgba(0,0,0,0.08)',
+                    'rgba(0,0,0,0.08)',
+                    'rgba(0,0,0,0.28)',
+                ]}
+                locations={[0, 0.35, 0.65, 1]}
+                style={StyleSheet.absoluteFill}
+            />
+        </View>
+    );
+
+    const heroChrome = (
+        <>
+            {heroScrim}
+            {expense.category && (
+                <View
+                    className="flex-row items-center rounded-full"
+                    style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        backgroundColor: 'rgba(0,0,0,0.45)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        zIndex: 2,
+                    }}
+                >
+                    <AppIcon
+                        name={categoryIcon[categoryKey] ?? 'pricetag-outline'}
+                        size={12}
+                        color="#FFFFFF"
+                    />
+                    <Text
+                        className="text-white font-semibold ml-1"
+                        style={{ fontSize: 11 }}
+                    >
+                        {t(`expenses.categories.${categoryKey}`)}
+                    </Text>
+                </View>
+            )}
+            <Text
+                numberOfLines={2}
+                style={{
+                    position: 'absolute',
+                    top: 36,
+                    left: 14,
+                    right: 14,
+                    fontSize: 17,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                    textAlign: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.45)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 3,
+                    zIndex: 2,
+                }}
+            >
+                {expense.description}
+            </Text>
+            <Text
+                style={{
+                    position: 'absolute',
+                    top: 12,
+                    right: 14,
+                    fontSize: 11,
+                    color: 'rgba(255,255,255,0.92)',
+                    textShadowColor: 'rgba(0,0,0,0.4)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 2,
+                    zIndex: 2,
+                }}
+            >
+                {heroDate}
+            </Text>
+            <FlowHeroRow
+                paddingTop={52}
+                start={
+                    <FlowPerson
+                        name={payerName}
+                        avatarUrl={payerAvatarUrl}
+                    />
+                }
+                center={
+                    <FlowAmountCenter
+                        amountText={amountText}
+                        isRtl={isRtl}
+                        flowCaption={flowCaption}
+                    />
+                }
+                end={
+                    splitMembers.length > 0 ? (
+                        <FlowSplitParty
+                            members={splitMembers}
+                            singleName={
+                                splitMembers.length === 1
+                                    ? splitMembers[0].displayName
+                                    : undefined
+                            }
+                            singleAvatarUrl={
+                                splitMembers.length === 1
+                                    ? splitMembers[0].avatarUrl
+                                    : undefined
+                            }
+                        />
+                    ) : null
+                }
+            />
+        </>
+    );
+
+    return (
+        <View className="px-4 pt-1">
+            <View
+                className="rounded-2xl overflow-hidden border border-slate-200"
+                style={{ height: 196, position: 'relative' }}
+                testID="expense-detail-hero"
+            >
+                {expense.receiptUrl ? (
+                    <>
+                        <Image
+                            source={{ uri: expense.receiptUrl }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
+                        />
+                        {heroChrome}
+                    </>
+                ) : (
+                    <LinearGradient
+                        colors={[baseColor, '#374151']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                    >
+                        {heroChrome}
+                    </LinearGradient>
+                )}
+            </View>
         </View>
     );
 }
@@ -477,22 +924,29 @@ function InvolvementStrip({
 }
 
 function SettlementHero({
+    settlement,
+    currentUserId,
     fromName,
     toName,
+    fromAvatarUrl,
+    toAvatarUrl,
     amountText,
     heroDate,
     isRtl,
 }: {
+    settlement: Settlement;
+    currentUserId: string;
     fromName: string;
     toName: string;
+    fromAvatarUrl?: string;
+    toAvatarUrl?: string;
     amountText: string;
     heroDate: string;
     isRtl: boolean;
 }) {
     const { t } = useTranslation();
-    const chevronName: AppIconName = isRtl
-        ? 'chevron-back'
-        : 'chevron-forward';
+    const copy = buildSettlementFeedCopy(settlement, currentUserId);
+    const flowCaption = t(copy.key);
 
     return (
         <View className="px-4 pt-1">
@@ -571,119 +1025,28 @@ function SettlementHero({
                     {heroDate}
                 </Text>
 
-                {/* Center payment flow — parent's direction: rtl auto-reverses children. */}
-                <View
-                    style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: 14,
-                        zIndex: 2,
-                    }}
-                >
-                    <FlowPerson name={fromName} label={t('settleUp.paid')} />
-
-                    <View
-                        style={{
-                            flex: 1,
-                            minWidth: 0,
-                            paddingHorizontal: 6,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Text
-                            style={{
-                                fontSize: 20,
-                                fontWeight: '700',
-                                color: '#FFFFFF',
-                                fontVariant: ['tabular-nums'],
-                                letterSpacing: -0.2,
-                                textShadowColor: 'rgba(0,0,0,0.35)',
-                                textShadowOffset: { width: 0, height: 1 },
-                                textShadowRadius: 3,
-                            }}
-                            numberOfLines={1}
-                        >
-                            {amountText}
-                        </Text>
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                width: '100%',
-                                marginTop: 4,
-                            }}
-                        >
-                            <View
-                                style={{
-                                    flex: 1,
-                                    height: 2,
-                                    backgroundColor: 'rgba(255,255,255,0.85)',
-                                    borderRadius: 9999,
-                                }}
-                            />
-                            <AppIcon
-                                name={chevronName}
-                                size={18}
-                                color="rgba(255,255,255,0.95)"
-                            />
-                        </View>
-                    </View>
-
-                    <FlowPerson name={toName} label={t('settleUp.received')} />
-                </View>
+                <FlowHeroRow
+                    start={
+                        <FlowPerson
+                            name={fromName}
+                            avatarUrl={fromAvatarUrl}
+                        />
+                    }
+                    center={
+                        <FlowAmountCenter
+                            amountText={amountText}
+                            isRtl={isRtl}
+                            flowCaption={flowCaption}
+                        />
+                    }
+                    end={
+                        <FlowPerson
+                            name={toName}
+                            avatarUrl={toAvatarUrl}
+                        />
+                    }
+                />
             </View>
-        </View>
-    );
-}
-
-function FlowPerson({ name, label }: { name: string; label: string }) {
-    return (
-        <View style={{ width: 96, alignItems: 'center' }}>
-            <View
-                style={{
-                    padding: 3,
-                    backgroundColor: 'rgba(255,255,255,0.25)',
-                    borderRadius: 9999,
-                }}
-            >
-                <View
-                    style={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: 9999,
-                    }}
-                >
-                    <MemberAvatar name={name} size="md" />
-                </View>
-            </View>
-            <Text
-                style={{
-                    marginTop: 6,
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: '#FFFFFF',
-                    width: 96,
-                    textAlign: 'center',
-                    textShadowColor: 'rgba(0,0,0,0.35)',
-                    textShadowOffset: { width: 0, height: 1 },
-                    textShadowRadius: 3,
-                }}
-                numberOfLines={1}
-            >
-                {name}
-            </Text>
-            <Text
-                style={{
-                    fontSize: 9,
-                    fontWeight: '700',
-                    color: 'rgba(255,255,255,0.8)',
-                    letterSpacing: 0.8,
-                    marginTop: 2,
-                }}
-            >
-                {label}
-            </Text>
         </View>
     );
 }
@@ -814,8 +1177,15 @@ function SettlementDetailBody({
     return (
         <View>
             <SettlementHero
+                settlement={settlement}
+                currentUserId={currentUserId}
                 fromName={fromName}
                 toName={toName}
+                fromAvatarUrl={memberAvatarUrl(
+                    memberMap,
+                    settlement.fromUserId,
+                )}
+                toAvatarUrl={memberAvatarUrl(memberMap, settlement.toUserId)}
                 amountText={amountText}
                 heroDate={heroDate}
                 isRtl={language === 'he'}

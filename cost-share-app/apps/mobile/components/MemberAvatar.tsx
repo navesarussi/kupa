@@ -14,6 +14,8 @@ interface MemberAvatarProps {
     name: string;
     avatarUrl?: string;
     size?: AvatarSize;
+    /** Overrides preset `size` when stacking many members in a tight row. */
+    pixelSize?: number;
     testID?: string;
 }
 
@@ -37,9 +39,14 @@ export function MemberAvatar({
     name,
     avatarUrl,
     size = 'md',
+    pixelSize,
     testID = 'member-avatar',
 }: MemberAvatarProps) {
-    const { imageSize, text } = sizeStyles[size];
+    const preset = sizeStyles[size];
+    const imageSize = pixelSize ?? preset.imageSize;
+    const initialsFontSize = pixelSize
+        ? Math.max(7, Math.round(pixelSize * 0.32))
+        : undefined;
     const frameStyle = {
         width: imageSize,
         height: imageSize,
@@ -67,8 +74,12 @@ export function MemberAvatar({
             testID={testID}
         >
             <Text
-                className={`${text} font-semibold text-slate-600 text-center`}
-                style={{ width: '100%', textAlign: 'center' }}
+                className={`${pixelSize ? '' : preset.text} font-semibold text-slate-600 text-center`}
+                style={{
+                    width: '100%',
+                    textAlign: 'center',
+                    ...(initialsFontSize ? { fontSize: initialsFontSize } : {}),
+                }}
             >
                 {getInitials(name)}
             </Text>

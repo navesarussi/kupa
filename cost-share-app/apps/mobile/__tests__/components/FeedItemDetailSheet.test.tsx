@@ -53,15 +53,26 @@ const expense: ExpenseWithDelta = {
 };
 
 const memberMap = {
-    u1: { userId: 'u1', displayName: 'Alice', isActive: true },
-    u2: { userId: 'u2', displayName: 'Bob', isActive: true },
+    u1: {
+        userId: 'u1',
+        displayName: 'Alice',
+        avatarUrl: 'https://example.com/alice.png',
+        isActive: true,
+    },
+    u2: {
+        userId: 'u2',
+        displayName: 'Bob',
+        avatarUrl: 'https://example.com/bob.png',
+        isActive: true,
+    },
 };
 
 describe('FeedItemDetailSheet', () => {
     it('shows expense details and exposes edit/delete via the kebab menu', () => {
         const onEdit = jest.fn();
         const onDelete = jest.fn();
-        const { getByTestId, getByText, queryByTestId } = renderWithQuery(
+        const { getByTestId, getByText, getAllByTestId, queryByTestId } =
+            renderWithQuery(
             <FeedItemDetailSheet
                 item={{ kind: 'expense', expense }}
                 memberMap={memberMap}
@@ -75,6 +86,11 @@ describe('FeedItemDetailSheet', () => {
         expect(getByTestId('expense-detail-sheet')).toBeTruthy();
         expect(getByText('Dinner')).toBeTruthy();
         expect(getByText('USD 100.00')).toBeTruthy();
+        expect(getByTestId('expense-detail-hero')).toBeTruthy();
+        expect(getAllByTestId('member-avatar-image').length).toBeGreaterThan(0);
+
+        fireEvent.press(getByTestId('expense-breakdown-toggle'));
+        expect(getByTestId('expense-breakdown-list')).toBeTruthy();
 
         // Edit/Delete live inside a popover that opens via the kebab button.
         expect(queryByTestId('detail-edit-btn')).toBeNull();
@@ -145,6 +161,7 @@ describe('FeedItemDetailSheet', () => {
 
         expect(getByText('settleUp.youReceivedAmount')).toBeTruthy();
         expect(getByText('settleUp.fromVia')).toBeTruthy();
+        expect(getByText('feed.settlementClosedAndPaidYou')).toBeTruthy();
         expect(getByText('USD 30.00')).toBeTruthy();
     });
 
@@ -162,6 +179,7 @@ describe('FeedItemDetailSheet', () => {
 
         expect(getByText('settleUp.youPaidAmount')).toBeTruthy();
         expect(getByText('settleUp.toVia')).toBeTruthy();
+        expect(getByText('feed.settlementYouClosedAndPaid')).toBeTruthy();
         expect(getByText('USD 30.00')).toBeTruthy();
     });
 

@@ -239,13 +239,25 @@
             "paidBadge": "PAID",
             "totalLabel": "Total",
             "splitBetweenCount_one": "Split between · {{count}} person",
-            "splitBetweenCount_other": "Split between · {{count}} people"
+            "splitBetweenCount_other": "Split between · {{count}} people",
+            "splitParty": "Split",
+            "paidForSplitters_one": "Paid for {{count}} person splitting",
+            "paidForSplitters_other": "Paid for {{count}} people splitting",
+            "feedYouPaid_one": "You paid for {{count}} person",
+            "feedYouPaid_other": "You paid for {{count}} people",
+            "feedPaidForYou": "Paid for you",
+            "feedPaidForYouAndOthers_one": "Paid for you and {{count}} other person splitting",
+            "feedPaidForYouAndOthers_other": "Paid for you and {{count}} other people splitting",
+            "feedPaidExcludingYou_one": "Paid for {{count}} person splitting without you",
+            "feedPaidExcludingYou_other": "Paid for {{count}} people splitting without you"
         },
         "feedDetail": {
             "expenseTitle": "Expense details",
             "expenseHeaderLabel": "Expense",
             "settlementTitle": "Settlement details",
-            "yourShare": "Your share"
+            "yourShare": "Your share",
+            "showFullBreakdown": "Full breakdown",
+            "hideFullBreakdown": "Hide breakdown"
         },
         "message": {
             "composerPlaceholder": "Write a message…",
@@ -494,12 +506,30 @@
         "expense": "Expense",
         "settlement": "Settlement",
         "message": "Message",
+        "cardTypes": {
+            "expense": "Expense",
+            "settlement": "Payment",
+            "message": "Message",
+            "groupInvite": "Group",
+            "memberJoined": "Joined",
+            "memberLeft": "Left",
+            "friendRequest": "Friends"
+        },
+        "notifications": {
+            "groupInvite": "{{name}} added you to {{group}}",
+            "memberJoined": "{{name}} joined {{group}}",
+            "memberLeft": "{{name}} left {{group}}",
+            "friendRequest": "Friend request from {{name}}",
+            "friendRequestAccepted": "You and {{name}} are now friends",
+            "friendRequestRejected": "You declined {{name}}'s friend request"
+        },
         "addedExpense": "added an expense",
         "settledPayment": "settled a payment",
         "loadError": "Failed to load activity",
         "youPaid": "You paid {{name}} {{amount}}",
         "paidYou": "{{name}} paid you {{amount}}",
-        "inGroup": "in {{group}}"
+        "inGroup": "in {{group}}",
+        "openInGroup": "Open in {{group}}"
     },
     "settleUp": {
         "title": "Settle up",
@@ -525,6 +555,7 @@
         "payment": "Payment",
         "paid": "PAID",
         "received": "RECEIVED",
+        "paidTo": "Paid to",
         "youReceivedAmount": "You received {{amount}}",
         "youPaidAmount": "You paid {{amount}}",
         "someonePaid": "{{from}} paid {{to}}",
@@ -536,7 +567,10 @@
     },
     "feed": {
         "settlement": "{{from}} paid {{to}} {{amount}}",
-        "settlementRow": "{{from}} paid {{to}}"
+        "settlementRow": "{{from}} paid {{to}}",
+        "settlementYouClosedAndPaid": "You settled up and paid",
+        "settlementClosedAndPaidYou": "Settled up and paid you",
+        "settlementClosedAndPaidOther": "Settled up and paid"
     },
     "history": {
         "title": "History",

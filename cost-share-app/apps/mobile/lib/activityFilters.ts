@@ -67,12 +67,17 @@ export function filterAndSortActivities(
         list = list.filter(
             (item) =>
                 item.activityType !== 'message' &&
+                item.activityType !== 'friend_request' &&
                 query.currencies.includes(item.currency),
         );
     }
 
     if (query.groupIds.length > 0) {
-        list = list.filter((item) => query.groupIds.includes(item.groupId));
+        list = list.filter(
+            (item) =>
+                item.groupId.length > 0 &&
+                query.groupIds.includes(item.groupId),
+        );
     }
 
     if (query.groupTypes.length > 0 && groupTypeById) {

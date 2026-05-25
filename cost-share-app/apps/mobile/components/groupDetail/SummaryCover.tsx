@@ -1,6 +1,6 @@
 /**
  * SummaryCover — top region of GroupSummaryCard.
- * Image OR type-gradient background, scrim, type chip, title block,
+ * Image OR type-gradient background, scrim, title block (name · type · members),
  * member stack, and the three top-bar buttons (back · share · menu)
  * overlaid on the cover.
  */
@@ -104,16 +104,6 @@ export function SummaryCover({
                 style={StyleSheet.absoluteFill}
             />
 
-            <View style={styles.typeChip}>
-                <AppIcon name={visual.icon} size={12} color="#fff" />
-                <Text
-                    className="text-[11px] font-semibold text-white"
-                    style={{ textTransform: 'capitalize' }}
-                >
-                    {typeLabel}
-                </Text>
-            </View>
-
             <View style={styles.titleRow}>
                 <View style={styles.titleColumn}>
                     <Text
@@ -123,6 +113,27 @@ export function SummaryCover({
                     >
                         {group.name}
                     </Text>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            marginTop: 2,
+                        }}
+                    >
+                        <AppIcon
+                            name={visual.icon}
+                            size={10}
+                            color="rgba(255,255,255,0.85)"
+                        />
+                        <Text
+                            numberOfLines={1}
+                            className="text-[10px] text-white/80"
+                            style={styles.subtitleShadow}
+                        >
+                            {typeLabel}
+                        </Text>
+                    </View>
                     <Text
                         numberOfLines={1}
                         className="text-[11px] text-white/90"
@@ -182,21 +193,6 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    typeChip: {
-        position: 'absolute',
-        top: 10,
-        // Note: 'left' here is fine — RTL handling is via the buttons row above
-        // (which uses left/right + RTL-flipped row order). Keeping the chip in
-        // the visual top-left even under RTL is consistent with the old hero.
-        left: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 9999,
-        backgroundColor: 'rgba(0,0,0,0.55)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
     },
     titleRow: {
         position: 'absolute',

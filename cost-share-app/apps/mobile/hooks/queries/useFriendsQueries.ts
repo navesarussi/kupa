@@ -46,6 +46,7 @@ function invalidateAllFriendsKeys(qc: ReturnType<typeof useQueryClient>) {
     void qc.invalidateQueries({ queryKey: queryKeys.friendRequestsIncoming });
     void qc.invalidateQueries({ queryKey: queryKeys.friendRequestsOutgoing });
     void qc.invalidateQueries({ queryKey: ['user-search'] });
+    void qc.invalidateQueries({ queryKey: ['activity'] });
 }
 
 export function useSendFriendRequestMutation() {

@@ -4,13 +4,23 @@
  */
 
 import React from 'react';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ExpenseCategory, ExpenseWithDelta } from '@cost-share/shared';
-import { FeedRowCard } from './FeedRowCard';
+import {
+    FeedRowCard,
+    FeedAmountLine,
+    FeedInvolvementLabel,
+} from './FeedRowCard';
 import { FeedRowThumbnail } from './FeedRowThumbnail';
 import { AppIconName } from './AppIcon';
 import { useAppLanguage } from '../hooks/useRtlLayout';
 import { formatFeedDateTime } from '../lib/formatFeedDateTime';
+import {
+    resolveExpenseFeedPerspective,
+    expenseFeedSummaryKey,
+    expenseFeedSummaryCount,
+} from '../lib/feedExpensePerspective';
 
 // ExpenseCategory → Ionicon for the icon-thumbnail fallback.
 const CATEGORY_ICON: Record<ExpenseCategory, AppIconName> = {
@@ -26,27 +36,36 @@ const CATEGORY_ICON: Record<ExpenseCategory, AppIconName> = {
 
 interface ExpenseRowProps {
     expense: ExpenseWithDelta;
-    // The following props are kept for caller compatibility (FeedItemRow).
-    // They are unused in the R1 visual and can be removed when FeedItemRow
-    // is refactored to the new row primitives.
+    currentUserId: string;
+    payerName: string;
+    // Kept for caller compatibility (FeedItemRow).
     actorName?: string;
     actorAvatarUrl?: string;
-    payerName: string;
     isMine?: boolean;
     onPress: (id: string) => void;
     searchQuery?: string;
 }
 
-function ExpenseRowBase({ expense, payerName, onPress }: ExpenseRowProps) {
+function ExpenseRowBase({
+    expense,
+    currentUserId,
+    payerName,
+    onPress,
+}: ExpenseRowProps) {
     const { t } = useTranslation();
     const language = useAppLanguage();
     const timestamp = formatFeedDateTime(new Date(expense.createdAt), language);
 
     const amount = `${expense.currency} ${expense.amount.toFixed(2)}`;
-    const meta = `${timestamp} · ${t('expenses.paidBy')} ${payerName}`.trim();
+    const perspective = resolveExpenseFeedPerspective(expense, currentUserId);
+    const summaryKey = expenseFeedSummaryKey(perspective.perspective);
+    const summary = t(summaryKey, {
+        count: expenseFeedSummaryCount(perspective),
+    });
+    const meta = `${timestamp} · ${summary}`.trim();
 
-    // Involvement sub-line — only when the current user has non-zero exposure.
-    let subLine: string | undefined;
+    // Involvement sub-line — label + amount on separate lines for stable LTR grid.
+    let subLine: React.ReactNode | undefined;
     const userShare = Math.abs(expense.myDelta);
     if (userShare > 0) {
         const formatted = `${expense.currency} ${userShare.toFixed(2)}`;
@@ -54,7 +73,16 @@ function ExpenseRowBase({ expense, payerName, onPress }: ExpenseRowProps) {
             expense.myDeltaState === 'lent'
                 ? 'groups.expense.youLent'
                 : 'groups.expense.youBorrowed';
-        subLine = t(key, { amount: formatted });
+        subLine = (
+            <View style={{ width: '100%' }}>
+                <FeedInvolvementLabel label={t(key, { amount: '' }).trim()} />
+                <FeedAmountLine
+                    amount={formatted}
+                    className="text-[11px] font-medium text-gray-500"
+                    baseFontSize={11}
+                />
+            </View>
+        );
     }
 
     const thumbnail = (

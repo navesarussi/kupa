@@ -3,7 +3,7 @@
  * search + filter, mixed expense/message feed, sticky bottom "Add expense" CTA.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -82,6 +82,10 @@ import {
     isAnyGroupFeedFilterActive,
 } from '../../components/GroupFeedFiltersSheet';
 import { filterAndSortGroupFeed } from '../../lib/groupFeedFilters';
+import {
+    findFeedItemIndex,
+    type GroupDetailFocusFeedItem,
+} from '../../lib/groupDetailFocus';
 import { getAvatarUrl, getDisplayName } from '../../lib/userDisplay';
 import { SettleUpSheet, SettleUpFormValues } from '../../components/SettleUpSheet';
 import {
@@ -117,7 +121,13 @@ export function GroupDetailScreen() {
     const isRtl = useRtlLayout();
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
-    const { groupId } = route.params;
+    const { groupId, focusFeedItem: focusFeedItemParam } = route.params as {
+        groupId: string;
+        focusFeedItem?: GroupDetailFocusFeedItem;
+    };
+    const listRef = useRef<FlatList<FeedItem>>(null);
+    const focusConsumedRef = useRef(false);
+    const pendingFocusKeyRef = useRef<string | null>(null);
     const { isLoading, startLoading, stopLoading } = useLoading();
     const [isFeedLoading, setIsFeedLoading] = useState(
         () => !isGroupFeedHydrated(groupId),
@@ -133,12 +143,19 @@ export function GroupDetailScreen() {
     const { data: groupUsers = [], refetch: refetchGroupUsers } =
         useGroupUsersQuery(groupId);
     const memberLites = useMemo<GroupMemberLite[]>(() => {
-        if (storeGroup?.members?.length) return storeGroup.members;
-        return groupUsers.map(u => ({
+        const fromUsers: GroupMemberLite[] = groupUsers.map(u => ({
             userId: u.id,
             displayName: getDisplayName(u, t),
             avatarUrl: getAvatarUrl(u) ?? undefined,
             isActive: u.isActive,
+        }));
+        if (!storeGroup?.members?.length) return fromUsers;
+        const avatarByUserId = new Map(
+            fromUsers.map(m => [m.userId, m.avatarUrl]),
+        );
+        return storeGroup.members.map(m => ({
+            ...m,
+            avatarUrl: m.avatarUrl ?? avatarByUserId.get(m.userId),
         }));
     }, [storeGroup?.members, groupUsers, t]);
     const [feedParticipants, setFeedParticipants] = useState<
@@ -318,6 +335,57 @@ export function GroupDetailScreen() {
         () => filterAndSortGroupFeed(feed, filters, memberMap, searchQuery),
         [feed, filters, memberMap, searchQuery],
     );
+
+    useEffect(() => {
+        const focus = focusFeedItemParam;
+        if (!focus) return;
+        const key = `${focus.kind}:${focus.id}`;
+        if (pendingFocusKeyRef.current === key) return;
+        pendingFocusKeyRef.current = key;
+        focusConsumedRef.current = false;
+        setSearchQuery('');
+        setFilters(DEFAULT_GROUP_FEED_FILTERS);
+    }, [focusFeedItemParam]);
+
+    useEffect(() => {
+        const focus = focusFeedItemParam;
+        if (!focus || focusConsumedRef.current || isFeedLoading) return;
+
+        const index = findFeedItemIndex(filteredFeed, focus);
+        if (index < 0) return;
+
+        const row = filteredFeed[index];
+        focusConsumedRef.current = true;
+        navigation.setParams({ groupId, focusFeedItem: undefined });
+
+        const openDetail = () => {
+            if (row.kind === 'expense') {
+                setFeedDetailItem({ kind: 'expense', expense: row.expense });
+            } else if (row.kind === 'settlement') {
+                setFeedDetailItem({
+                    kind: 'settlement',
+                    settlement: row.settlement,
+                });
+            }
+        };
+
+        const scrollTimer = setTimeout(() => {
+            listRef.current?.scrollToIndex({
+                index,
+                animated: true,
+                viewPosition: 0.35,
+            });
+            openDetail();
+        }, 120);
+
+        return () => clearTimeout(scrollTimer);
+    }, [
+        focusFeedItemParam,
+        filteredFeed,
+        isFeedLoading,
+        navigation,
+        groupId,
+    ]);
 
     const handleClearFeedSearchAndFilters = useCallback(() => {
         setSearchQuery('');
@@ -573,7 +641,17 @@ export function GroupDetailScreen() {
     return (
         <View className="flex-1 bg-slate-50">
             <FlatList
+                ref={listRef}
                 data={filteredFeed}
+                onScrollToIndexFailed={(info) => {
+                    setTimeout(() => {
+                        listRef.current?.scrollToIndex({
+                            index: info.index,
+                            animated: true,
+                            viewPosition: 0.35,
+                        });
+                    }, 80);
+                }}
                 keyExtractor={item =>
                     item.kind === 'expense'
                         ? `e:${item.expense.id}`

@@ -1,7 +1,14 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import { FeedRowCard } from '../../components/FeedRowCard';
-import { View } from 'react-native';
+import { FeedRowCard, FeedAmountLine } from '../../components/FeedRowCard';
+import { FEED_AMOUNT_CURRENCY_WIDTH } from '../../lib/feedAmountLayout';
+import { View, StyleSheet } from 'react-native';
+import { RtlLayoutProvider } from '../../hooks/useRtlLayout';
+
+jest.mock('../../store', () => ({
+    useAppStore: (selector: (state: { language: 'he' | 'en' }) => unknown) =>
+        selector({ language: 'he' }),
+}));
 
 describe('FeedRowCard', () => {
   const baseProps = {
@@ -15,7 +22,8 @@ describe('FeedRowCard', () => {
     const { getByText } = render(<FeedRowCard {...baseProps} />);
     expect(getByText('Sushi on Friday')).toBeTruthy();
     expect(getByText('Aug 14 · Paid by Sarah')).toBeTruthy();
-    expect(getByText('USD 84.20')).toBeTruthy();
+    expect(getByText('USD')).toBeTruthy();
+    expect(getByText('84.20')).toBeTruthy();
   });
 
   it('renders the sub-line when provided', () => {
@@ -34,5 +42,34 @@ describe('FeedRowCard', () => {
     );
     fireEvent.press(getByTestId('card'));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps currency amounts LTR with a fixed currency column in Hebrew', () => {
+    const { getByText } = render(
+      <RtlLayoutProvider>
+        <FeedRowCard {...baseProps} subLine="הלוויתָ ILS 21.05" />
+      </RtlLayoutProvider>,
+    );
+
+    const currency = getByText('USD');
+    expect(StyleSheet.flatten(currency.props.style)).toMatchObject({
+      writingDirection: 'ltr',
+      textAlign: 'left',
+      width: FEED_AMOUNT_CURRENCY_WIDTH,
+    });
+  });
+
+  it('renders a very large amount on one line with a smaller value font', () => {
+    const { getByText } = render(
+      <FeedAmountLine amount="AFN 1000000.00" className="text-[15px] font-bold" />,
+    );
+    const value = getByText('1000000.00');
+    expect(StyleSheet.flatten(value.props.style)).toMatchObject({
+      fontSize: 14,
+      flex: 1,
+      minWidth: 0,
+    });
+    expect(value.props.numberOfLines).toBe(1);
+    expect(value.props.adjustsFontSizeToFit).toBe(true);
   });
 });

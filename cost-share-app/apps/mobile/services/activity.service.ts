@@ -106,6 +106,66 @@ async function fetchProfiles(userIds: string[]): Promise<Map<string, ProfileSumm
     return profiles;
 }
 
+const FRIEND_REQUEST_HISTORY_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+
+function buildFriendRequestHistoryQuery(
+    userId: string,
+    limit: number,
+    before?: string,
+) {
+    let query = supabase
+        .from('friend_requests')
+        .select('id, from_user_id, status, created_at, responded_at')
+        .eq('to_user_id', userId)
+        .in('status', [...FRIEND_REQUEST_HISTORY_STATUSES])
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (before) {
+        query = query.lt('created_at', before);
+    }
+    return query;
+}
+
+function mapFriendRequestsToActivities(
+    rows: Record<string, unknown>[],
+    profilesById: Map<string, ProfileSummary>,
+): RecentActivity[] {
+    return rows.map((row) => {
+        const fromUserId = row.from_user_id as string;
+        const status = row.status as RecentActivity['friendRequestStatus'];
+        const sender = profilesById.get(fromUserId);
+        const senderLike = sender
+            ? {
+                  id: fromUserId,
+                  name: sender.name,
+                  avatarUrl: sender.avatarUrl,
+                  isActive: sender.isActive,
+              }
+            : null;
+        const createdAt = new Date(row.created_at as string);
+        const respondedAt = row.responded_at
+            ? new Date(row.responded_at as string)
+            : undefined;
+        const activityDate =
+            status === 'pending' ? createdAt : (respondedAt ?? createdAt);
+        return {
+            id: row.id as string,
+            activityType: 'friend_request' as const,
+            groupId: '',
+            description: '',
+            amount: 0,
+            currency: '',
+            userId: fromUserId,
+            userName: getDisplayName(senderLike, i18n.t),
+            userAvatarUrl: getAvatarUrl(senderLike) ?? undefined,
+            friendRequestStatus: status,
+            activityDate,
+            createdAt,
+        };
+    });
+}
+
 function buildSettlementQuery(groupIds: string[], limit: number, before?: string) {
     let query = supabase
         .from('settlements')
@@ -142,11 +202,15 @@ function mapToActivities(
     expenses: Record<string, unknown>[],
     settlements: Record<string, unknown>[],
     messages: Record<string, unknown>[],
+    friendRequests: Record<string, unknown>[],
     groupNamesById: Map<string, string>,
     messageProfilesById: Map<string, ProfileSummary>,
+    friendRequestProfilesById: Map<string, ProfileSummary>,
     currentUserId: string,
 ): RecentActivity[] {
-    const activities: RecentActivity[] = [];
+    const activities: RecentActivity[] = [
+        ...mapFriendRequestsToActivities(friendRequests, friendRequestProfilesById),
+    ];
 
     for (const row of expenses) {
         const createdBy = row.created_by as string;
@@ -248,13 +312,50 @@ export async function fetchRecentActivity(
             options.groupIds && options.groupIds.length > 0
                 ? options.groupIds
                 : await getUserGroupIds(userId);
-        if (groupIds.length === 0) return { items: [] };
 
-        const [expensesResult, settlementsResult, messagesResult] = await Promise.all([
-            buildExpenseQuery(groupIds, fetchLimit, options.before),
-            buildSettlementQuery(groupIds, fetchLimit, options.before),
-            buildMessageQuery(groupIds, fetchLimit, options.before),
-        ]);
+        const friendRequestsResult = await buildFriendRequestHistoryQuery(
+            userId,
+            fetchLimit,
+            options.before,
+        );
+        if (friendRequestsResult.error) throw friendRequestsResult.error;
+
+        const friendRequestRows = (friendRequestsResult.data ??
+            []) as Record<string, unknown>[];
+        const friendRequestUserIds = [
+            ...new Set(friendRequestRows.map((row) => row.from_user_id as string)),
+        ];
+
+        if (groupIds.length === 0) {
+            const friendRequestProfilesById =
+                await fetchProfiles(friendRequestUserIds);
+            const merged = mapToActivities(
+                [],
+                [],
+                [],
+                friendRequestRows,
+                new Map(),
+                new Map(),
+                friendRequestProfilesById,
+                userId,
+            );
+            const hasMore =
+                merged.length > limit ||
+                friendRequestRows.length === fetchLimit;
+            const items = merged.slice(0, limit);
+            const nextCursor =
+                hasMore && items.length > 0
+                    ? items.at(-1)!.createdAt.toISOString()
+                    : undefined;
+            return { items, nextCursor };
+        }
+
+        const [expensesResult, settlementsResult, messagesResult] =
+            await Promise.all([
+                buildExpenseQuery(groupIds, fetchLimit, options.before),
+                buildSettlementQuery(groupIds, fetchLimit, options.before),
+                buildMessageQuery(groupIds, fetchLimit, options.before),
+            ]);
 
         if (expensesResult.error) throw expensesResult.error;
         if (settlementsResult.error) throw settlementsResult.error;
@@ -271,19 +372,25 @@ export async function fetchRecentActivity(
             ),
         ];
 
-        const [groupNamesById, messageProfilesById] = await Promise.all([
-            options.groupNamesById
-                ? Promise.resolve(new Map(Object.entries(options.groupNamesById)))
-                : fetchGroupNames([...settlementGroupIds]),
-            fetchProfiles(messageUserIds),
-        ]);
+        const [groupNamesById, messageProfilesById, friendRequestProfilesById] =
+            await Promise.all([
+                options.groupNamesById
+                    ? Promise.resolve(
+                          new Map(Object.entries(options.groupNamesById)),
+                      )
+                    : fetchGroupNames([...settlementGroupIds]),
+                fetchProfiles(messageUserIds),
+                fetchProfiles(friendRequestUserIds),
+            ]);
 
         const merged = mapToActivities(
             (expensesResult.data ?? []) as Record<string, unknown>[],
             (settlementsResult.data ?? []) as Record<string, unknown>[],
             (messagesResult.data ?? []) as Record<string, unknown>[],
+            friendRequestRows,
             groupNamesById,
             messageProfilesById,
+            friendRequestProfilesById,
             userId,
         );
 
@@ -291,7 +398,8 @@ export async function fetchRecentActivity(
             merged.length > limit ||
             (expensesResult.data?.length ?? 0) === fetchLimit ||
             (settlementsResult.data?.length ?? 0) === fetchLimit ||
-            (messagesResult.data?.length ?? 0) === fetchLimit;
+            (messagesResult.data?.length ?? 0) === fetchLimit ||
+            friendRequestRows.length === fetchLimit;
         const items = merged.slice(0, limit);
         const nextCursor =
             hasMore && items.length > 0

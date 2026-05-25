@@ -39,9 +39,14 @@ export function FeedItemRow({
         return (
             <ExpenseRow
                 expense={item.expense}
+                currentUserId={currentUserId}
                 actorName={actor?.displayName ?? ''}
                 actorAvatarUrl={getAvatarUrlForMember(actor)}
-                payerName={payer?.displayName ?? ''}
+                payerName={
+                    item.expense.paidBy === currentUserId
+                        ? t('settleUp.you')
+                        : payer?.displayName ?? ''
+                }
                 isMine={item.expense.createdBy === currentUserId}
                 onPress={onExpensePress}
                 searchQuery={searchQuery}
@@ -61,6 +66,7 @@ export function FeedItemRow({
         return (
             <SettlementRow
                 settlement={item.settlement}
+                currentUserId={currentUserId}
                 actorName={actor?.displayName ?? fromName}
                 actorAvatarUrl={getAvatarUrlForMember(actor)}
                 fromName={fromName}

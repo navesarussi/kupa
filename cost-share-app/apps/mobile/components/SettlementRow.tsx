@@ -10,21 +10,24 @@ import { FeedRowCard } from './FeedRowCard';
 import { FeedRowThumbnail } from './FeedRowThumbnail';
 import { useAppLanguage } from '../hooks/useRtlLayout';
 import { formatFeedDateTime } from '../lib/formatFeedDateTime';
+import { buildSettlementFeedCopy } from '../lib/feedSettlementPerspective';
 import { colors } from '../theme';
 
 interface SettlementRowProps {
     settlement: Settlement;
-    // Kept for caller compatibility (FeedItemRow). Unused in R1 visual.
-    actorName?: string;
-    actorAvatarUrl?: string;
+    currentUserId: string;
     fromName: string;
     toName: string;
+    // Kept for caller compatibility (FeedItemRow).
+    actorName?: string;
+    actorAvatarUrl?: string;
     isMine?: boolean;
     onPress: () => void;
 }
 
 function SettlementRowBase({
     settlement,
+    currentUserId,
     fromName,
     toName,
     onPress,
@@ -36,7 +39,8 @@ function SettlementRowBase({
         language,
     );
 
-    const title = t('feed.settlementRow', { from: fromName, to: toName });
+    const copy = buildSettlementFeedCopy(settlement, currentUserId);
+    const title = t(copy.key);
     const meta = `${timestamp} · ${t('activity.settlement')}`;
     const amount = `${settlement.currency} ${settlement.amount.toFixed(2)}`;
 

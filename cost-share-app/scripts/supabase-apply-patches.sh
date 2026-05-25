@@ -53,5 +53,8 @@ supabase db query --linked --agent=no -f "$SUPABASE_DIR/fix-groups-select-creato
 echo "▶ Applying friends system (tables, trigger, backfill, RLS, RPCs) ..."
 supabase db query --linked --agent=no -f "$SUPABASE_DIR/friends-system.sql"
 
+echo "▶ Applying group messages (table, RLS, realtime, RPCs) ..."
+supabase db query --linked --agent=no -f "$SUPABASE_DIR/group-messages.sql"
+
 echo "▶ Verifying REST probes ..."
 bash "$SCRIPT_DIR/verify-supabase-schema.sh"

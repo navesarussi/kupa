@@ -243,13 +243,33 @@
             "splitBetweenCount_one": "מתחלק בין · {{count}} אדם",
             "splitBetweenCount_two": "מתחלק בין · {{count}} אנשים",
             "splitBetweenCount_many": "מתחלק בין · {{count}} אנשים",
-            "splitBetweenCount_other": "מתחלק בין · {{count}} אנשים"
+            "splitBetweenCount_other": "מתחלק בין · {{count}} אנשים",
+            "splitParty": "מתחלקים",
+            "paidForSplitters_one": "שילם על אדם אחד שמתחלק",
+            "paidForSplitters_two": "שילם על {{count}} אנשים שמתחלקים",
+            "paidForSplitters_many": "שילם על {{count}} אנשים שמתחלקים",
+            "paidForSplitters_other": "שילם על {{count}} אנשים שמתחלקים",
+            "feedYouPaid_one": "שילמת על אדם אחד",
+            "feedYouPaid_two": "שילמת על {{count}} אנשים",
+            "feedYouPaid_many": "שילמת על {{count}} אנשים",
+            "feedYouPaid_other": "שילמת על {{count}} אנשים",
+            "feedPaidForYou": "שילם/ה עליך",
+            "feedPaidForYouAndOthers_one": "שילם/ה עליך ועל עוד אדם אחד שמתחלק",
+            "feedPaidForYouAndOthers_two": "שילם/ה עליך ועל עוד {{count}} אנשים שמתחלקים",
+            "feedPaidForYouAndOthers_many": "שילם/ה עליך ועל עוד {{count}} אנשים שמתחלקים",
+            "feedPaidForYouAndOthers_other": "שילם/ה עליך ועל עוד {{count}} אנשים שמתחלקים",
+            "feedPaidExcludingYou_one": "שילם/ה על אדם אחד שמתחלק בלעדיך",
+            "feedPaidExcludingYou_two": "שילם/ה על {{count}} אנשים שמתחלקים בלעדיך",
+            "feedPaidExcludingYou_many": "שילם/ה על {{count}} אנשים שמתחלקים בלעדיך",
+            "feedPaidExcludingYou_other": "שילם/ה על {{count}} אנשים שמתחלקים בלעדיך"
         },
         "feedDetail": {
             "expenseTitle": "פרטי הוצאה",
             "expenseHeaderLabel": "הוצאה",
             "settlementTitle": "פרטי סגירת חשבון",
-            "yourShare": "החלק שלך"
+            "yourShare": "החלק שלך",
+            "showFullBreakdown": "לפירוט מלא",
+            "hideFullBreakdown": "הסתר פירוט"
         },
         "message": {
             "composerPlaceholder": "כתוב הודעה…",
@@ -502,12 +522,30 @@
         "expense": "הוצאה",
         "settlement": "תשלום",
         "message": "הודעה",
+        "cardTypes": {
+            "expense": "הוצאה",
+            "settlement": "תשלום",
+            "message": "הודעה",
+            "groupInvite": "קופה",
+            "memberJoined": "הצטרפות",
+            "memberLeft": "עזיבה",
+            "friendRequest": "חברים"
+        },
+        "notifications": {
+            "groupInvite": "{{name}} צירף/ה אותך ל{{group}}",
+            "memberJoined": "{{name}} הצטרף/ה ל{{group}}",
+            "memberLeft": "{{name}} עזב/ה את {{group}}",
+            "friendRequest": "בקשת חברות מ{{name}}",
+            "friendRequestAccepted": "את/ה ו-{{name}} חברים עכשיו",
+            "friendRequestRejected": "דחית את בקשת החברות מ{{name}}"
+        },
         "addedExpense": "הוסיף הוצאה",
         "settledPayment": "ביצע תשלום",
         "loadError": "טעינת הפעילות נכשלה",
         "youPaid": "שילמת ל-{{name}} {{amount}}",
         "paidYou": "{{name}} שילם/ה לך {{amount}}",
-        "inGroup": "בקופה {{group}}"
+        "inGroup": "בקופה {{group}}",
+        "openInGroup": "פתח ב{{group}}"
     },
     "settleUp": {
         "title": "סגירת חשבון",
@@ -533,6 +571,7 @@
         "payment": "תשלום",
         "paid": "שולם",
         "received": "התקבל",
+        "paidTo": "שילם ל  ־",
         "youReceivedAmount": "קיבלת {{amount}}",
         "youPaidAmount": "שילמת {{amount}}",
         "someonePaid": "{{from}} שילם ל-{{to}}",
@@ -544,7 +583,10 @@
     },
     "feed": {
         "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}",
-        "settlementRow": "{{from}} שילם/ה ל-{{to}}"
+        "settlementRow": "{{from}} שילם/ה ל-{{to}}",
+        "settlementYouClosedAndPaid": "סגרת חוב ושילמת",
+        "settlementClosedAndPaidYou": "סגר חוב ושילם/ה לך",
+        "settlementClosedAndPaidOther": "סגר חוב ושילם/ה"
     },
     "history": {
         "title": "היסטוריה",

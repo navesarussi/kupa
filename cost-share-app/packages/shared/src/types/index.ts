@@ -213,9 +213,24 @@ export interface UserExpenseView {
  * RecentActivity - Combined feed of expenses, settlements, and group messages
  * Implements: cross-group activity tab (REQ-ACT-01)
  */
+export type ActivityType =
+    | 'expense'
+    | 'settlement'
+    | 'message'
+    | 'friend_request'
+    | 'group_invite'
+    | 'member_joined'
+    | 'member_left';
+
+export type FriendRequestActivityStatus =
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'cancelled';
+
 export interface RecentActivity {
     id: string;
-    activityType: 'expense' | 'settlement' | 'message';
+    activityType: ActivityType;
     groupId: string;
     description: string;
     amount: number;
@@ -223,6 +238,8 @@ export interface RecentActivity {
     userId: string;
     userName: string;
     userAvatarUrl?: string;
+    /** Set for `friend_request` rows — drives history copy and styling. */
+    friendRequestStatus?: FriendRequestActivityStatus;
     activityDate: Date;
     createdAt: Date;
 }
