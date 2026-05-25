@@ -109,6 +109,29 @@ function handleFriendRequestsEvent(): void {
     void queryClient.invalidateQueries({ queryKey: queryKeys.friendRequestsOutgoing });
 }
 
+function handleArchiveEvent(payload: RealtimePayload): void {
+    const store = useAppStore.getState();
+
+    if (payload.eventType === 'INSERT' && payload.new) {
+        const groupId = payload.new.group_id as string | undefined;
+        if (!groupId) return;
+        const existing = store.groups.find(g => g.id === groupId);
+        if (!existing) return;
+        store.updateGroup({ ...existing, isArchivedByMe: true });
+        return;
+    }
+
+    if (payload.eventType === 'DELETE' && payload.old) {
+        const groupId = payload.old.group_id as string | undefined;
+        if (!groupId) return;
+        const existing = store.groups.find(g => g.id === groupId);
+        if (!existing) return;
+        store.updateGroup({ ...existing, isArchivedByMe: false });
+        return;
+    }
+    // UPDATE: not expected (rows are existence-based); ignore.
+}
+
 export function useAppRealtime(userId: string | undefined | null): void {
     useEffect(() => {
         if (!userId) return;
@@ -161,6 +184,22 @@ export function useAppRealtime(userId: string | undefined | null): void {
                         handleFriendRequestsEvent();
                     } catch (err) {
                         console.error('app realtime: friend_requests payload error:', err);
+                    }
+                },
+            )
+            .on(
+                'postgres_changes' as never,
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'group_user_archive',
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload: RealtimePayload) => {
+                    try {
+                        handleArchiveEvent(payload);
+                    } catch (err) {
+                        console.error('app realtime: archive payload error:', err);
                     }
                 },
             )
