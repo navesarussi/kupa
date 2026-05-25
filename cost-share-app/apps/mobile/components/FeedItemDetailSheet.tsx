@@ -3,13 +3,12 @@
  * and edit / delete icon actions (used from GroupDetailScreen feed).
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
     View,
     Modal,
     Pressable,
     ScrollView,
-    TouchableOpacity,
     StyleSheet,
     Image,
 } from 'react-native';
@@ -24,6 +23,7 @@ import {
 import { Text } from './AppText';
 import { AppIcon, AppIconName } from './AppIcon';
 import { MemberAvatar } from './MemberAvatar';
+import { DetailSheetHeader } from './DetailSheetHeader';
 import { formatFeedDateTime } from '../lib/formatFeedDateTime';
 import { useAppLanguage } from '../hooks/useRtlLayout';
 import { colors } from '../theme';
@@ -92,21 +92,6 @@ export function FeedItemDetailSheet({
             ? Boolean(item.expense)
             : Boolean(item.settlement));
 
-    const [menuOpen, setMenuOpen] = useState(false);
-
-    React.useEffect(() => {
-        if (!visible) setMenuOpen(false);
-    }, [visible]);
-
-    const handleEdit = () => {
-        setMenuOpen(false);
-        onEdit();
-    };
-    const handleDelete = () => {
-        setMenuOpen(false);
-        onDelete();
-    };
-
     return (
         <Modal
             visible={visible}
@@ -133,19 +118,13 @@ export function FeedItemDetailSheet({
                 >
                     <View className="self-center w-10 h-1 rounded-full bg-gray-200 mt-2.5 mb-2" />
 
-                    {item?.kind === 'expense' && (
-                        <ExpenseHeader
-                            onClose={onClose}
-                            menuOpen={menuOpen}
-                            onToggleMenu={() => setMenuOpen(o => !o)}
-                            onCloseMenu={() => setMenuOpen(false)}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                        />
-                    )}
-
-                    {item?.kind === 'settlement' && (
-                        <SettlementHeader
+                    {item && (
+                        <DetailSheetHeader
+                            label={
+                                item.kind === 'expense'
+                                    ? t('groups.feedDetail.expenseHeaderLabel')
+                                    : t('settleUp.detailHeaderLabel')
+                            }
                             onClose={onClose}
                             onEdit={onEdit}
                             onDelete={onDelete}
@@ -178,168 +157,6 @@ export function FeedItemDetailSheet({
                 </View>
             </View>
         </Modal>
-    );
-}
-
-function ExpenseHeader({
-    onClose,
-    menuOpen,
-    onToggleMenu,
-    onCloseMenu,
-    onEdit,
-    onDelete,
-}: {
-    onClose: () => void;
-    menuOpen: boolean;
-    onToggleMenu: () => void;
-    onCloseMenu: () => void;
-    onEdit: () => void;
-    onDelete: () => void;
-}) {
-    const { t } = useTranslation();
-    return (
-        <View
-            className="flex-row items-center justify-between px-2 pb-1"
-            style={{ position: 'relative', zIndex: 5 }}
-        >
-            <TouchableOpacity
-                onPress={onClose}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('groups.filters.close')}
-                className="w-11 h-11 items-center justify-center"
-            >
-                <AppIcon name="close" size={22} color={colors.gray600} />
-            </TouchableOpacity>
-
-            <Text
-                className="text-xs font-semibold uppercase text-gray-500"
-                style={{ letterSpacing: 0.7 }}
-            >
-                {t('groups.feedDetail.expenseHeaderLabel')}
-            </Text>
-
-            <View>
-                <TouchableOpacity
-                    onPress={onToggleMenu}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('common.edit')}
-                    className="w-11 h-11 items-center justify-center"
-                    testID="detail-kebab-btn"
-                >
-                    <AppIcon
-                        name="ellipsis-vertical"
-                        size={20}
-                        color={colors.gray600}
-                    />
-                </TouchableOpacity>
-
-                {menuOpen && (
-                    <>
-                        <Pressable
-                            onPress={onCloseMenu}
-                            style={styles.menuBackdrop}
-                        />
-                        <View style={styles.menuCard}>
-                            <TouchableOpacity
-                                onPress={onEdit}
-                                accessibilityRole="button"
-                                accessibilityLabel={t('common.edit')}
-                                className="flex-row items-center px-3 py-2.5 rounded-lg"
-                                testID="detail-edit-btn"
-                            >
-                                <AppIcon
-                                    name="create-outline"
-                                    size={16}
-                                    color={colors.gray700}
-                                />
-                                <Text className="text-sm font-medium text-gray-900 ml-2.5">
-                                    {t('common.edit')}
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={onDelete}
-                                accessibilityRole="button"
-                                accessibilityLabel={t('common.delete')}
-                                className="flex-row items-center px-3 py-2.5 rounded-lg"
-                                testID="detail-delete-btn"
-                            >
-                                <AppIcon
-                                    name="trash-outline"
-                                    size={16}
-                                    color={colors.error}
-                                />
-                                <Text
-                                    className="text-sm font-medium ml-2.5"
-                                    style={{ color: colors.error }}
-                                >
-                                    {t('common.delete')}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                )}
-            </View>
-        </View>
-    );
-}
-
-function SettlementHeader({
-    onClose,
-    onEdit,
-    onDelete,
-}: {
-    onClose: () => void;
-    onEdit: () => void;
-    onDelete: () => void;
-}) {
-    const { t } = useTranslation();
-    return (
-        <View className="px-5 pb-2">
-            <View style={styles.headerRow}>
-                <Text className="text-xl font-bold text-gray-900 flex-1">
-                    {t('groups.feedDetail.settlementTitle')}
-                </Text>
-                <View className="flex-row items-center gap-2">
-                    <TouchableOpacity
-                        onPress={onEdit}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('common.edit')}
-                        className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
-                        testID="detail-edit-btn"
-                    >
-                        <AppIcon
-                            name="create-outline"
-                            size={20}
-                            color={colors.primary}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={onDelete}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('common.delete')}
-                        className="w-10 h-10 rounded-full bg-red-50 items-center justify-center"
-                        testID="detail-delete-btn"
-                    >
-                        <AppIcon
-                            name="trash-outline"
-                            size={20}
-                            color={colors.error}
-                        />
-                    </TouchableOpacity>
-                </View>
-                <TouchableOpacity
-                    onPress={onClose}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('groups.filters.close')}
-                    className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center ml-2"
-                >
-                    <AppIcon name="close" size={18} color={colors.gray600} />
-                </TouchableOpacity>
-            </View>
-        </View>
     );
 }
 
@@ -769,34 +586,5 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         maxHeight: '88%',
         overflow: 'hidden',
-    },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    menuCard: {
-        position: 'absolute',
-        top: 42,
-        right: 4,
-        minWidth: 160,
-        padding: 4,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#0F172A',
-        shadowOpacity: 0.12,
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 20,
-        elevation: 8,
-        zIndex: 10,
-    },
-    menuBackdrop: {
-        position: 'absolute',
-        top: -1000,
-        left: -1000,
-        right: -1000,
-        bottom: -1000,
-        zIndex: 9,
     },
 });

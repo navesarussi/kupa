@@ -74,9 +74,10 @@ describe('FeedItemDetailSheet', () => {
         expect(onDelete).toHaveBeenCalled();
     });
 
-    it('shows edit/delete for settlements to any group member', () => {
+    it('exposes settlement edit/delete via the kebab menu', () => {
         const onEdit = jest.fn();
-        const { getByTestId } = renderWithQuery(
+        const onDelete = jest.fn();
+        const { getByTestId, queryByTestId } = renderWithQuery(
             <FeedItemDetailSheet
                 item={{
                     kind: 'settlement',
@@ -98,13 +99,20 @@ describe('FeedItemDetailSheet', () => {
                 currentUserId="u3"
                 onClose={jest.fn()}
                 onEdit={onEdit}
-                onDelete={jest.fn()}
+                onDelete={onDelete}
             />,
         );
 
         expect(getByTestId('settlement-detail-sheet')).toBeTruthy();
-        expect(getByTestId('detail-edit-btn')).toBeTruthy();
+        expect(queryByTestId('detail-edit-btn')).toBeNull();
+        expect(queryByTestId('detail-delete-btn')).toBeNull();
+
+        fireEvent.press(getByTestId('detail-kebab-btn'));
         fireEvent.press(getByTestId('detail-edit-btn'));
-        expect(onEdit).toHaveBeenCalled();
+        expect(onEdit).toHaveBeenCalledTimes(1);
+
+        fireEvent.press(getByTestId('detail-kebab-btn'));
+        fireEvent.press(getByTestId('detail-delete-btn'));
+        expect(onDelete).toHaveBeenCalledTimes(1);
     });
 });
