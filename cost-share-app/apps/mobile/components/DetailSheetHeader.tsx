@@ -13,7 +13,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Text } from './AppText';
 import { AppIcon } from './AppIcon';
-import { useAppLanguage } from '../hooks/useRtlLayout';
 import { colors } from '../theme';
 
 export interface DetailSheetHeaderProps {
@@ -31,8 +30,6 @@ export function DetailSheetHeader({
     onDelete,
 }: DetailSheetHeaderProps) {
     const { t } = useTranslation();
-    const language = useAppLanguage();
-    const isRtl = language === 'he';
     const [menuOpen, setMenuOpen] = useState(false);
 
     const handleEdit = () => {
@@ -88,12 +85,7 @@ export function DetailSheetHeader({
                             onPress={() => setMenuOpen(false)}
                             style={styles.menuBackdrop}
                         />
-                        <View
-                            style={[
-                                styles.menuCard,
-                                isRtl ? { left: 4 } : { right: 4 },
-                            ]}
-                        >
+                        <View style={styles.menuCard}>
                             <TouchableOpacity
                                 onPress={handleEdit}
                                 accessibilityRole="button"
@@ -141,6 +133,7 @@ const styles = StyleSheet.create({
     menuCard: {
         position: 'absolute',
         top: 42,
+        right: 4,
         minWidth: 160,
         padding: 4,
         backgroundColor: '#FFFFFF',

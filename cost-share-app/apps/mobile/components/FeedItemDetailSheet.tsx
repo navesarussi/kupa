@@ -571,11 +571,11 @@ function SettlementHero({
                     {heroDate}
                 </Text>
 
-                {/* Center payment flow */}
+                {/* Center payment flow — parent's direction: rtl auto-reverses children. */}
                 <View
                     style={{
                         flex: 1,
-                        flexDirection: isRtl ? 'row-reverse' : 'row',
+                        flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         paddingHorizontal: 14,
@@ -609,7 +609,7 @@ function SettlementHero({
                         </Text>
                         <View
                             style={{
-                                flexDirection: isRtl ? 'row-reverse' : 'row',
+                                flexDirection: 'row',
                                 alignItems: 'center',
                                 width: '100%',
                                 marginTop: 4,
