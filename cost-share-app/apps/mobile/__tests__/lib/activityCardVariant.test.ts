@@ -23,10 +23,10 @@ describe('getActivityCardVariant', () => {
         expect(pending.borderColor).toBe('#fde68a');
     });
 
-    it('uses accepted styling for accepted friend requests', () => {
+    it('uses accepted styling with the shared amber border for accepted friend requests', () => {
         const accepted = getActivityCardVariant('friend_request_received', 'accepted');
         expect(accepted.iconName).toBe('checkmark-circle-outline');
-        expect(accepted.borderColor).toBe('#bbf7d0');
+        expect(accepted.borderColor).toBe('#fde68a');
     });
 
     it('uses rejected styling for rejected friend requests', () => {
