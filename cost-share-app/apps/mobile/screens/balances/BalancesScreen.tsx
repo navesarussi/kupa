@@ -158,6 +158,8 @@ export function BalancesScreen() {
                 toUserId: values.toUserId,
                 amount: values.amount,
                 currency: values.currency,
+                paymentMethod: values.paymentMethod,
+                settlementDate: values.settlementDate,
             });
             setSettleTarget(null);
         },

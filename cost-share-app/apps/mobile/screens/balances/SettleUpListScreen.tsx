@@ -178,6 +178,8 @@ export function SettleUpListScreen() {
                 toUserId: values.toUserId,
                 amount: values.amount,
                 currency: values.currency,
+                paymentMethod: values.paymentMethod,
+                settlementDate: values.settlementDate,
             });
             setActiveDebt(null);
         },
@@ -221,6 +223,7 @@ export function SettleUpListScreen() {
                     toUserId: values.toUserId,
                     amount: values.amount,
                     currency: values.currency,
+                    // Note: UpdateSettlementDto does not yet accept paymentMethod / settlementDate
                 },
             });
             if (updated) setEditingSettlement(null);
@@ -415,7 +418,7 @@ function SettlementHistoryRow({
             testID={`settle-history-${settlement.id}`}
         >
             <View className="mr-2">
-                <AppIcon name="checkmark-circle" size={18} color={colors.success} />
+                <AppIcon name="checkmark-circle" size={18} color={colors.success.DEFAULT} />
             </View>
             <MemberAvatar name={fromName} avatarUrl={fromAvatar} size="xs" />
             <View className="mx-1.5">

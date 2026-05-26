@@ -47,7 +47,7 @@ function SettlementRowBase({
     const thumbnail = (
         <FeedRowThumbnail
             iconName="swap-horizontal-outline"
-            iconColor={colors.success}
+            iconColor={colors.success.DEFAULT}
             iconBgColor="#ecfdf5"
         />
     );

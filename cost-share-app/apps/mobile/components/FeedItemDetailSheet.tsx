@@ -882,7 +882,7 @@ function InvolvementStrip({
     const bg = isBorrowed ? '#FEF2F2' : '#ECFDF5';
     const border = isBorrowed ? '#FECACA' : '#A7F3D0';
     const textColor = isBorrowed ? '#B91C1C' : '#047857';
-    const iconColor = isBorrowed ? colors.error : colors.success;
+    const iconColor = isBorrowed ? colors.error : colors.success.DEFAULT;
     const iconName: AppIconName = isBorrowed
         ? 'arrow-up-circle-outline'
         : 'arrow-down-circle-outline';
@@ -1113,7 +1113,7 @@ function SettlementInvolvementStrip({
                 className="items-center justify-center bg-white"
                 style={{ width: 36, height: 36, borderRadius: 9999 }}
             >
-                <AppIcon name={iconName} size={20} color={colors.success} />
+                <AppIcon name={iconName} size={20} color={colors.success.DEFAULT} />
             </View>
             <View className="flex-1 mx-3 min-w-0">
                 <Text
