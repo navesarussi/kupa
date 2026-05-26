@@ -1,0 +1,85 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { SettleUpSheet, SettleUpFormValues } from '../../components/SettleUpSheet';
+import type { GroupMemberLite, PairwiseDebt } from '@cost-share/shared';
+
+jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
+jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: any) => children }));
+
+const members: GroupMemberLite[] = [
+    { userId: 'u1', displayName: 'You', avatarUrl: undefined, isActive: true },
+    { userId: 'u2', displayName: 'David', avatarUrl: undefined, isActive: true },
+];
+const debts: PairwiseDebt[] = [
+    { fromUserId: 'u1', toUserId: 'u2', currency: 'USD', amount: 18 } as PairwiseDebt,
+];
+const baseInitial = {
+    fromUserId: 'u1',
+    toUserId: 'u2',
+    currency: 'USD',
+    amount: 18,
+};
+
+const renderSheet = (overrides: Partial<React.ComponentProps<typeof SettleUpSheet>> = {}) =>
+    render(
+        <SettleUpSheet
+            visible
+            members={members}
+            pairwiseDebts={debts}
+            currentUserId="u1"
+            initial={baseInitial}
+            mode="create"
+            onClose={jest.fn()}
+            onSubmit={jest.fn()}
+            {...overrides}
+        />
+    );
+
+describe('SettleUpSheet (redesign)', () => {
+    it('pre-fills amount, currency, and from/to from initial', () => {
+        const { getByText, getByDisplayValue } = renderSheet();
+        expect(getByDisplayValue('18.00')).toBeTruthy();
+        expect(getByText('USD')).toBeTruthy();
+        expect(getByText('You')).toBeTruthy();
+        expect(getByText('David')).toBeTruthy();
+    });
+
+    it('SWAP chip flips from/to and submits the swapped payload', async () => {
+        const onSubmit = jest.fn();
+        const { getByTestId } = renderSheet({ onSubmit });
+        fireEvent.press(getByTestId('settle-swap-chip'));
+        fireEvent.press(getByTestId('settle-record-button'));
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({ fromUserId: 'u2', toUserId: 'u1' })
+        );
+    });
+
+    it('selecting a method tile updates the submitted paymentMethod', async () => {
+        const onSubmit = jest.fn();
+        const { getByTestId } = renderSheet({ onSubmit });
+        fireEvent.press(getByTestId('method-tile-paypal'));
+        fireEvent.press(getByTestId('settle-record-button'));
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({ paymentMethod: 'paypal' })
+        );
+    });
+
+    it('defaults paymentMethod to bank_transfer per design', async () => {
+        const onSubmit = jest.fn();
+        const { getByTestId } = renderSheet({ onSubmit });
+        fireEvent.press(getByTestId('settle-record-button'));
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({ paymentMethod: 'bank_transfer' })
+        );
+    });
+
+    it('disables Record payment when amount is zero', () => {
+        const onSubmit = jest.fn();
+        const { getByTestId } = renderSheet({
+            initial: { ...baseInitial, amount: 0 },
+            onSubmit,
+        });
+        fireEvent.press(getByTestId('settle-record-button'));
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+});
