@@ -587,6 +587,7 @@ export function GroupDetailScreen() {
                     toUserId: values.toUserId,
                     amount: values.amount,
                     currency: values.currency,
+                    // Note: UpdateSettlementDto does not yet accept paymentMethod / settlementDate
                 },
             });
             if (updated) setEditingSettlement(null);

@@ -16,6 +16,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { PaymentMethod } from '@cost-share/shared';
 import { GroupMemberLite, PairwiseDebt } from '@cost-share/shared';
 import { Text } from './AppText';
 import { MemberAvatar } from './MemberAvatar';
@@ -28,6 +29,8 @@ export interface SettleUpFormValues {
     toUserId: string;
     currency: string;
     amount: number;
+    paymentMethod: PaymentMethod;
+    settlementDate: Date;
 }
 
 interface SettleUpSheetProps {
@@ -41,6 +44,8 @@ interface SettleUpSheetProps {
         toUserId: string;
         currency: string;
         amount: number;
+        paymentMethod?: PaymentMethod;
+        settlementDate?: Date;
     };
     /** "edit" hides the swap arrow; "create" allows row-pick semantics. */
     mode: 'create' | 'edit';
@@ -149,6 +154,8 @@ export function SettleUpSheet({
             toUserId,
             currency,
             amount: Number(parsedAmount.toFixed(2)),
+            paymentMethod: initial.paymentMethod ?? 'bank_transfer',
+            settlementDate: initial.settlementDate ?? new Date(),
         });
     };
 

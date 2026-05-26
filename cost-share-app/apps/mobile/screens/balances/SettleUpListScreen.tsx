@@ -178,6 +178,8 @@ export function SettleUpListScreen() {
                 toUserId: values.toUserId,
                 amount: values.amount,
                 currency: values.currency,
+                paymentMethod: values.paymentMethod,
+                settlementDate: values.settlementDate,
             });
             setActiveDebt(null);
         },
@@ -221,6 +223,7 @@ export function SettleUpListScreen() {
                     toUserId: values.toUserId,
                     amount: values.amount,
                     currency: values.currency,
+                    // Note: UpdateSettlementDto does not yet accept paymentMethod / settlementDate
                 },
             });
             if (updated) setEditingSettlement(null);
