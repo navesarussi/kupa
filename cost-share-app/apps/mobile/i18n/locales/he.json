@@ -611,7 +611,13 @@
         "toVia": "ל-{{name}} · באמצעות {{method}}",
         "fromName": "מ-{{name}}",
         "toName": "ל-{{name}}",
-        "via": "באמצעות {{method}}"
+        "via": "באמצעות {{method}}",
+        "newPayment": "תשלום חדש",
+        "from": "מאת",
+        "to": "אל",
+        "swap": "החלף",
+        "method": "אמצעי תשלום",
+        "recordPaymentWithAmount": "רשום תשלום · {{currencyAndAmount}}"
     },
     "feed": {
         "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}",

@@ -595,7 +595,13 @@
         "toVia": "To {{name}} · via {{method}}",
         "fromName": "From {{name}}",
         "toName": "To {{name}}",
-        "via": "via {{method}}"
+        "via": "via {{method}}",
+        "newPayment": "New payment",
+        "from": "From",
+        "to": "To",
+        "swap": "Swap",
+        "method": "Method",
+        "recordPaymentWithAmount": "Record payment · {{currencyAndAmount}}"
     },
     "feed": {
         "settlement": "{{from}} paid {{to}} {{amount}}",
