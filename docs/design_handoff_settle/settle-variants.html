@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Kupa · Settle page · variations</title>
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0F172A; font-family: var(--font-sans); }
+    @keyframes kupa-caret { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+    input.amount-field::-webkit-outer-spin-button,
+    input.amount-field::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input.amount-field { -moz-appearance: textfield; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+// ─────────────────────────────────────────────────────────────────────────
+// Shared data
+// You owe David USD 18.00 in "Weekend in Tel Aviv".
+// (Also: outstanding suggestions, used by variant D.)
+// ─────────────────────────────────────────────────────────────────────────
+const ME = { id: 'u1', name: 'You', initials: 'YO', isCurrentUser: true };
+const DAVID = { id: 'u3', name: 'David', initials: 'D', avatarUrl: 'https://i.pravatar.cc/120?img=12' };
+const SARAH = { id: 'u2', name: 'Sarah', initials: 'S', avatarUrl: 'https://i.pravatar.cc/120?img=47' };
+const MAYA  = { id: 'u4', name: 'Maya',  initials: 'M', avatarUrl: 'https://i.pravatar.cc/120?img=44' };
+
+const METHODS = [
+    { id: 'cash',         label: 'Cash',          icon: 'cash-outline' },
+    { id: 'bankTransfer', label: 'Bank transfer', icon: 'card-outline' },
+    { id: 'paypal',       label: 'PayPal',        icon: 'logo-paypal' },
+    { id: 'other',        label: 'Other',         icon: 'ellipsis-horizontal' },
+];
+
+// Multi-debt scenario for variant D
+const SUGGESTIONS = [
+    { from: ME,    to: DAVID, amount: 18.00, currency: 'USD' },
+    { from: ME,    to: SARAH, amount:  6.50, currency: 'USD' },
+    { from: MAYA,  to: ME,    amount: 12.20, currency: 'USD' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────
+// Shared bits
+// ─────────────────────────────────────────────────────────────────────────
+function SheetHeader({ title, leftLabel = 'Cancel', rightLabel = 'Save', canSave = true, danger }) {
+    return (
+        <>
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8, paddingBottom: 4, background: '#fff' }}>
+                <div style={{ width: 40, height: 4, borderRadius: 9999, background: 'var(--gray-200)' }} />
+            </div>
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '4px 8px 8px 8px', background: '#fff',
+                borderBottom: '1px solid var(--border-soft)',
+            }}>
+                <button style={{
+                    background: 'transparent', border: 0, padding: '6px 10px',
+                    fontSize: 15, fontWeight: 500, color: 'var(--gray-600)',
+                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                }}>{leftLabel}</button>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {title}
+                </span>
+                <button disabled={!canSave} style={{
+                    background: 'transparent', border: 0, padding: '6px 10px',
+                    fontSize: 15, fontWeight: 700,
+                    color: canSave ? (danger ? 'var(--error)' : 'var(--primary-dark)') : 'var(--gray-400)',
+                    cursor: canSave ? 'pointer' : 'not-allowed',
+                    fontFamily: 'var(--font-sans)',
+                }}>{rightLabel}</button>
+            </div>
+        </>
+    );
+}
+
+function PickerRow({ icon, label, valueNode, isFirst, isLast }) {
+    return (
+        <button style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            width: '100%', padding: '12px 14px',
+            background: '#fff', border: 0,
+            borderTop: isFirst ? '0' : '1px solid var(--border-soft)',
+            cursor: 'pointer', textAlign: 'left',
+            fontFamily: 'var(--font-sans)',
+            WebkitTapHighlightColor: 'transparent',
+        }}>
+            <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'var(--gray-50)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+            }}>
+                <Icon name={icon} size={16} color="var(--gray-600)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="text-eyebrow" style={{ fontSize: 9 }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 1 }}>
+                    {valueNode}
+                </div>
+            </div>
+            <Icon name="chevron-forward" size={16} color="var(--gray-400)" />
+        </button>
+    );
+}
+
+function StickySaveBar({ canSave = true, label, success, icon = 'checkmark-circle' }) {
+    const bg = success ? 'var(--success)' : 'var(--primary)';
+    return (
+        <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: '12px 16px 22px 16px',
+            background: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'saturate(180%) blur(12px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(12px)',
+            borderTop: '1px solid var(--border-soft)',
+        }}>
+            <button disabled={!canSave} style={{
+                width: '100%', padding: '14px 20px',
+                borderRadius: 'var(--radius-xl)',
+                background: canSave ? bg : 'var(--gray-200)',
+                color: canSave ? '#fff' : 'var(--gray-400)',
+                border: 0, fontSize: 16, fontWeight: 700,
+                fontFamily: 'var(--font-sans)',
+                cursor: canSave ? 'pointer' : 'not-allowed',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: canSave ? 'var(--shadow-fab)' : 'none',
+                WebkitTapHighlightColor: 'transparent',
+            }}>
+                <Icon name={icon} size={20} color={canSave ? '#fff' : 'var(--gray-400)'} />
+                {label}
+            </button>
+        </div>
+    );
+}
+
+// Group context strip — sits under the sheet header on most variants
+function GroupContext({ extra }) {
+    return (
+        <div style={{
+            background: '#fff', padding: '8px 16px 12px 16px',
+            borderBottom: '1px solid var(--border-soft)',
+            display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+            <div style={{
+                width: 22, height: 22, borderRadius: 6,
+                background: 'var(--grad-trip)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+                <Icon name="airplane-outline" size={12} color="#fff" />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Weekend in Tel Aviv
+            </span>
+            {extra && (
+                <>
+                    <span style={{ color: 'var(--gray-400)', fontSize: 12 }}>·</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{extra}</span>
+                </>
+            )}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT A — "Classic form"
+// By-the-book Kupa: matches the AddExpense rhythm. Amount hero, picker rows,
+// note. Calm and reliable.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantA() {
+    const amount = 18.00, currency = 'USD';
+
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Settle up" rightLabel="Save" />
+            <GroupContext extra="You owe David USD 18.00" />
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110 }}>
+                {/* Amount hero */}
+                <div style={{ background: '#fff', padding: '20px 16px 22px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                        <button style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '4px 10px', borderRadius: 9999,
+                            background: 'var(--primary-extra-light)', color: 'var(--primary-dark)',
+                            border: 0, cursor: 'pointer',
+                            fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+                        }}>{currency}<Icon name="chevron-down" size={12} color="var(--primary-dark)" /></button>
+                    </div>
+                    <div style={{
+                        textAlign: 'center', fontSize: 56, fontWeight: 700,
+                        color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums',
+                        letterSpacing: '-0.02em',
+                    }}>{amount.toFixed(2)}</div>
+                    <div style={{
+                        textAlign: 'center', fontSize: 13, fontWeight: 500,
+                        color: 'var(--text-tertiary)', padding: '6px 0 0 0',
+                    }}>Settles your balance with David</div>
+                </div>
+
+                {/* Picker rows */}
+                <div style={{ padding: '14px 16px 0 16px' }}>
+                    <div style={{
+                        background: '#fff', borderRadius: 14,
+                        border: '1px solid var(--border-card)',
+                        boxShadow: 'var(--shadow-sm)', overflow: 'hidden',
+                    }}>
+                        <PickerRow icon="arrow-up-circle-outline" label="From" isFirst valueNode={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <MemberAvatar initials="YO" size="xs" style={{ width: 20, height: 20, fontSize: 9 }} />
+                                You
+                            </span>
+                        } />
+                        <PickerRow icon="arrow-down-circle-outline" label="To" valueNode={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <MemberAvatar initials="D" avatarUrl={DAVID.avatarUrl} size="xs" style={{ width: 20, height: 20, fontSize: 9 }} />
+                                David
+                            </span>
+                        } />
+                        <PickerRow icon="card-outline" label="Method" valueNode="Bank transfer" />
+                        <PickerRow icon="calendar-outline" label="Date" isLast valueNode="Today, Aug 14" />
+                    </div>
+                </div>
+
+                {/* Note */}
+                <div style={{ padding: '16px 16px 0 16px' }}>
+                    <div className="text-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>Note</div>
+                    <button style={{
+                        width: '100%', padding: '12px 14px',
+                        background: '#fff', border: '1px dashed var(--border-strong)',
+                        borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        fontFamily: 'var(--font-sans)',
+                    }}>
+                        <Icon name="create-outline" size={14} color="var(--gray-500)" />
+                        <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Add a note (optional)</span>
+                    </button>
+                </div>
+
+                {/* What changes */}
+                <div style={{ padding: '20px 16px 0 16px' }}>
+                    <div className="text-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>After this payment</div>
+                    <div style={{
+                        background: 'var(--success-bg)', border: '1px solid var(--success-border)',
+                        borderRadius: 12, padding: '12px 14px',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                        <Icon name="checkmark-circle-outline" size={18} color="var(--success)" />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--success-text)' }}>
+                            You and David will be even
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <StickySaveBar label={`Record payment · ${currency} ${amount.toFixed(2)}`} />
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT B — "From → To hero"
+// Mirrors the settlement-detail visual: emerald gradient hero with both
+// avatars and a chunky arrow. The hero is the proof of who → who; the form
+// below is just secondary metadata.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantB() {
+    const amount = 18.00, currency = 'USD';
+
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Settle up" rightLabel="Save" />
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110 }}>
+                {/* Emerald hero */}
+                <div style={{ padding: '12px 16px 0 16px' }}>
+                    <div style={{
+                        height: 196, borderRadius: 16,
+                        border: '1px solid var(--success-border)',
+                        background: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+                        position: 'relative', overflow: 'hidden',
+                        display: 'flex', flexDirection: 'column',
+                    }}>
+                        {/* top scrim */}
+                        <div style={{
+                            position: 'absolute', inset: 0, zIndex: 0,
+                            background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.18) 100%)',
+                        }} />
+
+                        {/* top: "Payment" chip + group */}
+                        <div style={{
+                            position: 'relative', zIndex: 2,
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '10px 12px 0 12px',
+                        }}>
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '4px 10px', borderRadius: 9999,
+                                background: 'rgba(0,0,0,0.45)', color: '#fff',
+                                fontSize: 11, fontWeight: 600,
+                            }}>
+                                <Icon name="checkmark-circle" size={12} color="#fff" />
+                                New payment
+                            </span>
+                            <span style={{
+                                fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.92)',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                            }}>Weekend in Tel Aviv</span>
+                        </div>
+
+                        {/* center flow */}
+                        <div style={{
+                            position: 'relative', zIndex: 2,
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '0 14px',
+                        }}>
+                            <FlowAvatar member={ME} label="FROM" />
+                            <div style={{ flex: 1, minWidth: 0, padding: '0 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                {/* Editable amount — tappable, with caret + pencil affordance */}
+                                <button style={{
+                                    display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                                    padding: '4px 12px 6px 12px', borderRadius: 12,
+                                    background: 'rgba(255,255,255,0.14)',
+                                    border: '1px solid rgba(255,255,255,0.32)',
+                                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+                                    cursor: 'text', fontFamily: 'var(--font-sans)',
+                                    WebkitTapHighlightColor: 'transparent',
+                                    position: 'relative',
+                                }}>
+                                    <span style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                                        fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.78)',
+                                        letterSpacing: '0.04em', alignSelf: 'center',
+                                    }}>
+                                        {currency}
+                                        <Icon name="chevron-down" size={10} color="rgba(255,255,255,0.78)" />
+                                    </span>
+                                    <span style={{
+                                        fontSize: 26, fontWeight: 700, color: '#fff',
+                                        fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
+                                        textShadow: '0 1px 3px rgba(0,0,0,0.35)', whiteSpace: 'nowrap',
+                                        lineHeight: 1.05,
+                                    }}>{amount.toFixed(2)}</span>
+                                    {/* blinking caret hint */}
+                                    <span style={{
+                                        display: 'inline-block', width: 2, height: 22,
+                                        background: 'rgba(255,255,255,0.85)', borderRadius: 1,
+                                        marginLeft: 1, alignSelf: 'center',
+                                        animation: 'kupa-caret 1s steps(2) infinite',
+                                    }} />
+                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                                    <div style={{ flex: 1, height: 2, background: 'rgba(255,255,255,0.85)', borderRadius: 9999 }} />
+                                    <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.95)" />
+                                </div>
+                                <button style={{
+                                    padding: '2px 8px', borderRadius: 9999,
+                                    background: 'rgba(255,255,255,0.18)', color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.35)',
+                                    fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                }}>
+                                    <Icon name="swap-horizontal-outline" size={11} color="#fff" />
+                                    SWAP
+                                </button>
+                            </div>
+                            <FlowAvatar member={DAVID} label="TO" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Method as square icon tiles */}
+                <div style={{ padding: '20px 16px 0 16px' }}>
+                    <div className="text-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>Method</div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        {METHODS.map(m => {
+                            const on = m.id === 'bankTransfer';
+                            return (
+                                <button key={m.id} aria-label={m.label} style={{
+                                    width: 56, height: 56, borderRadius: 14,
+                                    background: on ? 'var(--primary-extra-light)' : '#fff',
+                                    border: `1px solid ${on ? 'var(--primary-light)' : 'var(--border-card)'}`,
+                                    boxShadow: on ? 'none' : 'var(--shadow-sm)',
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer', flexShrink: 0,
+                                    fontFamily: 'var(--font-sans)',
+                                    WebkitTapHighlightColor: 'transparent',
+                                }}>
+                                    <Icon name={m.icon} size={22} color={on ? 'var(--primary-dark)' : 'var(--gray-700)'} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+            </div>
+
+            {/* Sticky save bar — small date chip docked above the primary button */}
+            <div style={{
+                position: 'absolute', left: 0, right: 0, bottom: 0,
+                padding: '10px 16px 22px 16px',
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'saturate(180%) blur(12px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(12px)',
+                borderTop: '1px solid var(--border-soft)',
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <button style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '5px 12px', borderRadius: 9999,
+                        background: '#fff', border: '1px solid var(--border-card)',
+                        boxShadow: 'var(--shadow-sm)',
+                        cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                        WebkitTapHighlightColor: 'transparent',
+                    }}>
+                        <Icon name="calendar-outline" size={13} color="var(--gray-600)" />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Today, Aug 14</span>
+                        <Icon name="chevron-down" size={11} color="var(--gray-500)" />
+                    </button>
+                </div>
+                <button style={{
+                    width: '100%', padding: '14px 20px',
+                    borderRadius: 'var(--radius-xl)',
+                    background: 'var(--primary)', color: '#fff',
+                    border: 0, fontSize: 16, fontWeight: 700,
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: 'var(--shadow-fab)',
+                    WebkitTapHighlightColor: 'transparent',
+                }}>
+                    <Icon name="checkmark-circle" size={20} color="#fff" />
+                    Record payment · {currency} {amount.toFixed(2)}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function FlowAvatar({ member, label }) {
+    return (
+        <div style={{ width: 96, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ boxShadow: '0 0 0 3px rgba(255,255,255,0.25)', borderRadius: 9999 }}>
+                <MemberAvatar initials={member.initials} avatarUrl={member.avatarUrl} size="md" style={{ border: '2px solid #fff' }} />
+            </div>
+            <div style={{
+                fontSize: 13, fontWeight: 700, color: '#fff',
+                textShadow: '0 1px 3px rgba(0,0,0,0.35)',
+                width: 96, textAlign: 'center',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{member.isCurrentUser ? 'You' : member.name}</div>
+            <div style={{
+                fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.8)',
+                letterSpacing: '0.08em',
+            }}>{label}</div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT C — "Conversational sentence"
+// The whole form is a single fill-in-the-blanks sentence at the top, each
+// blank a tappable chip. Reads naturally; lighter cognitive load.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantC() {
+    const amount = 18.00, currency = 'USD';
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Settle up" rightLabel="Save" />
+            <GroupContext />
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110 }}>
+                {/* Sentence */}
+                <div style={{
+                    background: '#fff', padding: '24px 18px 28px 18px',
+                    borderBottom: '1px solid var(--border-soft)',
+                    fontSize: 24, fontWeight: 600, color: 'var(--text-primary)',
+                    lineHeight: 1.55, letterSpacing: '-0.01em',
+                    textWrap: 'pretty',
+                }}>
+                    <ChipPerson member={ME} />
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}> paid </span>
+                    <ChipPerson member={DAVID} />
+                    <br/>
+                    <ChipAmount currency={currency} amount={amount} />
+                    <br/>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>via </span>
+                    <ChipText label="bank transfer" icon="card-outline" />
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}> on </span>
+                    <ChipText label="today" icon="calendar-outline" />
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>.</span>
+                </div>
+
+                {/* After this — same affordance as A */}
+                <div style={{ padding: '20px 16px 0 16px' }}>
+                    <div style={{
+                        background: 'var(--success-bg)', border: '1px solid var(--success-border)',
+                        borderRadius: 12, padding: '14px 14px',
+                        display: 'flex', alignItems: 'center', gap: 12,
+                    }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: 9999, background: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                            <Icon name="checkmark-circle-outline" size={20} color="var(--success)" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--success-text)' }}>
+                                You and David will be even
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--success-text)', opacity: 0.8, marginTop: 2 }}>
+                                Clears the {currency} {amount.toFixed(2)} you owe from this trip
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Optional add-ons — quiet */}
+                <div style={{ padding: '16px 16px 0 16px' }}>
+                    <div className="text-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>Optional</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button style={addBtn}>
+                            <Icon name="create-outline" size={13} color="var(--gray-600)" />
+                            Add a note
+                        </button>
+                        <button style={addBtn}>
+                            <Icon name="camera-outline" size={13} color="var(--gray-600)" />
+                            Attach receipt
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <StickySaveBar label={`Record payment · ${currency} ${amount.toFixed(2)}`} />
+        </div>
+    );
+}
+
+const addBtn = {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '8px 12px', borderRadius: 9999,
+    background: '#fff', border: '1px dashed var(--border-strong)',
+    color: 'var(--gray-700)', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-sans)',
+};
+
+function ChipPerson({ member }) {
+    return (
+        <button style={chipBase}>
+            <MemberAvatar initials={member.initials} avatarUrl={member.avatarUrl} size="xs"
+                          style={{ width: 22, height: 22, fontSize: 10 }} />
+            {member.isCurrentUser ? 'You' : member.name}
+            <Icon name="chevron-down" size={12} color="var(--primary-dark)" />
+        </button>
+    );
+}
+
+function ChipAmount({ currency, amount }) {
+    return (
+        <button style={{ ...chipBase, padding: '4px 12px', fontSize: 28, fontWeight: 700, letterSpacing: '-0.01em' }}>
+            <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.7, letterSpacing: '0.02em' }}>{currency}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{amount.toFixed(2)}</span>
+            <Icon name="chevron-down" size={14} color="var(--primary-dark)" />
+        </button>
+    );
+}
+
+function ChipText({ label, icon }) {
+    return (
+        <button style={{ ...chipBase, background: 'var(--gray-50)', borderColor: 'var(--border-card)', color: 'var(--gray-700)' }}>
+            <Icon name={icon} size={13} color="var(--gray-600)" />
+            {label}
+            <Icon name="chevron-down" size={12} color="var(--gray-500)" />
+        </button>
+    );
+}
+
+const chipBase = {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '4px 10px', borderRadius: 9999,
+    background: 'var(--primary-extra-light)',
+    border: '1px solid var(--primary-light)',
+    color: 'var(--primary-dark)', fontWeight: 700,
+    fontSize: 22, lineHeight: 1.2,
+    cursor: 'pointer', fontFamily: 'var(--font-sans)',
+    verticalAlign: 'baseline',
+    margin: '4px 2px',
+    WebkitTapHighlightColor: 'transparent',
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT D — "Settle-all suggestions"
+// The app proposes the simplest set of payments to zero everyone out.
+// User reviews, can deselect, then taps "Settle 2 payments". One-shot.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantD() {
+    const selected = new Set(['s0', 's1']); // first two selected, third unselected
+    const total = SUGGESTIONS.reduce((acc, s, i) => acc + (selected.has('s' + i) ? s.amount : 0), 0);
+
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Settle up" rightLabel="Skip" />
+            <GroupContext extra="3 payments to settle" />
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 124 }}>
+                {/* Lead */}
+                <div style={{ padding: '20px 18px 12px 18px' }}>
+                    <div style={{
+                        fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
+                        letterSpacing: '-0.01em', lineHeight: 1.25,
+                    }}>The simplest way to settle up</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.45 }}>
+                        2 payments close 3 open debts. Tap any to edit, or deselect to skip.
+                    </div>
+                </div>
+
+                {/* Payment cards */}
+                <div style={{ padding: '4px 16px 0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {SUGGESTIONS.map((s, i) => {
+                        const key = 's' + i;
+                        const on = selected.has(key);
+                        const fromYou = s.from.isCurrentUser;
+                        return (
+                            <div key={key} style={{
+                                background: '#fff', borderRadius: 14,
+                                border: `1px solid ${on ? 'var(--success-border)' : 'var(--border-card)'}`,
+                                boxShadow: on ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+                                overflow: 'hidden', position: 'relative',
+                                opacity: on ? 1 : 0.55,
+                            }}>
+                                {/* Top stripe colored by direction */}
+                                <div style={{
+                                    height: 4, width: '100%',
+                                    background: on ? (fromYou ? 'var(--error)' : 'var(--success)') : 'var(--gray-200)',
+                                }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}>
+                                    {/* checkbox */}
+                                    <div style={{
+                                        width: 24, height: 24, borderRadius: 9999, flexShrink: 0,
+                                        background: on ? 'var(--success)' : '#fff',
+                                        border: `1.5px solid ${on ? 'var(--success)' : 'var(--border-strong)'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        {on && <Icon name="checkmark-circle" size={16} color="#fff" />}
+                                    </div>
+                                    {/* avatars */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <MemberAvatar initials={s.from.initials} avatarUrl={s.from.avatarUrl} size="sm" />
+                                        <Icon name="chevron-forward" size={14} color="var(--gray-400)" />
+                                        <MemberAvatar initials={s.to.initials} avatarUrl={s.to.avatarUrl} size="sm" />
+                                    </div>
+                                    {/* who → who */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                            {fromYou ? `Pay ${s.to.name}` : `${s.from.name} pays you`}
+                                        </div>
+                                        <div style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                            marginTop: 3,
+                                        }}>
+                                            <Icon name="card-outline" size={11} color="var(--text-tertiary)" />
+                                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                                {fromYou ? 'Bank transfer' : 'Marks as received'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* amount */}
+                                    <div style={{
+                                        fontSize: 16, fontWeight: 700,
+                                        color: fromYou ? 'var(--error-text)' : 'var(--success-text)',
+                                        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                                    }}>
+                                        {s.currency} {s.amount.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* "or settle one at a time" escape hatch */}
+                <div style={{ padding: '18px 16px 0 16px' }}>
+                    <button style={{
+                        width: '100%', padding: '12px 14px',
+                        background: 'transparent', border: '1px dashed var(--border-strong)',
+                        borderRadius: 12, cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        fontSize: 13, fontWeight: 600, color: 'var(--gray-700)',
+                        fontFamily: 'var(--font-sans)',
+                    }}>
+                        <Icon name="add-circle-outline" size={14} color="var(--gray-600)" />
+                        Record a different payment
+                    </button>
+                </div>
+
+                {/* footnote */}
+                <div style={{ padding: '16px 18px 0 18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.45 }}>
+                        <Icon name="information-circle-outline" size={13} color="var(--gray-400)" />
+                        <span>Kupa minimizes the number of payments by routing debts through fewer people.</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Sticky bar — green, since this completes a positive event */}
+            <div style={{
+                position: 'absolute', left: 0, right: 0, bottom: 0,
+                padding: '12px 16px 22px 16px',
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'saturate(180%) blur(12px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(12px)',
+                borderTop: '1px solid var(--border-soft)',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Total to record · 2 payments
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                        USD {total.toFixed(2)}
+                    </span>
+                </div>
+                <button style={{
+                    width: '100%', padding: '14px 20px',
+                    borderRadius: 'var(--radius-xl)',
+                    background: 'var(--success)', color: '#fff',
+                    border: 0, fontSize: 16, fontWeight: 700,
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: 'var(--shadow-fab)',
+                }}>
+                    <Icon name="checkmark-circle" size={20} color="#fff" />
+                    Settle 2 payments
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT E — "Quick-pay calculator"
+// Venmo-style. Top: tiny "Pay [David]" pill. Middle: huge amount + method.
+// Bottom: numeric keypad. Commit is the big bottom button.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantE() {
+    const amount = 18.00, currency = 'USD';
+    const keys = [['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']];
+
+    return (
+        <div style={{ height: '100%', background: '#fff', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Pay" rightLabel="Save" canSave={false} />
+
+            {/* Recipient pill at top */}
+            <div style={{ padding: '14px 16px 0 16px', display: 'flex', justifyContent: 'center' }}>
+                <button style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '6px 12px 6px 6px', borderRadius: 9999,
+                    background: '#fff', border: '1px solid var(--border-card)',
+                    boxShadow: 'var(--shadow-sm)', cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                }}>
+                    <MemberAvatar initials="D" avatarUrl={DAVID.avatarUrl} size="xs" style={{ width: 26, height: 26, fontSize: 11 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>To</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>David</span>
+                    <Icon name="chevron-down" size={13} color="var(--gray-500)" />
+                </button>
+            </div>
+
+            {/* Hero amount */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 16px', minHeight: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+                    <button style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 9999,
+                        background: 'var(--primary-extra-light)', color: 'var(--primary-dark)',
+                        border: 0, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+                    }}>{currency}<Icon name="chevron-down" size={12} color="var(--primary-dark)" /></button>
+                </div>
+
+                <div style={{
+                    textAlign: 'center', fontSize: 76, fontWeight: 700,
+                    color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums',
+                    letterSpacing: '-0.03em', lineHeight: 1,
+                }}>{amount.toFixed(2)}</div>
+
+                {/* Suggestion: prefill exact debt */}
+                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
+                    <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '4px 10px', borderRadius: 9999,
+                        background: 'var(--success-bg)', border: '1px solid var(--success-border)',
+                        fontSize: 11, fontWeight: 600, color: 'var(--success-text)',
+                    }}>
+                        <Icon name="checkmark-circle" size={12} color="var(--success)" />
+                        Exact amount you owe
+                    </span>
+                </div>
+
+                {/* Method as quiet icon rail */}
+                <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    {METHODS.slice(0, 4).map(m => {
+                        const on = m.id === 'bankTransfer';
+                        return (
+                            <button key={m.id} style={{
+                                width: 44, height: 44, borderRadius: 12,
+                                background: on ? 'var(--primary-extra-light)' : '#fff',
+                                border: `1px solid ${on ? 'var(--primary-light)' : 'var(--border-card)'}`,
+                                boxShadow: on ? 'none' : 'var(--shadow-sm)',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', flexShrink: 0,
+                            }}>
+                                <Icon name={m.icon} size={18} color={on ? 'var(--primary-dark)' : 'var(--gray-600)'} />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Keypad */}
+            <div style={{ background: 'var(--bg-tertiary)', padding: '10px 8px 14px 8px', borderTop: '1px solid var(--border-soft)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                    {keys.flat().map((k, i) => {
+                        const isErase = k === '⌫';
+                        return (
+                            <button key={i} style={{
+                                padding: '14px 0',
+                                background: '#fff',
+                                border: '1px solid var(--border-card)',
+                                borderRadius: 12,
+                                fontSize: 22, fontWeight: 600,
+                                color: isErase ? 'var(--gray-500)' : 'var(--text-primary)',
+                                fontVariantNumeric: 'tabular-nums',
+                                fontFamily: 'var(--font-sans)',
+                                cursor: 'pointer',
+                                boxShadow: 'var(--shadow-sm)',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                {isErase ? <Icon name="chevron-back" size={20} color="var(--gray-500)" /> : k}
+                            </button>
+                        );
+                    })}
+                </div>
+                <button style={{
+                    width: '100%', marginTop: 8,
+                    padding: '14px 20px', borderRadius: 'var(--radius-xl)',
+                    background: 'var(--primary)', color: '#fff',
+                    border: 0, fontSize: 16, fontWeight: 700,
+                    fontFamily: 'var(--font-sans)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: 'var(--shadow-fab)', cursor: 'pointer',
+                }}>
+                    <Icon name="arrow-up-circle-outline" size={20} color="#fff" />
+                    Pay {currency} {amount.toFixed(2)}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// VARIANT F — "Record received"
+// Same shell as A, but reversed: someone else paid YOU. Different copy,
+// different default direction (down-arrow), same engine. Shows variant A
+// handles both directions gracefully.
+// ─────────────────────────────────────────────────────────────────────────
+function VariantF() {
+    const amount = 24.50, currency = 'USD';
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
+            <SheetHeader title="Record payment" rightLabel="Save" />
+            <GroupContext extra="Sarah owes you USD 24.50" />
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110 }}>
+                {/* Direction toggle — paid / received */}
+                <div style={{ padding: '14px 16px 4px 16px' }}>
+                    <div style={{
+                        background: 'var(--gray-100)', borderRadius: 10, padding: 3,
+                        display: 'flex', gap: 2,
+                    }}>
+                        {[
+                            { id: 'paid',     label: 'You paid',     icon: 'arrow-up-circle-outline' },
+                            { id: 'received', label: 'You received', icon: 'arrow-down-circle-outline' },
+                        ].map(m => {
+                            const on = m.id === 'received';
+                            return (
+                                <button key={m.id} style={{
+                                    flex: 1, padding: '8px 0',
+                                    background: on ? '#fff' : 'transparent',
+                                    border: 0, borderRadius: 8,
+                                    fontSize: 12, fontWeight: on ? 700 : 500,
+                                    color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                    boxShadow: on ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                }}>
+                                    <Icon name={m.icon} size={14} color={on ? 'var(--success)' : 'var(--gray-500)'} />
+                                    {m.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Amount hero */}
+                <div style={{ background: '#fff', margin: '12px 16px 0 16px', borderRadius: 14, border: '1px solid var(--border-card)', boxShadow: 'var(--shadow-sm)', padding: '18px 16px 18px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                        <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 9999,
+                            background: 'var(--success-bg)', color: 'var(--success-text)',
+                            border: '1px solid var(--success-border)',
+                            fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                        }}>
+                            <Icon name="arrow-down-circle-outline" size={11} color="var(--success)" />
+                            Received
+                        </span>
+                    </div>
+                    <div style={{
+                        textAlign: 'center', fontSize: 52, fontWeight: 700,
+                        color: 'var(--success-text)', fontVariantNumeric: 'tabular-nums',
+                        letterSpacing: '-0.02em', lineHeight: 1.1,
+                    }}>
+                        <span style={{ fontSize: 22, fontWeight: 600, opacity: 0.7, letterSpacing: '0.02em', marginRight: 6 }}>+{currency}</span>
+                        {amount.toFixed(2)}
+                    </div>
+                </div>
+
+                {/* Picker rows */}
+                <div style={{ padding: '14px 16px 0 16px' }}>
+                    <div style={{
+                        background: '#fff', borderRadius: 14,
+                        border: '1px solid var(--border-card)',
+                        boxShadow: 'var(--shadow-sm)', overflow: 'hidden',
+                    }}>
+                        <PickerRow icon="person-outline" label="From" isFirst valueNode={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <MemberAvatar initials="S" avatarUrl={SARAH.avatarUrl} size="xs" style={{ width: 20, height: 20, fontSize: 9 }} />
+                                Sarah
+                            </span>
+                        } />
+                        <PickerRow icon="card-outline" label="Method" valueNode="Cash" />
+                        <PickerRow icon="calendar-outline" label="Date" isLast valueNode="Today, Aug 14" />
+                    </div>
+                </div>
+
+                {/* What changes — celebratory */}
+                <div style={{ padding: '18px 16px 0 16px' }}>
+                    <div style={{
+                        background: '#fff', borderRadius: 14,
+                        border: '1px solid var(--success-border)',
+                        boxShadow: 'var(--shadow-sm)', overflow: 'hidden',
+                        padding: '14px 14px',
+                        display: 'flex', alignItems: 'center', gap: 12,
+                    }}>
+                        <div style={{
+                            width: 38, height: 38, borderRadius: 9999,
+                            background: 'var(--success-bg)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                            <Icon name="checkmark-circle-outline" size={20} color="var(--success)" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                Sarah will be all settled up
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                                Her balance with you in this group goes to zero.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <StickySaveBar success label={`Record · +${currency} ${amount.toFixed(2)}`} />
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Frame each variant in an iOS device
+// ─────────────────────────────────────────────────────────────────────────
+function Phone({ children }) {
+    return (
+        <IOSDevice width={402} height={874}>
+            <div style={{ position: 'relative', height: '100%' }}>
+                <div style={{ height: 62, background: 'var(--bg-secondary)' }} />
+                <div style={{ position: 'absolute', left: 0, right: 0, top: 62, bottom: 0 }}>
+                    {children}
+                </div>
+            </div>
+        </IOSDevice>
+    );
+}
+
+// Faded group screen — the context the popup opens over.
+function FadedBackdrop() {
+    return (
+        <div style={{ height: '100%', background: 'var(--bg-secondary)', filter: 'brightness(.92)' }}>
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 8px 6px 8px', background: '#fff',
+            }}>
+                <IconButton name="chevron-back" size={24} color="var(--gray-700)" />
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)' }}>Group</div>
+                <div style={{ display: 'flex' }}>
+                    <IconButton name="share-outline" size={22} color="var(--gray-700)" />
+                    <IconButton name="ellipsis-vertical" size={22} color="var(--gray-700)" />
+                </div>
+            </div>
+            <div style={{ padding: '6px 16px 12px 16px', background: '#fff' }}>
+                <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid var(--border-card)', boxShadow: 'var(--shadow-sm)', background: '#fff' }}>
+                    <div style={{ height: 150, position: 'relative' }}>
+                        <img src="https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&fit=crop"
+                             alt=""
+                             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 100%)' }} />
+                        <div style={{ position: 'absolute', left: 14, right: 14, bottom: 10, color: '#fff' }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Weekend in Tel Aviv</div>
+                            <div style={{ fontSize: 11, opacity: 0.9, marginTop: 2 }}>4 people</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Same as Phone, but renders the child as a bottom-sheet popup over a faded
+// group screen. Uses the chrome from the settlement-detail popup.
+function PhonePopup({ children, sheetHeightPct = 84 }) {
+    return (
+        <IOSDevice width={402} height={874}>
+            <div style={{ position: 'relative', height: '100%' }}>
+                <div style={{ height: 62, background: 'var(--bg-secondary)' }} />
+                <div style={{ position: 'absolute', left: 0, right: 0, top: 62, bottom: 0 }}>
+                    {/* Faded group backdrop */}
+                    <FadedBackdrop />
+                    {/* Scrim */}
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.55)' }} />
+                    {/* Sheet */}
+                    <div style={{
+                        position: 'absolute', left: 0, right: 0, bottom: 0,
+                        height: `${sheetHeightPct}%`,
+                        background: '#fff',
+                        borderRadius: '24px 24px 0 0',
+                        boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
+                        overflow: 'hidden',
+                        display: 'flex', flexDirection: 'column',
+                    }}>
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </IOSDevice>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById('stage')).render(
+    <DesignCanvas>
+        <DCSection id="settle-pay" title="Settle up — pay someone"
+                   subtitle="Pre-filled scenario: you owe David USD 18.00 in Weekend in Tel Aviv. Five directions for the create-settlement page.">
+            <DCArtboard id="a" label="A · Classic form" width={402} height={874}>
+                <Phone><VariantA /></Phone>
+            </DCArtboard>
+            <DCArtboard id="b" label="B · From → To hero (popup)" width={402} height={874}>
+                <PhonePopup sheetHeightPct={62}><VariantB /></PhonePopup>
+            </DCArtboard>
+            <DCArtboard id="c" label="C · Conversational" width={402} height={874}>
+                <Phone><VariantC /></Phone>
+            </DCArtboard>
+            <DCArtboard id="d" label="D · Settle-all suggestions" width={402} height={874}>
+                <Phone><VariantD /></Phone>
+            </DCArtboard>
+            <DCArtboard id="e" label="E · Quick-pay calculator" width={402} height={874}>
+                <Phone><VariantE /></Phone>
+            </DCArtboard>
+        </DCSection>
+
+        <DCSection id="settle-receive" title="Settle up — record received"
+                   subtitle="Same page, opposite direction: someone paid you. Shown as a refinement of variant A.">
+            <DCArtboard id="f" label="F · Record received" width={402} height={874}>
+                <Phone><VariantF /></Phone>
+            </DCArtboard>
+        </DCSection>
+    </DesignCanvas>
+);
+</script>
+</body>
+</html>
