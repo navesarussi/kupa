@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute, type ParamListBase, type RouteProp } from '@react-navigation/native';
@@ -282,8 +282,28 @@ export function AppNavigator() {
                 listeners={tabPopToTopOnPress('ActivityFeed')}
                 options={{
                     tabBarLabel: t('tabs.activity'),
-                    tabBarIcon: tabBarIcon('time', 'time-outline'),
-                    tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <View>
+                            <AppIcon
+                                name={focused ? 'time' : 'time-outline'}
+                                size={size}
+                                color={color}
+                            />
+                            {unreadCount > 0 && (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        top: -2,
+                                        right: -4,
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: colors.primary,
+                                    }}
+                                />
+                            )}
+                        </View>
+                    ),
                 }}
             />
             <Tab.Screen
