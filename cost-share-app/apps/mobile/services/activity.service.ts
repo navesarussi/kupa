@@ -45,6 +45,23 @@ function rowToEvent(row: ActivityEventRow): ActivityEvent {
     };
 }
 
+/**
+ * Returns the caller's `profiles.activity_last_seen_at` value, or `null` if
+ * unavailable. Called on focus BEFORE `mark_activity_seen` so the screen can
+ * "freeze" the divider position between unseen and seen events.
+ */
+export async function fetchActivityLastSeenAt(): Promise<Date | null> {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('activity_last_seen_at')
+        .eq('id', userId)
+        .maybeSingle();
+    if (error || !data?.activity_last_seen_at) return null;
+    return new Date(data.activity_last_seen_at as string);
+}
+
 export async function fetchRecentActivity(
     options: FetchRecentActivityOptions = {},
 ): Promise<ActivityPage> {

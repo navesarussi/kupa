@@ -15,6 +15,7 @@ jest.mock('@react-navigation/native', () => {
 
 jest.mock('../../../services/activity.service', () => ({
     fetchRecentActivity: jest.fn(),
+    fetchActivityLastSeenAt: jest.fn().mockResolvedValue(null),
     ACTIVITY_INITIAL_PAGE_SIZE: 15,
     ACTIVITY_PAGE_SIZE: 20,
     ACTIVITY_INITIAL_SKELETON_COUNT: 3,
