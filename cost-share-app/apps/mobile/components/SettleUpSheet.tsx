@@ -10,8 +10,7 @@
  *   └────────────────────────────────────────┘
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Pressable, TextInput, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Pressable, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import type { GroupMemberLite, PairwiseDebt, PaymentMethod } from '@cost-share/shared';
@@ -20,6 +19,7 @@ import { MemberAvatar } from './MemberAvatar';
 import { AppIcon } from './AppIcon';
 import type { AppIconName } from './AppIcon';
 import { BottomSheetShell } from './BottomSheetShell';
+import { DatePickerPopup } from './expenseV2/DatePickerPopup';
 import { useRtlLayout } from '../hooks/useRtlLayout';
 import { getAvatarUrlForMember } from '../lib/userDisplay';
 
@@ -200,17 +200,16 @@ export function SettleUpSheet({
                     })}
                 />
 
-                {datePickerOpen && (
-                    <DateTimePicker
-                        value={settlementDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        onChange={(_, date) => {
-                            setDatePickerOpen(false);
-                            if (date) setSettlementDate(date);
-                        }}
-                    />
-                )}
+                <DatePickerPopup
+                    visible={datePickerOpen}
+                    initialDate={settlementDate}
+                    onCancel={() => setDatePickerOpen(false)}
+                    onConfirm={next => {
+                        setSettlementDate(next);
+                        setDatePickerOpen(false);
+                    }}
+                />
+
             </View>
         </BottomSheetShell>
     );

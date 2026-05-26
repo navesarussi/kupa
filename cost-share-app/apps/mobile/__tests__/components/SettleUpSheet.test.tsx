@@ -3,8 +3,10 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { SettleUpSheet, SettleUpFormValues } from '../../components/SettleUpSheet';
 import type { GroupMemberLite, PairwiseDebt } from '@cost-share/shared';
 
-jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: any) => children }));
+jest.mock('../../components/expenseV2/DatePickerPopup', () => ({
+    DatePickerPopup: () => null,
+}));
 
 const members: GroupMemberLite[] = [
     { userId: 'u1', displayName: 'You', avatarUrl: undefined, isActive: true },
