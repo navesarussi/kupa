@@ -36,12 +36,13 @@ DECLARE
     v_carol   CONSTANT UUID := '00000000-0000-0000-0000-00000000aec1';
     v_dave    CONSTANT UUID := '00000000-0000-0000-0000-00000000aed1';
     v_exp     UUID;
-    v_set     UUID;
-    v_msg     UUID;
     v_fr      UUID;
     v_member  UUID;
     v_count   INT;
+    v_total   INT;
     v_before  TIMESTAMPTZ;
+    v_after   TIMESTAMPTZ;
+    v_status  TEXT;
 BEGIN
     -- ---- seed ----------------------------------------------------------
     INSERT INTO auth.users (id) VALUES (v_alice), (v_bob), (v_carol), (v_dave);
@@ -129,14 +130,16 @@ BEGIN
         RAISE EXCEPTION 'Case 6 failed: friend request produced % rows', v_count;
     END IF;
 
-    IF (SELECT metadata->>'status' FROM activity_events
-        WHERE kind = 'friend_request_received' AND ref_id = v_fr) <> 'accepted' THEN
-        RAISE EXCEPTION 'Case 6 failed: metadata.status was not updated';
+    SELECT metadata->>'status' INTO v_status FROM activity_events
+        WHERE kind = 'friend_request_received' AND ref_id = v_fr;
+    IF v_status IS DISTINCT FROM 'accepted' THEN
+        RAISE EXCEPTION 'Case 6 failed: expected metadata.status=accepted, got %', v_status;
     END IF;
 
-    IF (SELECT created_at FROM activity_events
-        WHERE kind = 'friend_request_received' AND ref_id = v_fr) <> v_before THEN
-        RAISE EXCEPTION 'Case 6 failed: created_at was bumped on status update';
+    SELECT created_at INTO v_after FROM activity_events
+        WHERE kind = 'friend_request_received' AND ref_id = v_fr;
+    IF v_after IS DISTINCT FROM v_before THEN
+        RAISE EXCEPTION 'Case 6 failed: created_at bumped on status update (before=%, after=%)', v_before, v_after;
     END IF;
 
     -- ---- CASE 7: rejoin — Bob leaves, then rejoins; fresh rows appear,
@@ -182,13 +185,14 @@ BEGIN
 
     SELECT get_activity_unread_count() INTO v_count;
     IF v_count = 0 THEN
-        RAISE EXCEPTION 'Case 8 failed: expected >0 unread for Alice';
+        RAISE EXCEPTION 'Case 8 failed: expected >0 unread for Alice, got 0';
     END IF;
 
     -- Should not count message_posted: total includes message - confirm
     -- that excluding messages drops the count.
-    IF v_count >= (SELECT COUNT(*) FROM activity_events WHERE user_id = v_alice) THEN
-        RAISE EXCEPTION 'Case 8 failed: unread count should be strictly less than total Alice rows';
+    SELECT COUNT(*) INTO v_total FROM activity_events WHERE user_id = v_alice;
+    IF v_count >= v_total THEN
+        RAISE EXCEPTION 'Case 8 failed: unread (%) should be strictly less than total Alice rows (%)', v_count, v_total;
     END IF;
 
     -- ---- CASE 9: mark_activity_seen clears the count ------------------
