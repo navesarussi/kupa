@@ -186,7 +186,7 @@ async function fetchGroupsInternal(): Promise<GroupWithMembers[]> {
         const { data, error: groupsErr } = await supabase
             .from('groups')
             .select(
-                '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url, is_active))',
+                '*, group_members!inner(user_id, is_active, profiles!group_members_user_id_fkey(id, name, avatar_url, is_active))',
             )
             .in('id', groupIds)
             .eq('is_active', true)
@@ -443,7 +443,7 @@ async function syncGroupMembershipState(groupId: string): Promise<void> {
     const { data, error } = await supabase
         .from('groups')
         .select(
-            '*, group_members!inner(user_id, is_active, profiles(id, name, avatar_url, is_active))',
+            '*, group_members!inner(user_id, is_active, profiles!group_members_user_id_fkey(id, name, avatar_url, is_active))',
         )
         .eq('id', groupId)
         .eq('is_active', true)
