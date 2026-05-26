@@ -24,6 +24,19 @@ jest.mock('../../../services/groups.service', () => ({
     fetchProfilesByUserIds: jest.fn().mockResolvedValue({}),
 }));
 
+jest.mock('../../../services/expenses.service', () => ({
+    getExpenseWithSplitsById: jest.fn(),
+    deleteExpense: jest.fn(),
+}));
+
+jest.mock('../../../services/settlements.service', () => ({
+    getSettlementById: jest.fn(),
+}));
+
+jest.mock('../../../services/expense-delta', () => ({
+    decorateExpense: jest.fn((expense) => expense),
+}));
+
 jest.mock('../../../lib/supabase', () => ({
     supabase: {
         rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
@@ -213,6 +226,44 @@ describe('ActivityFeedScreen', () => {
         await waitFor(() => {
             expect(mockSupabaseRpc).toHaveBeenCalledWith('mark_activity_seen');
         });
+    });
+
+    it('opens the expense detail sheet when an expense_added row is pressed', async () => {
+        const { getExpenseWithSplitsById } = jest.requireMock('../../../services/expenses.service');
+        (getExpenseWithSplitsById as jest.Mock).mockResolvedValue({
+            id: 'exp1',
+            groupId: 'g1',
+            description: 'Lunch',
+            amount: 12,
+            currency: 'USD',
+            expenseDate: new Date('2026-05-01'),
+            paidBy: 'u2',
+            createdBy: 'u2',
+            splits: [{ userId: 'u1', amount: 6 }, { userId: 'u2', amount: 6 }],
+        });
+        mockFetchRecentActivity.mockResolvedValue({
+            items: [
+                {
+                    id: 'a1',
+                    userId: 'u1',
+                    kind: 'expense_added',
+                    groupId: 'g1',
+                    refId: 'exp1',
+                    actorUserId: 'u2',
+                    metadata: { description: 'Lunch', amount: 12, currency: 'USD' },
+                    createdAt: new Date('2026-05-01'),
+                },
+            ],
+        });
+
+        const { findByTestId } = renderWithQuery(<ActivityFeedScreen />);
+        const card = await findByTestId('activity-card-a1');
+        fireEvent.press(card);
+
+        await waitFor(() => {
+            expect(getExpenseWithSplitsById).toHaveBeenCalledWith('exp1');
+        });
+        expect(await findByTestId('expense-detail-sheet')).toBeTruthy();
     });
 
     it('invalidates the unread-count query with the correct queryKey on focus', async () => {
