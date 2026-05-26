@@ -19,6 +19,7 @@ import { colors } from '../theme';
 import { useInviteRedemption } from '../hooks/useInviteRedemption';
 import { prefetchGroupsList } from '../hooks/queries/prefetchGroupsList';
 import { prefetchDashboard } from '../hooks/queries/prefetchDashboard';
+import { useActivityUnreadCount } from '../hooks/queries/useActivityUnreadCount';
 
 function HeaderBackButton({ onPress }: { onPress: () => void }) {
     const isRtl = useRtlLayout();
@@ -251,6 +252,7 @@ function ProfileStack() {
 export function AppNavigator() {
     const { t } = useTranslation();
     useInviteRedemption();
+    const { data: unreadCount = 0 } = useActivityUnreadCount();
 
     useEffect(() => {
         prefetchGroupsList();
@@ -281,6 +283,7 @@ export function AppNavigator() {
                 options={{
                     tabBarLabel: t('tabs.activity'),
                     tabBarIcon: tabBarIcon('time', 'time-outline'),
+                    tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
                 }}
             />
             <Tab.Screen
