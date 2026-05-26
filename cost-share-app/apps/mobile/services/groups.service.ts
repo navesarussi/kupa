@@ -304,6 +304,7 @@ export async function createGroup(dto: CreateGroupDto): Promise<Group | null> {
         const rows = Array.from(memberIds).map(userId => ({
             group_id: groupRow.id,
             user_id: userId,
+            added_by: userId === createdBy ? null : createdBy,
         }));
         const { error: membersErr } = await supabase.from('group_members').insert(rows);
         if (membersErr) throw membersErr;
