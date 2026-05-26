@@ -62,11 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_activity_events_user_kind_created
 -- RLS: clients read their own events; only SECURITY DEFINER triggers write.
 ALTER TABLE activity_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users read own activity events" ON activity_events;
 CREATE POLICY "Users read own activity events"
     ON activity_events FOR SELECT
     USING (user_id = auth.uid());
-
--- (No INSERT/UPDATE/DELETE policy → blocked for clients.)
 
 -- ============================================================================
 -- 4. Realtime publication — append activity_events without touching the rest.
@@ -107,6 +106,8 @@ CREATE OR REPLACE FUNCTION get_activity_unread_count() RETURNS integer
           AND ae.kind <> 'message_posted';
     $$;
 
+REVOKE EXECUTE ON FUNCTION mark_activity_seen() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION get_activity_unread_count() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION mark_activity_seen() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_activity_unread_count() TO authenticated;
 
