@@ -197,12 +197,11 @@ BEGIN
     END IF;
 
     -- ---- CASE 10: self-actor events are not counted as unread.
-    -- Alice has at least 2 events she shouldn't be pinged for: her own
-    -- expense_added (actor=Alice) and the message_posted (excluded by kind).
-    -- The gap between total and unread must reflect both exclusions.
+    -- Alice has an `expense_added` row where actor_user_id = Alice. That
+    -- row must NOT count toward unread, so total - unread >= 1.
     v_gap := v_total - v_count;
-    IF v_gap < 2 THEN
-        RAISE EXCEPTION 'Case 10 failed: expected total - unread >= 2 (self-expense + message), got total=%, unread=%, gap=%',
+    IF v_gap < 1 THEN
+        RAISE EXCEPTION 'Case 10 failed: expected total - unread >= 1 (self-expense), got total=%, unread=%, gap=%',
             v_total, v_count, v_gap;
     END IF;
 
@@ -211,6 +210,16 @@ BEGIN
     SELECT get_activity_unread_count() INTO v_count;
     IF v_count <> 0 THEN
         RAISE EXCEPTION 'Case 9 failed: unread count = % after mark_activity_seen', v_count;
+    END IF;
+
+    -- ---- CASE 11: message_posted from another user counts as unread ---
+    -- Reset Alice's watermark so all events are "new" again. Bob's message
+    -- was inserted earlier with actor=Bob. Confirm it now contributes to
+    -- the unread count (previously excluded by `kind <> 'message_posted'`).
+    UPDATE public.profiles SET activity_last_seen_at = 'epoch'::timestamptz WHERE id = v_alice;
+    SELECT get_activity_unread_count() INTO v_count;
+    IF v_count < 1 THEN
+        RAISE EXCEPTION 'Case 11 failed: expected message_posted to count toward unread, got %', v_count;
     END IF;
 
     RAISE NOTICE 'All activity_events tests passed.';

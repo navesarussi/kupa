@@ -107,7 +107,6 @@ CREATE OR REPLACE FUNCTION get_activity_unread_count() RETURNS integer
         JOIN profiles p ON p.id = ae.user_id
         WHERE ae.user_id = auth.uid()
           AND ae.created_at > p.activity_last_seen_at
-          AND ae.kind <> 'message_posted'
           AND ae.actor_user_id <> auth.uid();
     $$;
 
