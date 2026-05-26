@@ -253,9 +253,27 @@ CREATE OR REPLACE FUNCTION emit_friend_request_activity_events() RETURNS TRIGGER
         END IF;
 
         IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status THEN
+            -- Update recipient's existing row in place (does not bump created_at).
             UPDATE activity_events
             SET metadata = jsonb_build_object('status', NEW.status, 'responded_at', NEW.responded_at)
             WHERE kind = 'friend_request_received' AND ref_id = NEW.id;
+
+            -- Emit a sender-side row on acceptance so the sender sees
+            -- "You and X are now friends" in their feed. created_at is
+            -- set to responded_at so the event sorts at the acceptance moment.
+            IF NEW.status = 'accepted' THEN
+                INSERT INTO activity_events (user_id, kind, group_id, ref_id, actor_user_id, metadata, created_at)
+                VALUES (
+                    NEW.from_user_id,
+                    'friend_request_received',
+                    NULL,
+                    NEW.id,
+                    NEW.to_user_id,
+                    jsonb_build_object('status', NEW.status, 'responded_at', NEW.responded_at),
+                    COALESCE(NEW.responded_at, NOW())
+                )
+                ON CONFLICT (user_id, kind, ref_id) DO NOTHING;
+            END IF;
         END IF;
         RETURN NEW;
     END;
@@ -407,7 +425,8 @@ WHERE m.is_deleted = false
   AND m.created_at > now() - interval '12 months'
 ON CONFLICT DO NOTHING;
 
--- 7d. Friend requests → friend_request_received (one row per request).
+-- 7d. Friend requests → friend_request_received.
+--    Recipient row: one per request.
 INSERT INTO activity_events (user_id, kind, group_id, ref_id, actor_user_id, metadata, created_at)
 SELECT
     fr.to_user_id, 'friend_request_received', NULL, fr.id, fr.from_user_id,
@@ -415,6 +434,18 @@ SELECT
     fr.created_at
 FROM friend_requests fr
 WHERE fr.created_at > now() - interval '12 months'
+ON CONFLICT DO NOTHING;
+
+--    Sender row: emit for already-accepted requests so the sender sees
+--    "You and X are now friends" in their feed.
+INSERT INTO activity_events (user_id, kind, group_id, ref_id, actor_user_id, metadata, created_at)
+SELECT
+    fr.from_user_id, 'friend_request_received', NULL, fr.id, fr.to_user_id,
+    jsonb_build_object('status', fr.status, 'responded_at', fr.responded_at),
+    COALESCE(fr.responded_at, fr.created_at)
+FROM friend_requests fr
+WHERE fr.status = 'accepted'
+  AND fr.created_at > now() - interval '12 months'
 ON CONFLICT DO NOTHING;
 
 -- 7e. Group joins (currently active, non-founder, joined within window).
