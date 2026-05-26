@@ -40,6 +40,7 @@ DECLARE
     v_member  UUID;
     v_count   INT;
     v_total   INT;
+    v_gap     INT;
     v_before  TIMESTAMPTZ;
     v_after   TIMESTAMPTZ;
     v_status  TEXT;
@@ -193,6 +194,16 @@ BEGIN
     SELECT COUNT(*) INTO v_total FROM activity_events WHERE user_id = v_alice;
     IF v_count >= v_total THEN
         RAISE EXCEPTION 'Case 8 failed: unread (%) should be strictly less than total Alice rows (%)', v_count, v_total;
+    END IF;
+
+    -- ---- CASE 10: self-actor events are not counted as unread.
+    -- Alice has at least 2 events she shouldn't be pinged for: her own
+    -- expense_added (actor=Alice) and the message_posted (excluded by kind).
+    -- The gap between total and unread must reflect both exclusions.
+    v_gap := v_total - v_count;
+    IF v_gap < 2 THEN
+        RAISE EXCEPTION 'Case 10 failed: expected total - unread >= 2 (self-expense + message), got total=%, unread=%, gap=%',
+            v_total, v_count, v_gap;
     END IF;
 
     -- ---- CASE 9: mark_activity_seen clears the count ------------------

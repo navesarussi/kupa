@@ -98,12 +98,17 @@ CREATE OR REPLACE FUNCTION get_activity_unread_count() RETURNS integer
     SECURITY DEFINER STABLE
     SET search_path = public
     AS $$
+        -- `actor_user_id <> auth.uid()` filters out:
+        --   * events the user themselves originated (own expense/settlement/etc.)
+        --   * events with NULL actor (own leave, invite-link self-join)
+        -- because NULL <> uuid evaluates to NULL (falsy in WHERE).
         SELECT COUNT(*)::integer
         FROM activity_events ae
         JOIN profiles p ON p.id = ae.user_id
         WHERE ae.user_id = auth.uid()
           AND ae.created_at > p.activity_last_seen_at
-          AND ae.kind <> 'message_posted';
+          AND ae.kind <> 'message_posted'
+          AND ae.actor_user_id <> auth.uid();
     $$;
 
 REVOKE EXECUTE ON FUNCTION mark_activity_seen() FROM PUBLIC, anon;
