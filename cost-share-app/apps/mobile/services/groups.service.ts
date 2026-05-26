@@ -466,6 +466,7 @@ async function syncGroupMembershipState(groupId: string): Promise<void> {
 }
 
 export async function addGroupMember(groupId: string, userId: string): Promise<GroupMember | null> {
+    const addedBy = await getCurrentUserId();
     const { data, error } = await supabase
         .from('group_members')
         .upsert(
@@ -475,6 +476,7 @@ export async function addGroupMember(groupId: string, userId: string): Promise<G
                 is_active: true,
                 left_at: null,
                 joined_at: new Date().toISOString(),
+                added_by: addedBy ?? null,
             },
             { onConflict: 'group_id,user_id' },
         )
