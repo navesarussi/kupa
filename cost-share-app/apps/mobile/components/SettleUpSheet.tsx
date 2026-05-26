@@ -18,6 +18,7 @@ import type { GroupMemberLite, PairwiseDebt, PaymentMethod } from '@cost-share/s
 import { Text } from './AppText';
 import { MemberAvatar } from './MemberAvatar';
 import { AppIcon } from './AppIcon';
+import type { AppIconName } from './AppIcon';
 import { BottomSheetShell } from './BottomSheetShell';
 import { useRtlLayout } from '../hooks/useRtlLayout';
 import { getAvatarUrlForMember } from '../lib/userDisplay';
@@ -53,7 +54,7 @@ interface SettleUpSheetProps {
 
 type MethodKey = Extract<PaymentMethod, 'cash' | 'bank_transfer' | 'paypal' | 'other'>;
 
-const METHOD_TILES: ReadonlyArray<{ key: MethodKey; icon: string }> = [
+const METHOD_TILES: ReadonlyArray<{ key: MethodKey; icon: AppIconName }> = [
     { key: 'cash', icon: 'cash-outline' },
     { key: 'bank_transfer', icon: 'card-outline' },
     { key: 'paypal', icon: 'logo-paypal' },
@@ -125,11 +126,9 @@ export function SettleUpSheet({
         submitting || !Number.isFinite(parsedAmount) || parsedAmount <= 0;
 
     const handleSwap = useCallback(() => {
-        setFromUserId(prev => {
-            setToUserId(prev);
-            return toUserId;
-        });
-    }, [toUserId]);
+        setFromUserId(toUserId);
+        setToUserId(fromUserId);
+    }, [fromUserId, toUserId]);
 
     const handleSubmit = useCallback(async () => {
         if (recordDisabled) return;
@@ -279,7 +278,7 @@ function SettleUpHero({
                     <FlowAvatar member={fromMember} label={t('settleUp.from')} />
 
                     <View className="flex-1 items-center">
-                        <Pressable
+                        <View
                             className="flex-row items-baseline rounded-xl px-3 py-1"
                             style={{
                                 backgroundColor: 'rgba(255,255,255,0.14)',
@@ -315,7 +314,7 @@ function SettleUpHero({
                                 }}
                                 testID="settle-amount-input"
                             />
-                        </Pressable>
+                        </View>
 
                         <View className="flex-row items-center mt-2 w-3/4">
                             <View className="flex-1 h-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.85)' }} />
@@ -428,7 +427,7 @@ function MethodTiles({ selected, onSelect, t }: MethodTilesProps) {
                         }
                     >
                         <AppIcon
-                            name={icon as any}
+                            name={icon}
                             size={22}
                             color={isSelected ? '#3B82F6' : '#374151'}
                         />
@@ -472,6 +471,7 @@ function SettleUpBottomDock({
                         shadowOffset: { width: 0, height: 1 },
                     }}
                     accessibilityRole="button"
+                    accessibilityLabel={formatShortDate(settlementDate)}
                     testID="settle-date-chip"
                 >
                     <AppIcon name="calendar-outline" size={13} color="#4B5563" />
@@ -486,6 +486,8 @@ function SettleUpBottomDock({
                 onPress={onRecord}
                 disabled={recordDisabled}
                 testID="settle-record-button"
+                accessibilityRole="button"
+                accessibilityLabel={label}
                 className={
                     recordDisabled
                         ? 'flex-row items-center justify-center rounded-2xl bg-gray-200 px-5 py-3.5'

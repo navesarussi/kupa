@@ -82,4 +82,13 @@ describe('SettleUpSheet (redesign)', () => {
         fireEvent.press(getByTestId('settle-record-button'));
         expect(onSubmit).not.toHaveBeenCalled();
     });
+
+    it('record button label includes the formatted amount', () => {
+        const { getByTestId, getByText } = renderSheet();
+        // The button renders the label text and exposes it via accessibilityLabel.
+        const recordButton = getByTestId('settle-record-button');
+        expect(recordButton.props.accessibilityLabel).toBe('settleUp.recordPaymentWithAmount');
+        // The Text child inside the button contains the same label string.
+        expect(getByText('settleUp.recordPaymentWithAmount')).toBeTruthy();
+    });
 });
