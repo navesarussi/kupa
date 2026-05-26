@@ -33,7 +33,7 @@ const EXPENSE: ActivityCardVariant = {
 
 const SETTLEMENT: ActivityCardVariant = {
     iconName: 'swap-horizontal-outline',
-    iconColor: colors.success,
+    iconColor: colors.success.DEFAULT,
     iconBgColor: '#ecfdf5',
     backgroundColor: colors.white,
     borderColor: '#bbf7d0',
@@ -69,7 +69,7 @@ const FRIEND_REQUEST: ActivityCardVariant = {
 
 const FRIEND_REQUEST_ACCEPTED: ActivityCardVariant = {
     iconName: 'checkmark-circle-outline',
-    iconColor: colors.success,
+    iconColor: colors.success.DEFAULT,
     iconBgColor: '#ecfdf5',
     backgroundColor: colors.white,
     borderColor: '#fde68a',
@@ -105,7 +105,7 @@ const GROUP_INVITE: ActivityCardVariant = {
 
 const MEMBER_JOINED: ActivityCardVariant = {
     iconName: 'enter-outline',
-    iconColor: colors.success,
+    iconColor: colors.success.DEFAULT,
     iconBgColor: '#ecfdf5',
     backgroundColor: colors.white,
     borderColor: '#bbf7d0',

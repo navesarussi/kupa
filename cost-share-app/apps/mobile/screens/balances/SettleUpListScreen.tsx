@@ -415,7 +415,7 @@ function SettlementHistoryRow({
             testID={`settle-history-${settlement.id}`}
         >
             <View className="mr-2">
-                <AppIcon name="checkmark-circle" size={18} color={colors.success} />
+                <AppIcon name="checkmark-circle" size={18} color={colors.success.DEFAULT} />
             </View>
             <MemberAvatar name={fromName} avatarUrl={fromAvatar} size="xs" />
             <View className="mx-1.5">
