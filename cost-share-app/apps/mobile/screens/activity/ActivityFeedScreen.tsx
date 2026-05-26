@@ -308,12 +308,40 @@ export function ActivityFeedScreen() {
     );
 
     const openExpenseDetail = useCallback(
-        async (expenseId: string, groupId: string | null) => {
-            const expense = await getExpenseWithSplitsById(expenseId);
-            if (!expense) return;
-            const decorated = decorateExpense(expense, currentUser?.id ?? '');
-            const seed = seedMemberMapFromGroup(groupId);
+        async (event: ActivityEvent) => {
+            const md = (event.metadata ?? {}) as Record<string, unknown>;
+            const seed = seedMemberMapFromGroup(event.groupId);
+            // Open immediately with a stub built from event.metadata so the
+            // modal appears on the same tick as the press. Splits + extras
+            // fill in once the network fetch resolves.
+            const stub: ExpenseWithDelta = {
+                id: event.refId,
+                groupId: event.groupId ?? '',
+                description: typeof md.description === 'string' ? md.description : '',
+                amount: Number(md.amount ?? 0),
+                currency: typeof md.currency === 'string' ? md.currency : '',
+                expenseDate: typeof md.expense_date === 'string'
+                    ? new Date(md.expense_date)
+                    : event.createdAt,
+                paidBy: event.actorUserId ?? '',
+                createdBy: event.actorUserId ?? '',
+                isDeleted: false,
+                createdAt: event.createdAt,
+                updatedAt: event.createdAt,
+                splits: [],
+                myDelta: 0,
+                myDeltaState: 'settled',
+            };
             setDetailMembers(seed);
+            setDetailItem({ kind: 'expense', expense: stub });
+
+            const expense = await getExpenseWithSplitsById(event.refId);
+            if (!expense) {
+                // Source row no longer accessible; close to avoid stale stub.
+                setDetailItem(null);
+                return;
+            }
+            const decorated = decorateExpense(expense, currentUser?.id ?? '');
             setDetailItem({ kind: 'expense', expense: decorated });
             const referencedIds = new Set<string>([
                 expense.paidBy,
@@ -332,11 +360,32 @@ export function ActivityFeedScreen() {
     );
 
     const openSettlementDetail = useCallback(
-        async (settlementId: string, groupId: string | null) => {
-            const settlement = await getSettlementById(settlementId);
-            if (!settlement) return;
-            const seed = seedMemberMapFromGroup(groupId);
+        async (event: ActivityEvent) => {
+            const md = (event.metadata ?? {}) as Record<string, unknown>;
+            const seed = seedMemberMapFromGroup(event.groupId);
+            const stub: Settlement = {
+                id: event.refId,
+                groupId: event.groupId ?? '',
+                fromUserId: typeof md.from_user_id === 'string' ? md.from_user_id : '',
+                toUserId: typeof md.to_user_id === 'string' ? md.to_user_id : '',
+                amount: Number(md.amount ?? 0),
+                currency: typeof md.currency === 'string' ? md.currency : '',
+                settlementDate: typeof md.settlement_date === 'string'
+                    ? new Date(md.settlement_date)
+                    : event.createdAt,
+                createdBy: event.actorUserId ?? '',
+                createdAt: event.createdAt,
+                updatedAt: event.createdAt,
+                deletedAt: null,
+            };
             setDetailMembers(seed);
+            setDetailItem({ kind: 'settlement', settlement: stub });
+
+            const settlement = await getSettlementById(event.refId);
+            if (!settlement) {
+                setDetailItem(null);
+                return;
+            }
             setDetailItem({ kind: 'settlement', settlement });
             const referencedIds = new Set<string>([
                 settlement.fromUserId,
@@ -361,11 +410,11 @@ export function ActivityFeedScreen() {
                 return;
             }
             if (event.kind === 'expense_added') {
-                void openExpenseDetail(event.refId, event.groupId);
+                void openExpenseDetail(event);
                 return;
             }
             if (event.kind === 'settlement_added') {
-                void openSettlementDetail(event.refId, event.groupId);
+                void openSettlementDetail(event);
                 return;
             }
             // group_added / group_member_joined / message_posted → navigate to group

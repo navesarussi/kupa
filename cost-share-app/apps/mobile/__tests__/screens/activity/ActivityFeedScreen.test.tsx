@@ -76,12 +76,12 @@ beforeEach(() => {
     mockSupabaseRpc.mockResolvedValue({ data: null, error: null } as never);
     const navMock = jest.requireMock('@react-navigation/native');
     (navMock.useFocusEffect as jest.Mock).mockClear();
-    mockUseAppStore.mockImplementation((selector) =>
-        selector({
-            currentUser: { id: 'u1' },
-            groups: [{ id: 'g1', name: 'Trip', defaultCurrency: 'USD', groupType: 'trip' }],
-        }),
-    );
+    const storeState = {
+        currentUser: { id: 'u1' },
+        groups: [{ id: 'g1', name: 'Trip', defaultCurrency: 'USD', groupType: 'trip', members: [] }],
+    };
+    mockUseAppStore.mockImplementation((selector) => selector(storeState));
+    (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
 });
 
 describe('ActivityFeedScreen', () => {
