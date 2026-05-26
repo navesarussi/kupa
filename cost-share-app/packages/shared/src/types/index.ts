@@ -225,41 +225,6 @@ export interface UserExpenseView {
 }
 
 /**
- * RecentActivity - Combined feed of expenses, settlements, and group messages
- * Implements: cross-group activity tab (REQ-ACT-01)
- */
-export type ActivityType =
-    | 'expense'
-    | 'settlement'
-    | 'message'
-    | 'friend_request'
-    | 'group_invite'
-    | 'member_joined'
-    | 'member_left';
-
-export type FriendRequestActivityStatus =
-    | 'pending'
-    | 'accepted'
-    | 'rejected'
-    | 'cancelled';
-
-export interface RecentActivity {
-    id: string;
-    activityType: ActivityType;
-    groupId: string;
-    description: string;
-    amount: number;
-    currency: string;
-    userId: string;
-    userName: string;
-    userAvatarUrl?: string;
-    /** Set for `friend_request` rows — drives history copy and styling. */
-    friendRequestStatus?: FriendRequestActivityStatus;
-    activityDate: Date;
-    createdAt: Date;
-}
-
-/**
  * ActivityEventKind — server-side enum mirror.
  * Source of truth: activity_events.kind CHECK constraint.
  */
