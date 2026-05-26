@@ -37,7 +37,7 @@ export function SummaryBalanceStrip({
     const { net, currency, isSettled } = balance;
     const owed = net > 0;
     const amount = formatAmount(net, currency);
-    const amountColor = owed ? colors.success.DEFAULT : colors.error;
+    const amountColor = owed ? colors.success.text : colors.error;
 
     return (
         <TouchableOpacity
