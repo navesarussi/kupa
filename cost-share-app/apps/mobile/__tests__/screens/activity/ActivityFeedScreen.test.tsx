@@ -20,6 +20,16 @@ jest.mock('../../../services/activity.service', () => ({
     ACTIVITY_INITIAL_SKELETON_COUNT: 3,
 }));
 
+jest.mock('../../../services/groups.service', () => ({
+    fetchProfilesByUserIds: jest.fn().mockResolvedValue({}),
+}));
+
+jest.mock('../../../lib/supabase', () => ({
+    supabase: {
+        rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+    },
+}));
+
 jest.mock('../../../store', () => ({
     useAppStore: jest.fn(),
 }));
@@ -27,23 +37,31 @@ jest.mock('../../../store', () => ({
 import { ActivityFeedScreen } from '../../../screens/activity/ActivityFeedScreen';
 import { fetchRecentActivity } from '../../../services/activity.service';
 import { useAppStore } from '../../../store';
+import { supabase } from '../../../lib/supabase';
+import { queryKeys } from '../../../hooks/queries/keys';
 
 const mockFetchRecentActivity = fetchRecentActivity as jest.MockedFunction<
     typeof fetchRecentActivity
 >;
 const mockUseAppStore = useAppStore as unknown as jest.Mock;
+const mockSupabaseRpc = supabase.rpc as jest.MockedFunction<typeof supabase.rpc>;
 
 function renderWithQuery(ui: React.ReactElement) {
     const client = new QueryClient({
         defaultOptions: { queries: { retry: false } },
     });
-    return render(
+    const utils = render(
         <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
     );
+    return { ...utils, client };
 }
 
 beforeEach(() => {
     mockFetchRecentActivity.mockReset();
+    mockSupabaseRpc.mockClear();
+    mockSupabaseRpc.mockResolvedValue({ data: null, error: null } as never);
+    const navMock = jest.requireMock('@react-navigation/native');
+    (navMock.useFocusEffect as jest.Mock).mockClear();
     mockUseAppStore.mockImplementation((selector) =>
         selector({
             currentUser: { id: 'u1' },
@@ -78,15 +96,13 @@ describe('ActivityFeedScreen', () => {
             items: [
                 {
                     id: 'a1',
-                    activityType: 'expense',
-                    groupId: 'g1',
-                    description: 'Lunch',
-                    amount: 12,
-                    currency: 'USD',
                     userId: 'u1',
-                    userName: 'Alice',
-                    activityDate: new Date('2026-05-01'),
-                    createdAt: new Date(),
+                    kind: 'expense_added',
+                    groupId: 'g1',
+                    refId: 'e1',
+                    actorUserId: 'u1',
+                    metadata: { description: 'Lunch', amount: 12, currency: 'USD' },
+                    createdAt: new Date('2026-05-01'),
                 },
             ],
         });
@@ -99,27 +115,23 @@ describe('ActivityFeedScreen', () => {
             items: [
                 {
                     id: 'a1',
-                    activityType: 'expense',
-                    groupId: 'g1',
-                    description: 'Lunch',
-                    amount: 12,
-                    currency: 'USD',
                     userId: 'u1',
-                    userName: 'Alice',
-                    activityDate: new Date('2026-05-01'),
-                    createdAt: new Date(),
+                    kind: 'expense_added',
+                    groupId: 'g1',
+                    refId: 'e1',
+                    actorUserId: 'u1',
+                    metadata: { description: 'Lunch', amount: 12, currency: 'USD' },
+                    createdAt: new Date('2026-05-01'),
                 },
                 {
                     id: 'a2',
-                    activityType: 'expense',
+                    userId: 'u1',
+                    kind: 'expense_added',
                     groupId: 'g1',
-                    description: 'Dinner',
-                    amount: 20,
-                    currency: 'USD',
-                    userId: 'u2',
-                    userName: 'Bob',
-                    activityDate: new Date('2026-05-02'),
-                    createdAt: new Date(),
+                    refId: 'e2',
+                    actorUserId: 'u2',
+                    metadata: { description: 'Dinner', amount: 20, currency: 'USD' },
+                    createdAt: new Date('2026-05-02'),
                 },
             ],
         });
@@ -140,15 +152,13 @@ describe('ActivityFeedScreen', () => {
             items: [
                 {
                     id: 'm1',
-                    activityType: 'message',
-                    groupId: 'g1',
-                    description: 'Hello everyone',
-                    amount: 0,
-                    currency: '',
                     userId: 'u1',
-                    userName: 'Alice',
-                    activityDate: new Date('2026-05-01'),
-                    createdAt: new Date(),
+                    kind: 'message_posted',
+                    groupId: 'g1',
+                    refId: 'msg1',
+                    actorUserId: 'u1',
+                    metadata: { body: 'Hello everyone' },
+                    createdAt: new Date('2026-05-01'),
                 },
             ],
         });
@@ -169,14 +179,12 @@ describe('ActivityFeedScreen', () => {
         mockFetchRecentActivity.mockResolvedValue({
             items: Array.from({ length: 15 }, (_, i) => ({
                 id: `a${i}`,
-                activityType: 'expense' as const,
-                groupId: 'g1',
-                description: `Item ${i}`,
-                amount: 10,
-                currency: 'USD',
                 userId: 'u1',
-                userName: 'Alice',
-                activityDate: new Date('2026-05-01'),
+                kind: 'expense_added' as const,
+                groupId: 'g1',
+                refId: `e${i}`,
+                actorUserId: 'u1',
+                metadata: { description: `Item ${i}`, amount: 10, currency: 'USD' },
                 createdAt: new Date(`2026-05-01T00:00:${String(i).padStart(2, '0')}.000Z`),
             })),
             nextCursor: '2026-05-01T00:00:00.000Z',
@@ -190,5 +198,49 @@ describe('ActivityFeedScreen', () => {
 
         await new Promise((resolve) => setTimeout(resolve, 100));
         expect(mockFetchRecentActivity).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls mark_activity_seen RPC when the screen gains focus', async () => {
+        mockFetchRecentActivity.mockResolvedValue({ items: [] });
+        renderWithQuery(<ActivityFeedScreen />);
+
+        // useFocusEffect is a no-op stub; invoke the registered callback to
+        // simulate the screen gaining focus.
+        const navMock = jest.requireMock('@react-navigation/native');
+        const focusCb = (navMock.useFocusEffect as jest.Mock).mock.calls[0][0];
+        focusCb();
+
+        await waitFor(() => {
+            expect(mockSupabaseRpc).toHaveBeenCalledWith('mark_activity_seen');
+        });
+    });
+
+    it('invalidates the unread-count query with the correct queryKey on focus', async () => {
+        mockFetchRecentActivity.mockResolvedValue({ items: [] });
+
+        const invalidateSpy = jest.spyOn(
+            QueryClient.prototype,
+            'invalidateQueries',
+        );
+
+        try {
+            renderWithQuery(<ActivityFeedScreen />);
+
+            const navMock = jest.requireMock('@react-navigation/native');
+            const focusCb = (navMock.useFocusEffect as jest.Mock).mock.calls[0][0];
+            focusCb();
+
+            await waitFor(() => {
+                expect(mockSupabaseRpc).toHaveBeenCalledWith('mark_activity_seen');
+            });
+
+            await waitFor(() => {
+                expect(invalidateSpy).toHaveBeenCalledWith({
+                    queryKey: queryKeys.activityUnreadCount,
+                });
+            });
+        } finally {
+            invalidateSpy.mockRestore();
+        }
     });
 });

@@ -1,9 +1,8 @@
 /**
- * ActivityFeedScreen
- * Cross-group activity feed (Supabase) — REQ-ACT-01
+ * ActivityFeedScreen — cross-group feed driven by activity_events.
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     FlatList,
@@ -15,10 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+    ActivityEvent,
     ExpenseWithDelta,
     GroupMemberLite,
-    RecentActivity,
     Settlement,
 } from '@cost-share/shared';
 import { useActivityQuery } from '../../hooks/queries/useActivityQuery';
@@ -30,6 +30,8 @@ import {
 import { getSettlementById } from '../../services/settlements.service';
 import { decorateExpense } from '../../services/expense-delta';
 import { fetchProfilesByUserIds } from '../../services/groups.service';
+import { supabase } from '../../lib/supabase';
+import { queryKeys } from '../../hooks/queries/keys';
 import { resolveAutoTextInputStyle, rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
 import { EmptyState } from '../../components/EmptyState';
 import { ActivityItem } from '../../components/ActivityItem';
@@ -63,8 +65,9 @@ export function ActivityFeedScreen() {
     const { t } = useTranslation();
     const isRtl = useRtlLayout();
     const navigation = useNavigation<any>();
-    const currentUser = useAppStore((s) => s.currentUser);
-    const groups = useAppStore((s) => s.groups);
+    const queryClient = useQueryClient();
+    const currentUser = useAppStore(s => s.currentUser);
+    const groups = useAppStore(s => s.groups);
 
     const {
         data,
@@ -81,20 +84,34 @@ export function ActivityFeedScreen() {
     const [filters, setFilters] = useState<ActivityFilters>(DEFAULT_ACTIVITY_FILTERS);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [detailItem, setDetailItem] = useState<FeedDetailItem | null>(null);
-    const [detailMembers, setDetailMembers] = useState<
-        Record<string, GroupMemberLite>
-    >({});
+    const [detailMembers, setDetailMembers] = useState<Record<string, GroupMemberLite>>({});
     const [pendingDelete, setPendingDelete] = useState(false);
-    // Show the pull-to-refresh spinner ONLY for explicit user pulls.
-    // Background refetches (realtime invalidation, focus-when-stale) update
-    // the list silently — they must not flip the spinner on.
     const [userRefreshing, setUserRefreshing] = useState(false);
+    const [profileMap, setProfileMap] = useState<Record<string, GroupMemberLite>>({});
     const canLoadMoreRef = useRef(false);
 
-    const activities = useMemo(
-        () => data?.pages.flatMap((page) => page.items) ?? [],
+    const activities: ActivityEvent[] = useMemo(
+        () => data?.pages.flatMap(page => page.items) ?? [],
         [data],
     );
+
+    // Resolve all unique profile IDs referenced by current page (actors,
+    // settlement counterparts, group_member_joined.new_member_user_id).
+    useEffect(() => {
+        const ids = new Set<string>();
+        for (const evt of activities) {
+            if (evt.actorUserId) ids.add(evt.actorUserId);
+            const md = (evt.metadata ?? {}) as Record<string, unknown>;
+            if (typeof md.from_user_id === 'string') ids.add(md.from_user_id);
+            if (typeof md.to_user_id === 'string') ids.add(md.to_user_id);
+            if (typeof md.new_member_user_id === 'string') ids.add(md.new_member_user_id);
+        }
+        const missing = [...ids].filter(id => !profileMap[id]);
+        if (missing.length === 0) return;
+        void fetchProfilesByUserIds(missing).then(extra => {
+            setProfileMap(prev => ({ ...prev, ...extra }));
+        });
+    }, [activities, profileMap]);
 
     const handleRefresh = useCallback(async () => {
         canLoadMoreRef.current = false;
@@ -106,21 +123,20 @@ export function ActivityFeedScreen() {
         }
     }, [refetch]);
 
-    // Only refetch on focus when cached data is stale (older than the
-    // query's staleTime). Without this gate, every tab focus forced a
-    // visible refresh-spinner reload of unchanged data.
     useFocusEffect(
         useCallback(() => {
-            if (isStale) {
-                void refetch();
-            }
-        }, [refetch, isStale]),
+            // Mark seen + invalidate badge count.
+            void supabase.rpc('mark_activity_seen').then(() => {
+                void queryClient.invalidateQueries({
+                    queryKey: queryKeys.activityUnreadCount,
+                });
+            });
+            if (isStale) void refetch();
+        }, [refetch, isStale, queryClient]),
     );
 
     const handleLoadMore = useCallback(() => {
-        if (!canLoadMoreRef.current || !hasNextPage || isFetchingNextPage) {
-            return;
-        }
+        if (!canLoadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
         void fetchNextPage();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
@@ -129,28 +145,28 @@ export function ActivityFeedScreen() {
     }, []);
 
     const availableCurrencies = useMemo(() => {
-        const fromGroups = groups.map((g) => g.defaultCurrency);
+        const fromGroups = groups.map(g => g.defaultCurrency);
         const fromActivities = activities
-            .map((a) => a.currency)
-            .filter(Boolean);
+            .map(a => (a.metadata as Record<string, unknown>)?.currency)
+            .filter((c): c is string => typeof c === 'string' && c.length > 0);
         return unique([...fromGroups, ...fromActivities]).sort();
     }, [groups, activities]);
 
     const availableGroups = useMemo(
         () =>
             groups
-                .map((g) => ({ id: g.id, name: g.name }))
+                .map(g => ({ id: g.id, name: g.name }))
                 .sort((a, b) => a.name.localeCompare(b.name)),
         [groups],
     );
 
     const groupTypeById = useMemo(
-        () => Object.fromEntries(groups.map((g) => [g.id, g.groupType])),
+        () => Object.fromEntries(groups.map(g => [g.id, g.groupType])),
         [groups],
     );
 
     const groupNameById = useMemo(
-        () => Object.fromEntries(groups.map((g) => [g.id, g.name])),
+        () => Object.fromEntries(groups.map(g => [g.id, g.name])),
         [groups],
     );
 
@@ -161,8 +177,10 @@ export function ActivityFeedScreen() {
             currentUser?.id,
             groupTypeById,
         );
-        return filtered.filter((item) => matchesActivitySearch(item, searchQuery));
-    }, [activities, filters, searchQuery, currentUser?.id, groupTypeById]);
+        return filtered.filter(item =>
+            matchesActivitySearch(item, searchQuery, groupNameById),
+        );
+    }, [activities, filters, searchQuery, currentUser?.id, groupTypeById, groupNameById]);
 
     const filterActive = isAnyActivityFilterActive(filters);
     const showInitialSkeleton = isLoading && activities.length === 0;
@@ -181,16 +199,14 @@ export function ActivityFeedScreen() {
 
     const detailOpenInGroup = useMemo(() => {
         if (!detailItem) return undefined;
-        const groupId =
-            detailItem.kind === 'expense'
-                ? detailItem.expense.groupId
-                : detailItem.settlement.groupId;
+        const groupId = detailItem.kind === 'expense'
+            ? detailItem.expense.groupId
+            : detailItem.settlement.groupId;
         const groupName = groupNameById[groupId];
         if (!groupName) return undefined;
-        const focusFeedItem: GroupDetailFocusFeedItem =
-            detailItem.kind === 'expense'
-                ? { kind: 'expense', id: detailItem.expense.id }
-                : { kind: 'settlement', id: detailItem.settlement.id };
+        const focusFeedItem: GroupDetailFocusFeedItem = detailItem.kind === 'expense'
+            ? { kind: 'expense', id: detailItem.expense.id }
+            : { kind: 'settlement', id: detailItem.settlement.id };
         return {
             label: t('activity.openInGroup', { group: groupName }),
             onPress: () => navigateToGroupWithFocus(groupId, focusFeedItem),
@@ -206,7 +222,7 @@ export function ActivityFeedScreen() {
                 new Set([
                     expense.paidBy,
                     expense.createdBy,
-                    ...expense.splits.map((s) => s.userId),
+                    ...expense.splits.map(s => s.userId),
                 ].filter(Boolean)),
             );
             const profiles = await fetchProfilesByUserIds(userIds);
@@ -220,13 +236,11 @@ export function ActivityFeedScreen() {
         const settlement = await getSettlementById(settlementId);
         if (!settlement) return;
         const userIds = Array.from(
-            new Set(
-                [
-                    settlement.fromUserId,
-                    settlement.toUserId,
-                    settlement.createdBy,
-                ].filter(Boolean),
-            ),
+            new Set([
+                settlement.fromUserId,
+                settlement.toUserId,
+                settlement.createdBy,
+            ].filter(Boolean)),
         );
         const profiles = await fetchProfilesByUserIds(userIds);
         setDetailMembers(profiles);
@@ -234,23 +248,24 @@ export function ActivityFeedScreen() {
     }, []);
 
     const handleActivityPress = useCallback(
-        (activity: RecentActivity) => {
-            if (activity.activityType === 'friend_request') {
+        (event: ActivityEvent) => {
+            if (event.kind === 'friend_request_received') {
                 navigation.navigate('Profile', { screen: 'Friends' });
                 return;
             }
-            if (activity.activityType === 'expense') {
-                void openExpenseDetail(activity.id);
+            if (event.kind === 'expense_added') {
+                void openExpenseDetail(event.refId);
                 return;
             }
-            if (activity.activityType === 'settlement') {
-                void openSettlementDetail(activity.id);
+            if (event.kind === 'settlement_added') {
+                void openSettlementDetail(event.refId);
                 return;
             }
-            if (activity.groupId) {
+            // group_added / group_member_joined / message_posted → navigate to group
+            if (event.groupId) {
                 navigation.navigate('Groups', {
                     screen: 'GroupDetail',
-                    params: { groupId: activity.groupId },
+                    params: { groupId: event.groupId },
                 });
             }
         },
@@ -296,20 +311,39 @@ export function ActivityFeedScreen() {
     }, [detailItem, refetch]);
 
     const renderActivity = useCallback(
-        ({ item }: { item: RecentActivity }) => (
-            <ActivityItem
-                activity={item}
-                groupName={groupNameById[item.groupId]}
-                onPress={handleActivityPress}
-            />
-        ),
-        [handleActivityPress, groupNameById],
+        ({ item }: { item: ActivityEvent }) => {
+            const actor = item.actorUserId ? profileMap[item.actorUserId] : undefined;
+            const md = (item.metadata ?? {}) as Record<string, unknown>;
+            let counterpart: GroupMemberLite | undefined;
+            if (item.kind === 'settlement_added') {
+                const otherId = typeof md.from_user_id === 'string' && md.from_user_id !== item.actorUserId
+                    ? md.from_user_id
+                    : typeof md.to_user_id === 'string'
+                    ? md.to_user_id
+                    : undefined;
+                if (otherId) counterpart = profileMap[otherId];
+            }
+            const newMemberId = typeof md.new_member_user_id === 'string'
+                ? md.new_member_user_id
+                : undefined;
+            const newMember = newMemberId ? profileMap[newMemberId] : undefined;
+            const groupName = item.groupId ? groupNameById[item.groupId] : undefined;
+            return (
+                <ActivityItem
+                    event={item}
+                    actor={actor}
+                    counterpart={counterpart}
+                    newMember={newMember}
+                    groupName={groupName}
+                    currentUserId={currentUser?.id ?? ''}
+                    onPress={handleActivityPress}
+                />
+            );
+        },
+        [handleActivityPress, groupNameById, profileMap, currentUser?.id],
     );
 
-    const keyExtractor = useCallback(
-        (item: RecentActivity) => `${item.activityType}-${item.id}`,
-        [],
-    );
+    const keyExtractor = useCallback((item: ActivityEvent) => item.id, []);
 
     const listEmptyComponent = useMemo(() => {
         if (showInitialSkeleton) {
@@ -321,7 +355,6 @@ export function ActivityFeedScreen() {
                 </View>
             );
         }
-
         if (isError) {
             return (
                 <EmptyState
@@ -333,7 +366,6 @@ export function ActivityFeedScreen() {
                 />
             );
         }
-
         if (searchQuery.trim().length > 0) {
             return (
                 <EmptyState
@@ -343,7 +375,6 @@ export function ActivityFeedScreen() {
                 />
             );
         }
-
         return (
             <EmptyState
                 iconName="list-outline"
@@ -366,9 +397,7 @@ export function ActivityFeedScreen() {
                         className={[
                             'flex-1 text-sm text-gray-900 mx-2',
                             rtlTextClassName(isRtl),
-                        ]
-                            .filter(Boolean)
-                            .join(' ')}
+                        ].filter(Boolean).join(' ')}
                         autoCorrect={false}
                         autoCapitalize="none"
                         returnKeyType="search"
@@ -381,11 +410,7 @@ export function ActivityFeedScreen() {
                             accessibilityRole="button"
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                            <AppIcon
-                                name="close-circle"
-                                size={18}
-                                color={colors.gray400}
-                            />
+                            <AppIcon name="close-circle" size={18} color={colors.gray400} />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -396,11 +421,7 @@ export function ActivityFeedScreen() {
                     className="ml-2 h-9 w-9 items-center justify-center relative"
                     testID="activity-filter-btn"
                 >
-                    <AppIcon
-                        name="options-outline"
-                        size={22}
-                        color={colors.gray500}
-                    />
+                    <AppIcon name="options-outline" size={22} color={colors.gray500} />
                     {filterActive && (
                         <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
                     )}
@@ -460,9 +481,7 @@ export function ActivityFeedScreen() {
                 message={t('expenses.deleteExpenseConfirm')}
                 confirmText={t('common.delete')}
                 cancelText={t('common.cancel')}
-                onConfirm={() => {
-                    void handleConfirmDelete();
-                }}
+                onConfirm={() => { void handleConfirmDelete(); }}
                 onCancel={() => setPendingDelete(false)}
                 destructive
             />
