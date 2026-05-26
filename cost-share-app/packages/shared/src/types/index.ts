@@ -259,6 +259,34 @@ export interface RecentActivity {
     createdAt: Date;
 }
 
+/**
+ * ActivityEventKind — server-side enum mirror.
+ * Source of truth: activity_events.kind CHECK constraint.
+ */
+export type ActivityEventKind =
+    | 'expense_added'
+    | 'settlement_added'
+    | 'message_posted'
+    | 'friend_request_received'
+    | 'group_added'
+    | 'group_member_joined'
+    | 'group_removed';
+
+/**
+ * ActivityEvent — one row of the per-user activity feed.
+ * Maps 1:1 to public.activity_events.
+ */
+export interface ActivityEvent {
+    id: string;
+    userId: string;
+    kind: ActivityEventKind;
+    groupId: string | null;
+    refId: string;
+    actorUserId: string | null;
+    metadata: Record<string, unknown>;
+    createdAt: Date;
+}
+
 // ============================================
 // 3. ENUMS & CONSTANTS
 // ============================================
