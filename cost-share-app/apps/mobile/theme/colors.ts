@@ -14,7 +14,11 @@ export const colors = {
     primaryExtraLight: '#DBEAFE', // Blue 100 — for subtle highlights, card accents
 
     // Semantic Colors
-    success: '#10B981',      // Green 500
+    success: {
+        DEFAULT: '#10B981',  // Green 500 (current value, kept under DEFAULT)
+        text: '#047857',     // Green 700 — design's "success-text"
+        border: '#A7F3D0',   // Green 200 — design's "success-border"
+    },
     warning: '#F59E0B',      // Amber 500
     error: '#EF4444',        // Red 500
     info: '#60A5FA',         // Blue 400
@@ -55,6 +59,8 @@ export const colors = {
         default: '#E5E7EB',
         dark: '#D1D5DB',
         light: '#F3F4F6',
+        soft: '#F1F5F9',     // design's "border.soft"
+        card: '#E2E8F0',     // design's "border.card"
     },
 } as const;
 

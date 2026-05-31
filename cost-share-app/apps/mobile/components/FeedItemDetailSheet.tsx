@@ -297,7 +297,6 @@ function ExpenseDetailBody({
                 splitMembers={splitMembers}
                 amountText={amountFmt(expense.amount)}
                 heroDate={heroDate}
-                language={language}
             />
 
             {involvement !== 'settled' && (
@@ -456,13 +455,17 @@ const FLOW_SIDE_WIDTH = 96;
 
 function FlowAmountCenter({
     amountText,
-    isRtl,
     flowCaption,
 }: {
     amountText: string;
-    isRtl: boolean;
     flowCaption?: string;
 }) {
+    // Drive the chevron from the app language, not I18nManager.isRTL. On iOS,
+    // I18nManager.isRTL only updates after a full app restart, so switching
+    // language mid-session leaves them out of sync. FlowHeroRow forces the
+    // visual side via an explicit `direction` style, so the chevron has to
+    // follow the same source of truth to point at the right party.
+    const isRtl = useRtlLayout();
     const chevronName: AppIconName = isRtl
         ? 'chevron-back'
         : 'chevron-forward';
@@ -655,11 +658,18 @@ function FlowHeroRow({
     end: React.ReactNode;
     paddingTop?: number;
 }) {
+    // Force the visual side from the app language. We can't rely on the
+    // implicit `flexDirection: 'row'` auto-flip because `I18nManager.isRTL`
+    // can lag behind the app language on iOS (it only updates on restart).
+    // Setting `direction` explicitly keeps payer on the leading edge and
+    // splits/recipient on the trailing edge regardless of `I18nManager` state.
+    const isRtl = useRtlLayout();
     return (
         <View
             style={{
                 flex: 1,
                 flexDirection: 'row',
+                direction: isRtl ? 'rtl' : 'ltr',
                 alignItems: 'center',
                 paddingHorizontal: 14,
                 paddingTop,
@@ -693,7 +703,6 @@ function ExpenseHero({
     splitMembers,
     amountText,
     heroDate,
-    language,
 }: {
     expense: ExpenseWithDelta;
     currentUserId: string;
@@ -702,7 +711,6 @@ function ExpenseHero({
     splitMembers: GroupMemberLite[];
     amountText: string;
     heroDate: string;
-    language: 'en' | 'he';
 }) {
     const { t } = useTranslation();
     const perspective = resolveExpenseFeedPerspective(expense, currentUserId);
@@ -714,7 +722,6 @@ function ExpenseHero({
             : undefined;
     const categoryKey = expense.category ?? 'other';
     const baseColor = categoryBg[categoryKey] ?? categoryBg.other;
-    const isRtl = language === 'he';
 
     const heroScrim = (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
@@ -805,7 +812,6 @@ function ExpenseHero({
                 center={
                     <FlowAmountCenter
                         amountText={amountText}
-                        isRtl={isRtl}
                         flowCaption={flowCaption}
                     />
                 }
@@ -876,7 +882,7 @@ function InvolvementStrip({
     const bg = isBorrowed ? '#FEF2F2' : '#ECFDF5';
     const border = isBorrowed ? '#FECACA' : '#A7F3D0';
     const textColor = isBorrowed ? '#B91C1C' : '#047857';
-    const iconColor = isBorrowed ? colors.error : colors.success;
+    const iconColor = isBorrowed ? colors.error : colors.success.DEFAULT;
     const iconName: AppIconName = isBorrowed
         ? 'arrow-up-circle-outline'
         : 'arrow-down-circle-outline';
@@ -932,7 +938,6 @@ function SettlementHero({
     toAvatarUrl,
     amountText,
     heroDate,
-    isRtl,
 }: {
     settlement: Settlement;
     currentUserId: string;
@@ -942,7 +947,6 @@ function SettlementHero({
     toAvatarUrl?: string;
     amountText: string;
     heroDate: string;
-    isRtl: boolean;
 }) {
     const { t } = useTranslation();
     const copy = buildSettlementFeedCopy(settlement, currentUserId);
@@ -1030,12 +1034,12 @@ function SettlementHero({
                         <FlowPerson
                             name={fromName}
                             avatarUrl={fromAvatarUrl}
+                            label={t('settleUp.from')}
                         />
                     }
                     center={
                         <FlowAmountCenter
                             amountText={amountText}
-                            isRtl={isRtl}
                             flowCaption={flowCaption}
                         />
                     }
@@ -1043,6 +1047,7 @@ function SettlementHero({
                         <FlowPerson
                             name={toName}
                             avatarUrl={toAvatarUrl}
+                            label={t('settleUp.to')}
                         />
                     }
                 />
@@ -1110,7 +1115,7 @@ function SettlementInvolvementStrip({
                 className="items-center justify-center bg-white"
                 style={{ width: 36, height: 36, borderRadius: 9999 }}
             >
-                <AppIcon name={iconName} size={20} color={colors.success} />
+                <AppIcon name={iconName} size={20} color={colors.success.DEFAULT} />
             </View>
             <View className="flex-1 mx-3 min-w-0">
                 <Text
@@ -1188,7 +1193,6 @@ function SettlementDetailBody({
                 toAvatarUrl={memberAvatarUrl(memberMap, settlement.toUserId)}
                 amountText={amountText}
                 heroDate={heroDate}
-                isRtl={language === 'he'}
             />
             <SettlementInvolvementStrip
                 settlement={settlement}

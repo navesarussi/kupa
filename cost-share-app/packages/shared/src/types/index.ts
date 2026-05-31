@@ -80,10 +80,25 @@ export interface Expense {
     receiptUrl?: string;
     paidBy: string;  // Profile ID - who paid
     createdBy: string;  // Profile ID - who recorded
+    /**
+     * Mode the creator chose when configuring the split. Stored verbatim
+     * so opening the editor for an existing expense restores the original
+     * intent (instead of guessing from per-member amounts). Optional during
+     * rollout — older DB rows pre-migration may not have this column.
+     */
+    splitMode?: ExpenseSplitMode;
     isDeleted: boolean;  // Soft delete flag
     createdAt: Date;
     updatedAt: Date;
 }
+
+/**
+ * How an expense's total is split among participants.
+ *   'equal'   — every participant owes total / n
+ *   'percent' — each participant owes a percentage of total
+ *   'amount'  — each participant owes an explicit currency amount
+ */
+export type ExpenseSplitMode = 'equal' | 'percent' | 'amount';
 
 /**
  * ExpenseSplit entity - How an expense is split among participants
@@ -210,37 +225,30 @@ export interface UserExpenseView {
 }
 
 /**
- * RecentActivity - Combined feed of expenses, settlements, and group messages
- * Implements: cross-group activity tab (REQ-ACT-01)
+ * ActivityEventKind — server-side enum mirror.
+ * Source of truth: activity_events.kind CHECK constraint.
  */
-export type ActivityType =
-    | 'expense'
-    | 'settlement'
-    | 'message'
-    | 'friend_request'
-    | 'group_invite'
-    | 'member_joined'
-    | 'member_left';
+export type ActivityEventKind =
+    | 'expense_added'
+    | 'settlement_added'
+    | 'message_posted'
+    | 'friend_request_received'
+    | 'group_added'
+    | 'group_member_joined'
+    | 'group_removed';
 
-export type FriendRequestActivityStatus =
-    | 'pending'
-    | 'accepted'
-    | 'rejected'
-    | 'cancelled';
-
-export interface RecentActivity {
+/**
+ * ActivityEvent — one row of the per-user activity feed.
+ * Maps 1:1 to public.activity_events.
+ */
+export interface ActivityEvent {
     id: string;
-    activityType: ActivityType;
-    groupId: string;
-    description: string;
-    amount: number;
-    currency: string;
     userId: string;
-    userName: string;
-    userAvatarUrl?: string;
-    /** Set for `friend_request` rows — drives history copy and styling. */
-    friendRequestStatus?: FriendRequestActivityStatus;
-    activityDate: Date;
+    kind: ActivityEventKind;
+    groupId: string | null;
+    refId: string;
+    actorUserId: string | null;
+    metadata: Record<string, unknown>;
     createdAt: Date;
 }
 
@@ -336,6 +344,8 @@ export interface CreateExpenseDto {
     expenseDate?: Date;  // Defaults to today
     paidBy: string;  // Profile ID
     splits: ExpenseSplitInput[];  // How to split the expense
+    /** Split mode the creator picked. Service layer defaults to 'equal' when omitted. */
+    splitMode?: ExpenseSplitMode;
     receiptUrl?: string;
 }
 
@@ -359,6 +369,7 @@ export interface UpdateExpenseDto {
     receiptUrl?: string;
     paidBy?: string;
     splits?: ExpenseSplitInput[];
+    splitMode?: ExpenseSplitMode;
 }
 
 /**

@@ -95,6 +95,7 @@ import {
     useUpdateSettlementMutation,
 } from '../../hooks/queries/useSettlementQueries';
 import { useGroupSimplifiedDebtsByCurrencyQuery } from '../../hooks/queries/useGroupBalancesQueries';
+import { useGroupBalanceDisplay } from '../../hooks/useGroupBalancesDisplay';
 import { AppIcon } from '../../components/AppIcon';
 import { FeedItemDetailSheet } from '../../components/FeedItemDetailSheet';
 import { colors } from '../../theme';
@@ -121,9 +122,14 @@ export function GroupDetailScreen() {
     const isRtl = useRtlLayout();
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
-    const { groupId, focusFeedItem: focusFeedItemParam } = route.params as {
+    const {
+        groupId,
+        focusFeedItem: focusFeedItemParam,
+        editSettlementId: editSettlementIdParam,
+    } = route.params as {
         groupId: string;
         focusFeedItem?: GroupDetailFocusFeedItem;
+        editSettlementId?: string;
     };
     const listRef = useRef<FlatList<FeedItem>>(null);
     const focusConsumedRef = useRef(false);
@@ -203,16 +209,19 @@ export function GroupDetailScreen() {
     );
 
     const groupBalance = useAppStore(s => s.groupBalances[groupId]);
+    const balanceDisplay = useGroupBalanceDisplay(
+        groupBalance,
+        displayGroup?.defaultCurrency,
+    );
     const balance = useMemo(() => {
-        const net = groupBalance?.net ?? 0;
+        const net = balanceDisplay?.net ?? 0;
         return {
             net,
-            currency: groupBalance?.currency ?? displayGroup?.defaultCurrency ?? 'USD',
+            currency: balanceDisplay?.currency ?? displayGroup?.defaultCurrency ?? 'USD',
             isSettled: Math.abs(net) < 0.01,
         };
-    }, [groupBalance, displayGroup?.defaultCurrency]);
+    }, [balanceDisplay, displayGroup?.defaultCurrency]);
 
-    const noteHasContent = Boolean(displayGroup?.note?.trim());
     const settlementCount = simplifiedEntries.reduce(
         (n, e) => n + e.result.debts.length,
         0,
@@ -386,6 +395,14 @@ export function GroupDetailScreen() {
         navigation,
         groupId,
     ]);
+
+    useEffect(() => {
+        if (!editSettlementIdParam) return;
+        const target = settlements.find(s => s.id === editSettlementIdParam);
+        if (!target) return;
+        setEditingSettlement(target);
+        navigation.setParams({ groupId, editSettlementId: undefined });
+    }, [editSettlementIdParam, settlements, navigation, groupId]);
 
     const handleClearFeedSearchAndFilters = useCallback(() => {
         setSearchQuery('');
@@ -587,6 +604,7 @@ export function GroupDetailScreen() {
                     toUserId: values.toUserId,
                     amount: values.amount,
                     currency: values.currency,
+                    // Note: UpdateSettlementDto does not yet accept paymentMethod / settlementDate
                 },
             });
             if (updated) setEditingSettlement(null);
@@ -680,7 +698,6 @@ export function GroupDetailScreen() {
                             members={memberLites}
                             balance={balance}
                             settlementCount={settlementCount}
-                            noteHasContent={noteHasContent}
                             onBack={handleBack}
                             onShare={handleShare}
                             onMenu={handleOpenGroupMenu}
@@ -866,11 +883,14 @@ export function GroupDetailScreen() {
                         toUserId: editingSettlement.toUserId,
                         currency: editingSettlement.currency,
                         amount: editingSettlement.amount,
+                        settlementDate: editingSettlement.settlementDate,
+                        paymentMethod: editingSettlement.paymentMethod,
                     }}
                     mode="edit"
                     submitting={updateSettlementMutation.isPending}
                     onSubmit={handleSettlementEditSubmit}
                     onClose={() => setEditingSettlement(null)}
+                    groupName={displayGroup?.name}
                 />
             )}
 

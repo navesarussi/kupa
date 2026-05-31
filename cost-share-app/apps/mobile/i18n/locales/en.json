@@ -256,8 +256,8 @@
             "expenseHeaderLabel": "Expense",
             "settlementTitle": "Settlement details",
             "yourShare": "Your share",
-            "showFullBreakdown": "Full breakdown",
-            "hideFullBreakdown": "Hide breakdown"
+            "showFullBreakdown": "Show split breakdown",
+            "hideFullBreakdown": "Hide split breakdown"
         },
         "message": {
             "composerPlaceholder": "Write a message…",
@@ -355,18 +355,51 @@
             "healthcare": "Healthcare",
             "other": "Other"
         },
-        "paidBySub": "{{amount}} · paid by {{name}}"
+        "paidBySub": "{{amount}} · paid by {{name}}",
+        "v2": {
+            "headerNew": "NEW EXPENSE",
+            "headerEdit": "EDIT EXPENSE",
+            "amountPlaceholder": "0.00",
+            "descriptionPlaceholder": "What was this for?",
+            "today": "Today",
+            "datePickerTitle": "Pick date",
+            "receipt": "Receipt",
+            "paidByEyebrow": "Paid by",
+            "splitEyebrow": "Split",
+            "whoAndHow": "Who & how",
+            "sectionPaidBy": "PAID BY",
+            "sectionSplitBetween": "SPLIT BETWEEN",
+            "modes": {
+                "equal": "Equal",
+                "percent": "Percent",
+                "exact": "Exact"
+            },
+            "summary": {
+                "equal": "Equally",
+                "percent": "By percent",
+                "exact": "By amount"
+            },
+            "errors": {
+                "percentUnder": "{{value}}% short of 100%",
+                "percentOver": "{{value}}% over 100%",
+                "amountUnder": "{{currency}} {{value}} short of {{currency}} {{total}}",
+                "amountOver": "{{currency}} {{value}} over {{currency}} {{total}}"
+            },
+            "splitMeta": "{{selected}} of {{total}} · {{currency}} {{each}} ea."
+        }
     },
     "balances": {
         "title": "Balances",
         "settledUp": "Settled up",
+        "groupTotals": "Group totals",
+        "totalSpent": "Total spent",
+        "unsettled": "Unsettled",
+        "expenseCount_one": "1 expense",
+        "expenseCount_other": "{{count}} expenses",
+        "membersSectionLabel": "Members",
         "getsBack": "Gets back",
         "owes": "Owes",
         "paid": "Paid",
-        "modeToggle": {
-            "paid": "Paid",
-            "spentOn": "Spent on"
-        },
         "paidMode": {
             "row": "{{name}} paid",
             "rowYou": "You paid",
@@ -529,7 +562,8 @@
         "youPaid": "You paid {{name}} {{amount}}",
         "paidYou": "{{name}} paid you {{amount}}",
         "inGroup": "in {{group}}",
-        "openInGroup": "Open in {{group}}"
+        "openInGroup": "Open in {{group}}",
+        "earlier": "Earlier"
     },
     "settleUp": {
         "title": "Settle up",
@@ -551,6 +585,7 @@
         "toastUpdated": "Payment updated",
         "toastDeleted": "Payment deleted",
         "notInvolved": "You're not in this debt",
+        "othersToggle": "Settlements that don't involve you ({{count}})",
         "detailHeaderLabel": "Settlement",
         "payment": "Payment",
         "paid": "PAID",
@@ -563,7 +598,25 @@
         "toVia": "To {{name}} · via {{method}}",
         "fromName": "From {{name}}",
         "toName": "To {{name}}",
-        "via": "via {{method}}"
+        "via": "via {{method}}",
+        "newPayment": "New payment",
+        "from": "From",
+        "to": "To",
+        "swap": "Swap",
+        "method": "Payment method",
+        "methodType": "Payment method type",
+        "paymentApps": "Payment apps",
+        "paymentAppsSubtitle": "Opens the app on your phone",
+        "paymentAppLabels": {
+            "bit": "Bit",
+            "paybox": "PayBox"
+        },
+        "recordPaymentWithAmount": "Record payment · {{currencyAndAmount}}",
+        "openPaymentApp": "Open {{app}}",
+        "paymentAppErrorTitle": "Can't open payment",
+        "paymentAppOpenFailed": "Couldn't open the payment app. Make sure it is installed.",
+        "currencyPickerTitle": "Choose currency",
+        "amountOwed": "{{amount}} owed"
     },
     "feed": {
         "settlement": "{{from}} paid {{to}} {{amount}}",

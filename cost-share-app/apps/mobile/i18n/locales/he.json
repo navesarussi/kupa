@@ -268,8 +268,8 @@
             "expenseHeaderLabel": "הוצאה",
             "settlementTitle": "פרטי סגירת חשבון",
             "yourShare": "החלק שלך",
-            "showFullBreakdown": "לפירוט מלא",
-            "hideFullBreakdown": "הסתר פירוט"
+            "showFullBreakdown": "לפירוט החלוקה",
+            "hideFullBreakdown": "הסתר חלוקה"
         },
         "message": {
             "composerPlaceholder": "כתוב הודעה…",
@@ -369,18 +369,51 @@
             "healthcare": "בריאות",
             "other": "אחר"
         },
-        "paidBySub": "{{amount}} · שולם על ידי {{name}}"
+        "paidBySub": "{{amount}} · שולם על ידי {{name}}",
+        "v2": {
+            "headerNew": "הוצאה חדשה",
+            "headerEdit": "עריכת הוצאה",
+            "amountPlaceholder": "0.00",
+            "descriptionPlaceholder": "על מה זה היה?",
+            "today": "היום",
+            "datePickerTitle": "בחר תאריך",
+            "receipt": "קבלה",
+            "paidByEyebrow": "שולם על ידי",
+            "splitEyebrow": "חלוקה",
+            "whoAndHow": "מי ואיך",
+            "sectionPaidBy": "שולם על ידי",
+            "sectionSplitBetween": "חלוקה בין",
+            "modes": {
+                "equal": "שווה",
+                "percent": "אחוזים",
+                "exact": "סכום"
+            },
+            "summary": {
+                "equal": "שווה בשווה",
+                "percent": "לפי אחוז",
+                "exact": "לפי סכום"
+            },
+            "errors": {
+                "percentUnder": "חסר {{value}}% מ-100%",
+                "percentOver": "{{value}}% מעל 100%",
+                "amountUnder": "חסר {{currency}} {{value}} מתוך {{currency}} {{total}}",
+                "amountOver": "{{currency}} {{value}} מעל {{currency}} {{total}}"
+            },
+            "splitMeta": "{{selected}} מתוך {{total}} · {{currency}} {{each}} לאחד"
+        }
     },
     "balances": {
         "title": "יתרות",
         "settledUp": "מסודר",
+        "groupTotals": "סיכום קבוצה",
+        "totalSpent": "סה״כ הוצאות",
+        "unsettled": "פתוח לסגירה",
+        "expenseCount_one": "הוצאה אחת",
+        "expenseCount_other": "{{count}} הוצאות",
+        "membersSectionLabel": "חברי הקבוצה",
         "getsBack": "מקבל בחזרה",
         "owes": "חייב",
         "paid": "שילם",
-        "modeToggle": {
-            "paid": "שילם",
-            "spentOn": "הוצא על"
-        },
         "paidMode": {
             "row": "{{name}} שילם",
             "rowYou": "שילמת",
@@ -545,7 +578,8 @@
         "youPaid": "שילמת ל-{{name}} {{amount}}",
         "paidYou": "{{name}} שילם/ה לך {{amount}}",
         "inGroup": "בקופה {{group}}",
-        "openInGroup": "פתח ב{{group}}"
+        "openInGroup": "פתח ב{{group}}",
+        "earlier": "קודם"
     },
     "settleUp": {
         "title": "סגירת חשבון",
@@ -567,6 +601,7 @@
         "toastUpdated": "התשלום עודכן",
         "toastDeleted": "התשלום נמחק",
         "notInvolved": "אינך מעורב/ת בחוב הזה",
+        "othersToggle": "סגירות חשבון שאינך מעורב/ת בהן ({{count}})",
         "detailHeaderLabel": "תשלום",
         "payment": "תשלום",
         "paid": "שולם",
@@ -579,7 +614,24 @@
         "toVia": "ל-{{name}} · באמצעות {{method}}",
         "fromName": "מ-{{name}}",
         "toName": "ל-{{name}}",
-        "via": "באמצעות {{method}}"
+        "via": "באמצעות {{method}}",
+        "newPayment": "תשלום חדש",
+        "from": "מאת",
+        "to": "אל",
+        "method": "אמצעי תשלום",
+        "methodType": "סוג אמצעי תשלום",
+        "paymentApps": "אפליקציות תשלום",
+        "paymentAppsSubtitle": "פותח את האפליקציה בטלפון שלך",
+        "paymentAppLabels": {
+            "bit": "ביט",
+            "paybox": "PayBox"
+        },
+        "recordPaymentWithAmount": "רשום תשלום · {{currencyAndAmount}}",
+        "openPaymentApp": "פתח {{app}}",
+        "paymentAppErrorTitle": "לא ניתן לפתוח תשלום",
+        "paymentAppOpenFailed": "פתיחת אפליקציית התשלום נכשלה. ודא שהאפליקציה מותקנת.",
+        "currencyPickerTitle": "בחר מטבע",
+        "amountOwed": "חוב {{amount}}"
     },
     "feed": {
         "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}",
