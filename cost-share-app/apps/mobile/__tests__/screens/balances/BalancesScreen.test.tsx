@@ -130,10 +130,9 @@ describe('BalancesScreen', () => {
         expect(getByTestId('member-row-me')).toBeTruthy();
         expect(getByTestId('member-row-alice')).toBeTruthy();
         expect(getByTestId('member-row-bob')).toBeTruthy();
-        // "You" appears via i18n key — t() returns key in tests, but the row
-        // still uses the translated string-shape. Verify by ensuring the
-        // "common.you" key is referenced via the paidMode.row label string.
-        expect(getAllByText(/balances\.paidMode\.row/).length).toBeGreaterThan(0);
+        // The current user row shows "settleUp.you" (i18n key in tests), while
+        // other members show their plain display name.
+        expect(getAllByText(/settleUp\.you/).length).toBeGreaterThan(0);
     });
 
     it('shows per-currency paid amounts in Paid mode and switches to owed in Spent on', () => {
