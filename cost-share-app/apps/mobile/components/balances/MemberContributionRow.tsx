@@ -12,7 +12,7 @@ import { CurrencyAmount } from '@cost-share/shared';
 import { Text } from '../AppText';
 import { MemberAvatar } from '../MemberAvatar';
 import { CurrencyAmountList } from './CurrencyAmountList';
-import type { BalanceMode } from './BalanceModeToggle';
+import type { BalanceMode } from './balanceMode';
 
 interface MemberContributionRowProps {
     userId: string;

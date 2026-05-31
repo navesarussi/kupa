@@ -9,6 +9,9 @@ import React from 'react';
 import { View, TouchableOpacity, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '../AppText';
+import type { BalanceMode } from './balanceMode';
+
+export type { BalanceMode } from './balanceMode';
 
 /** Inline shadow — NativeWind `shadow-sm` on TouchableOpacity breaks navigation context when toggled. */
 const selectedSegmentShadow: ViewStyle = {
@@ -18,8 +21,6 @@ const selectedSegmentShadow: ViewStyle = {
     shadowRadius: 2,
     elevation: 2,
 };
-
-export type BalanceMode = 'paid' | 'spentOn';
 
 interface BalanceModeToggleProps {
     mode: BalanceMode;
