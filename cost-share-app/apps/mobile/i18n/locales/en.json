@@ -391,6 +391,12 @@
     "balances": {
         "title": "Balances",
         "settledUp": "Settled up",
+        "groupTotals": "Group totals",
+        "totalSpent": "Total spent",
+        "unsettled": "Unsettled",
+        "expenseCount_one": "1 expense",
+        "expenseCount_other": "{{count}} expenses",
+        "membersSectionLabel": "Members",
         "getsBack": "Gets back",
         "owes": "Owes",
         "paid": "Paid",
@@ -583,6 +589,7 @@
         "toastUpdated": "Payment updated",
         "toastDeleted": "Payment deleted",
         "notInvolved": "You're not in this debt",
+        "othersToggle": "Settlements that don't involve you ({{count}})",
         "detailHeaderLabel": "Settlement",
         "payment": "Payment",
         "paid": "PAID",
@@ -599,9 +606,9 @@
         "newPayment": "New payment",
         "from": "From",
         "to": "To",
-        "swap": "Swap",
         "method": "Method",
-        "recordPaymentWithAmount": "Record payment · {{currencyAndAmount}}"
+        "currencyPickerTitle": "Choose currency",
+        "amountOwed": "{{amount}} owed"
     },
     "feed": {
         "settlement": "{{from}} paid {{to}} {{amount}}",
