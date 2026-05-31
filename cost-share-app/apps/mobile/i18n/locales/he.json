@@ -414,10 +414,6 @@
         "getsBack": "מקבל בחזרה",
         "owes": "חייב",
         "paid": "שילם",
-        "modeToggle": {
-            "paid": "שילם",
-            "spentOn": "הוצא על"
-        },
         "paidMode": {
             "row": "{{name}} שילם",
             "rowYou": "שילמת",

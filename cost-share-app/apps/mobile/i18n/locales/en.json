@@ -400,10 +400,6 @@
         "getsBack": "Gets back",
         "owes": "Owes",
         "paid": "Paid",
-        "modeToggle": {
-            "paid": "Paid",
-            "spentOn": "Spent on"
-        },
         "paidMode": {
             "row": "{{name}} paid",
             "rowYou": "You paid",
