@@ -602,7 +602,19 @@
         "newPayment": "New payment",
         "from": "From",
         "to": "To",
-        "method": "Method",
+        "swap": "Swap",
+        "method": "Payment method",
+        "methodType": "Payment method type",
+        "paymentApps": "Payment apps",
+        "paymentAppsSubtitle": "Opens the app on your phone",
+        "paymentAppLabels": {
+            "bit": "Bit",
+            "paybox": "PayBox"
+        },
+        "recordPaymentWithAmount": "Record payment · {{currencyAndAmount}}",
+        "openPaymentApp": "Open {{app}}",
+        "paymentAppErrorTitle": "Can't open payment",
+        "paymentAppOpenFailed": "Couldn't open the payment app. Make sure it is installed.",
         "currencyPickerTitle": "Choose currency",
         "amountOwed": "{{amount}} owed"
     },

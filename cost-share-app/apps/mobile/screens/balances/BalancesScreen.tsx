@@ -320,6 +320,7 @@ export function BalancesScreen() {
                     submitting={createMutation.isPending}
                     onSubmit={handleSubmitSettlement}
                     onClose={() => setSettleTarget(null)}
+                    groupName={groupName}
                 />
             )}
         </View>

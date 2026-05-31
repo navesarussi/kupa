@@ -368,6 +368,7 @@ export function SettleUpListScreen() {
                     submitting={createMutation.isPending}
                     onSubmit={handleSubmit}
                     onClose={() => setActiveDebt(null)}
+                    groupName={groupName}
                 />
             )}
 
@@ -411,6 +412,7 @@ export function SettleUpListScreen() {
                     submitting={updateSettlementMutation.isPending}
                     onSubmit={handleSettlementEditSubmit}
                     onClose={() => setEditingSettlement(null)}
+                    groupName={groupName}
                 />
             )}
         </SafeAreaView>
