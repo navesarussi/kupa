@@ -29,7 +29,8 @@ jobs:
 
       - name: Apply pending migrations
         env:
+          SUPABASE_ENV: development
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}
         run: |
-          DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.drxfbicunusmipdgbgdk.supabase.co:5432/postgres"
+          DB_URL="$(bash scripts/supabase-migration-db-url.sh)"
           supabase db push --db-url "$DB_URL" --yes
