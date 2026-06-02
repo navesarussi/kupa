@@ -16,6 +16,7 @@ import {
     calculateEqualSplit,
     validateExpenseSplits,
 } from '@cost-share/shared';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
 import { markGroupExpensesHydrated } from '../lib/groupFeedCache';
@@ -67,6 +68,10 @@ export async function fetchExpenses(groupId?: string): Promise<ExpenseWithSplits
         }
         return expenses;
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'expenses', op: 'fetch' },
+            extra: { groupId },
+        });
         console.error('Failed to fetch expenses:', error);
         Toast.show({
             type: 'error',
@@ -167,6 +172,10 @@ export async function createExpense(dto: CreateExpenseDto): Promise<Expense | nu
         });
         return expense;
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'expenses', op: 'create' },
+            extra: { groupId: dto.groupId, amount: dto.amount, currency: dto.currency },
+        });
         console.error('Failed to create expense:', error);
         Toast.show({
             type: 'error',
@@ -258,6 +267,10 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
         });
         return baseExpense;
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'expenses', op: 'update' },
+            extra: { expenseId: id, patchKeys: Object.keys(dto) },
+        });
         console.error('Failed to update expense:', error);
         Toast.show({
             type: 'error',
