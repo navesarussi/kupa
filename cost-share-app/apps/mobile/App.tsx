@@ -19,7 +19,7 @@ import {
 import { supabase } from './lib/supabase';
 import { assertProfileActiveWithTimeout } from './lib/auth';
 import { signalDeactivatedAccount } from './lib/signalDeactivatedAccount';
-import { hydrateCurrentUserProfile } from './services/users.service';
+import { acceptSessionIfAllowed as acceptSessionIfAllowedImpl } from './lib/acceptSessionIfAllowed';
 import { queryClient } from './lib/queryClient';
 import { useAppStore } from './store';
 import { useAppRealtime } from './hooks/useAppRealtime';
@@ -70,29 +70,14 @@ export default function App() {
     setSession(null);
   }, [setPendingDeactivationNotice, setSession]);
 
-  const acceptSessionIfAllowed = useCallback(async (nextSession: Session | null) => {
-    if (!nextSession) {
-      setSession(null);
-      return;
-    }
-
-    // Only reject on a definitive 'deactivated' from the server. 'unknown' (offline / timeout)
-    // must NOT trigger the deletion notice — the local session was valid; let the user in and
-    // re-verify on the next foreground via guardSession.
-    const status = await assertProfileActiveWithTimeout();
-    if (status === 'deactivated') {
-      await rejectDeactivatedSession();
-      return;
-    }
-
-    const hydration = await hydrateCurrentUserProfile(nextSession.user.id);
-    if (hydration === 'deactivated') {
-      await rejectDeactivatedSession();
-      return;
-    }
-
-    setSession(nextSession);
-  }, [rejectDeactivatedSession, setSession]);
+  const acceptSessionIfAllowed = useCallback(
+    (nextSession: Session | null, mode: 'fresh' | 'hydration') =>
+      acceptSessionIfAllowedImpl(nextSession, mode, {
+        setSession,
+        setPendingDeactivationNotice,
+      }),
+    [setSession, setPendingDeactivationNotice],
+  );
 
   const processOAuthCallbackUrl = useCallback(async (url: string) => {
     const { error } = await handleAuthRedirectUrl(url);
@@ -152,7 +137,7 @@ export default function App() {
         if (!mounted) return;
 
         if (hydratedSession) {
-          await acceptSessionIfAllowed(hydratedSession);
+          await acceptSessionIfAllowed(hydratedSession, 'hydration');
         } else {
           setSession(null);
         }
@@ -169,7 +154,7 @@ export default function App() {
 
           if (event === 'SIGNED_IN') {
             setTimeout(() => {
-              void acceptSessionIfAllowed(nextSession);
+              void acceptSessionIfAllowed(nextSession, 'fresh');
             }, 0);
             return;
           }
