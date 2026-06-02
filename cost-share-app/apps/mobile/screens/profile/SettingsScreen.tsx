@@ -1,13 +1,14 @@
 import { Text } from '../../components/AppText';
 import React, { useCallback, useState } from 'react';
 import { View, ScrollView, Linking, Platform } from 'react-native';
-import { platformAlert } from '../../lib/platformAlert';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 import * as StoreReview from 'expo-store-review';
-import { Language, DEFAULT_CURRENCY } from '@cost-share/shared';
+import { Language } from '@cost-share/shared';
 import { useAppStore } from '../../store';
-import { changeLanguage } from '../../i18n';
+import { useChangeAppLanguage } from '../../hooks/useChangeAppLanguage';
+import { useAppLanguage } from '../../hooks/useRtlLayout';
+import { defaultCurrencyForAppLanguage } from '../../lib/appDefaultCurrency';
 import { signOut } from '../../services/auth.service';
 import { updateUser } from '../../services/users.service';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -17,7 +18,7 @@ import { ContactSupportRow } from '../../components/settings/ContactSupportRow';
 import { LegalDocumentSheet } from '../../components/settings/LegalDocumentSheet';
 import { LanguageSheet } from '../../components/settings/LanguageSheet';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
-import Toast from 'react-native-toast-message';
+import { showAppToast, showErrorToast, showSuccessMessage } from '../../lib/appToast';
 import { deleteMyAccount, getMyOpenBalances, type OpenBalancesSummary } from '../../services/account.service';
 import { useNavigation } from '@react-navigation/native';
 import { DeleteAccountWarningSheet } from '../../components/settings/DeleteAccountWarningSheet';
@@ -32,8 +33,8 @@ const PLAY_STORE_URL = process.env.EXPO_PUBLIC_PLAY_STORE_URL;
 
 export function SettingsScreen() {
     const { t } = useTranslation();
-    const language = useAppStore((s) => s.language);
-    const setLanguage = useAppStore((s) => s.setLanguage);
+    const language = useAppLanguage();
+    const changeAppLanguage = useChangeAppLanguage();
     const currentUser = useAppStore((s) => s.currentUser);
 
     const [showLogout, setShowLogout] = useState(false);
@@ -47,17 +48,16 @@ export function SettingsScreen() {
 
     const navigation = useNavigation<any>();
 
-    const handleLanguagePick = useCallback(async (lang: Language) => {
-        setShowLanguage(false);
-        try {
-            await changeLanguage(lang);
-            setLanguage(lang);
-        } catch {
-            platformAlert(t('common.error'), t('profile.languageChangeError'));
-        }
-    }, [setLanguage, t]);
+    const handleLanguagePick = useCallback(
+        async (lang: Language) => {
+            setShowLanguage(false);
+            await changeAppLanguage(lang);
+        },
+        [changeAppLanguage],
+    );
 
-    const currencyCode = currentUser?.defaultCurrency ?? DEFAULT_CURRENCY;
+    const currencyCode =
+        currentUser?.defaultCurrency ?? defaultCurrencyForAppLanguage(language);
     const currencyMeta = currencyCodes.code(currencyCode);
     const currencyValueText = currencyMeta
         ? `${currencyMeta.code} - ${getCurrencyDisplayName(currencyMeta.code, currencyMeta.currency, language)}`
@@ -69,17 +69,13 @@ export function SettingsScreen() {
 
         const result = await updateUser(currentUser.id, { defaultCurrency: nextCurrency });
         if (result) {
-            Toast.show({
+            showAppToast({
                 type: 'success',
-                text1: t('common.success'),
-                text2: t('profile.profileUpdated'),
+                titleKey: 'common.success',
+                messageKey: 'profile.profileUpdated',
             });
         } else {
-            Toast.show({
-                type: 'error',
-                text1: t('common.error'),
-                text2: t('profile.updateError'),
-            });
+            showErrorToast('common.error', 'profile.updateError');
         }
     }, [currentUser, t]);
 
@@ -101,11 +97,11 @@ export function SettingsScreen() {
         const result = await deleteMyAccount();
         if (result.ok) {
             setShowDeleteConfirm(false);
-            Toast.show({ type: 'success', text1: t('deleteAccount.deletedToast') });
+            showSuccessMessage('deleteAccount.deletedToast');
         } else {
-            Toast.show({
+            showAppToast({
                 type: 'error',
-                text1: t(result.error ?? 'deleteAccount.deleteFailed'),
+                titleKey: result.error ?? 'deleteAccount.deleteFailed',
             });
         }
     }, [t]);

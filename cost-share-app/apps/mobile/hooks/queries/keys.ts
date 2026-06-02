@@ -19,4 +19,7 @@ export const queryKeys = {
         ['group-simplified-debts-by-currency', groupId] as const,
     legalDocument: (slug: 'terms' | 'privacy', locale: 'en' | 'he') =>
         ['legal-document', slug, locale] as const,
+    adminPlatformMetrics: ['admin', 'platform-metrics'] as const,
+    exchangeRates: (base: string, symbolsKey: string) =>
+        ['exchangeRates', base, symbolsKey] as const,
 };

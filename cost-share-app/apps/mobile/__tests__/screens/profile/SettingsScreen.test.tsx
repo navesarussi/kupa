@@ -12,7 +12,9 @@ jest.mock('expo-store-review', () => ({
 }));
 
 jest.mock('../../../services/auth.service', () => ({ signOut: jest.fn() }));
-jest.mock('../../../i18n', () => ({ changeLanguage: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('../../../hooks/useChangeAppLanguage', () => ({
+    useChangeAppLanguage: () => jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('../../../services/account.service', () => ({
     deleteMyAccount: jest.fn().mockResolvedValue({ ok: true }),
     getMyOpenBalances: jest.fn(),
@@ -26,7 +28,7 @@ jest.mock('expo-clipboard', () => ({
 }));
 jest.mock('../../../lib/openMailto', () => ({
     getSupportEmail: jest.fn(() => 'sarussilberg@gmail.com'),
-    getSupportMailtoUrl: jest.fn(() => 'mailto:sarussilberg@gmail.com?subject=Kupa%20Support'),
+    getSupportMailtoUrl: jest.fn(() => 'mailto:sarussilberg@gmail.com?subject=Kupay%20Support'),
     openSupportContact: jest.fn().mockResolvedValue(undefined),
     DEFAULT_SUPPORT_EMAIL: 'sarussilberg@gmail.com',
 }));

@@ -95,9 +95,21 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 180,
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#ffffff",
+          "android": {
+            "image": "./assets/splash-icon.png",
+            "imageWidth": 200,
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+          },
+          "ios": {
+            "image": "./assets/splash-icon.png",
+            "imageWidth": 216,
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+          }
         }
       ],
       [
@@ -108,7 +120,15 @@
           "microphonePermission": false
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "@react-native-google-signin/google-signin",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "kupay-hb",
+          "project": "kupa-mobile-prod"
+        }
+      ]
     ],
     "extra": {
       "eas": {

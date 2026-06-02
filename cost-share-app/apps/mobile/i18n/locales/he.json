@@ -34,7 +34,7 @@
         "profile": "פרופיל"
     },
     "auth": {
-        "appName": "kupa",
+        "appName": "Kupay",
         "signInWithGoogle": "המשך עם Google",
         "subtitle": "חלוקת הוצאות עם חברים",
         "tagline": "הקופה עם החבר'ה",
@@ -45,6 +45,8 @@
             "balances": "יתרות"
         },
         "signInError": "הכניסה נכשלה. אנא נסה שוב.",
+        "googleSignInSheetTitle": "התחברות עם Google",
+        "googleSignInSheetHint": "לחצו למטה — בחירת החשבון תיפתח מעל המסך הזה.",
         "signingIn": "מתחבר..."
     },
     "onboarding": {
@@ -107,25 +109,33 @@
             "balanceDefaultLabel": "היתרה שלך"
         },
         "create": {
-            "header": "קופה חדשה",
-            "namePlaceholder": "שם הקופה",
-            "nameInputPlaceholder": "טיול לים · ארוחת שישי · דירה משותפת...",
-            "backgroundLabel": "תמונת רקע",
-            "heroSea": "ים",
-            "heroMountains": "הרים",
-            "heroForest": "יער",
-            "heroFlowers": "פרחים",
-            "heroWaves": "גלים",
-            "uploadHint": "העלאת תמונה",
-            "membersLabel": "חברי הקופה",
-            "adminHint": "מנהל/ת הקופה",
-            "addMembers": "הוסיפו חברים",
-            "inviteHint": "שולחים בוואטסאפ, לינק או מאנשי קשר — וכל החבר'ה בקופה",
-            "submit": "צרו את הקופה",
+            "header": "הקופה הראשונה",
+            "hero": {
+                "eyebrow": "צעד אחרון",
+                "title": "צור קופה ראשונה ותתחיל לחלק הוצאות עם חברים",
+                "subtitle": "שם, סוג ומטבע. שאר החברים יכולים להצטרף אחרי שתפתחו.",
+                "checkName": "שם לקופה",
+                "checkDefaults": "סוג ומטבע (ברירת מחדל)",
+                "checkMembers": "הזמנת חברים",
+                "optional": "לא חובה",
+                "win1": "הוצאות מתחלקות לבד",
+                "win2": "סוג ומטבע — ניתן לשנות",
+                "win3": "הזמנה בלינק או וואטסאפ"
+            },
+            "suggestions": {
+                "label": "רעיונות לשם",
+                "trip": "טיול לים",
+                "flat": "שותפים לדירה",
+                "games": "ערב משחקים",
+                "friday": "ארוחת שישי"
+            },
+            "membersHint": "אפשר להזמין עכשיו — או אחרי שתפתחו את הקופה.",
+            "submit": "פתיחת הקופה",
+            "submitReady": "יאללה, פותחים",
             "skipTitle": "לדלג על יצירת קופה?",
-            "skipMessage": "אפשר לפתוח קופה אחר כך ממסך הקופות.",
-            "skipConfirm": "דלג לעכשיו",
-            "findFriendsAfterCreate": "מיד אחרי פתיחת הקופה — מחפשים חברים ושולחים הזמנה"
+            "skipMessage": "בלי קופה אין הוצאות. אפשר לפתוח קופה מתפריט הקופות בכל רגע.",
+            "skipConfirm": "דילוג",
+            "findFriendsAfterCreate": "אחרי פתיחת הקופה — לינק, וואטסאפ או אנשי קשר."
         }
     },
     "groups": {
@@ -170,6 +180,9 @@
         "createError": "פתיחת הקופה נכשלה",
         "inactiveMemberSkipped": "לא ניתן להוסיף משתמשים שנמחקו לקופה",
         "updateError": "עדכון הקופה נכשל",
+        "deleteError": "מחיקת הקופה נכשלה",
+        "memberAddError": "הוספת החבר נכשלה",
+        "memberRemoveError": "הסרת החבר נכשלה",
         "deleteGroup": "מחק קופה",
         "deleteForEveryone": "מחק קופה לכולם",
         "deleteGroupConfirm": "האם אתה בטוח שברצונך למחוק את הקופה הזו? לא ניתן לבטל פעולה זו.",
@@ -304,13 +317,13 @@
             "menuTitle": "שיתוף קופה",
             "inviteOption": "הזמנת חבר להצטרפות",
             "inviteDescription": "שלח קישור להוספת חבר לקופה",
-            "exportOption": "ייצוא לקובץ",
-            "exportDescription": "שמור את פעילות הקופה והיתרות כקובץ",
-            "exportTitle": "שיתוף דוח קופה (PDF)",
-            "exportTitleHtml": "שיתוף דוח קופה",
+            "exportOption": "ייצוא לקובץ אקסל",
+            "exportDescription": "שמור את פעילות הקופה והיתרות כקובץ CSV (פתיחה באקסל / Google Sheets)",
+            "exportTitle": "שיתוף דוח קופה",
             "exportError": "לא ניתן ליצור את הקובץ",
             "exporting": "מכין ייצוא…",
             "exportedAt": "יוצא בתאריך",
+            "groupName": "קופה",
             "members": "חברים",
             "defaultCurrency": "מטבע ברירת מחדל",
             "sectionBalances": "יתרות מפושטות (מי חייב למי)",
@@ -328,7 +341,7 @@
             "typeExpense": "הוצאה",
             "typeMessage": "הודעה",
             "typeSettlement": "סגירת חשבון",
-            "footer": "נוצר על ידי Kupa"
+            "footer": "נוצר על ידי Kupay"
         },
         "expense": {
             "youLent": "הלוויתָ {{amount}}",
@@ -452,6 +465,7 @@
         "loadError": "טעינת ההוצאות נכשלה",
         "createError": "יצירת ההוצאה נכשלה",
         "updateError": "עדכון ההוצאה נכשל",
+        "deleteError": "מחיקת ההוצאה נכשלה",
         "receipt": "קבלה",
         "addReceipt": "הוסף תמונת קבלה",
         "replaceReceipt": "החלף",
@@ -592,7 +606,16 @@
         "portal": {
             "title": "פורטל מנהלים",
             "sectionLabel": "כלי ניהול",
-            "deletedUsersRow": "משתמשים שנמחקו"
+            "deletedUsersRow": "משתמשים שנמחקו",
+            "resetOnboardingRow": "איפוס אונבורדינג",
+            "previewCreateGroupRow": "תצוגה מקדימה — יצירת קופה ראשונה"
+        },
+        "onboarding": {
+            "resetTitle": "לאפס את האונבורדינג?",
+            "resetMessage": "הדגלים יאופסו ומסך יצירת הקופה הראשונה ייפתח. אונבורדינג לפני התחברות דורש התנתקות והפעלה מחדש.",
+            "resetConfirm": "איפוס",
+            "resetSuccess": "האונבורדינג אופס",
+            "previewTitle": "תצוגה מקדימה"
         },
         "deletedUsers": {
             "title": "משתמשים שנמחקו",
@@ -606,6 +629,14 @@
         },
         "errors": {
             "notAuthorized": "אין לך הרשאה לפעולה הזו"
+        },
+        "metrics": {
+            "sectionLabel": "סקירה",
+            "registeredUsers": "משתמשים רשומים",
+            "activeGroups": "קבוצות פעילות",
+            "archivedGroups": "קבוצות בארכיון",
+            "archiveFootnote": "ארכיון = ללא פעילות במשך חודשיים ויתרות אפס (לכל המשתמשים). ארכיון ידני אישי לא נספר כאן.",
+            "loadError": "לא ניתן לטעון נתונים. נסו שוב מאוחר יותר."
         }
     },
     "profile": {
@@ -724,6 +755,10 @@
         "toastRecorded": "התשלום נרשם",
         "toastUpdated": "התשלום עודכן",
         "toastDeleted": "התשלום נמחק",
+        "loadError": "טעינת התשלומים נכשלה",
+        "recordError": "רישום התשלום נכשל",
+        "updateError": "עדכון התשלום נכשל",
+        "deleteError": "מחיקת התשלום נכשלה",
         "notInvolved": "אינך מעורב/ת בחוב הזה",
         "othersToggle": "סגירות חשבון שאינך מעורב/ת בהן ({{count}})",
         "detailHeaderLabel": "תשלום",
@@ -755,7 +790,11 @@
         "paymentAppErrorTitle": "לא ניתן לפתוח תשלום",
         "paymentAppOpenFailed": "פתיחת אפליקציית התשלום נכשלה. ודא שהאפליקציה מותקנת.",
         "currencyPickerTitle": "בחר מטבע",
-        "amountOwed": "חוב {{amount}}"
+        "amountOwed": "חוב {{amount}}",
+        "recordPaymentCta": "רשום תשלום",
+        "memberPickerFromTitle": "בחר משלם",
+        "memberPickerToTitle": "בחר מקבל",
+        "sameParticipantError": "המשלם והמקבל לא יכולים להיות אותו אדם"
     },
     "feed": {
         "settlement": "{{from}} שילם/ה ל-{{to}} {{amount}}",
@@ -775,21 +814,21 @@
     },
     "invite": {
         "friend": {
-            "title": "הזמן חבר ל-Kupa",
+            "title": "הזמן חבר ל-Kupay",
             "subtitle": "שלח קישור דרך וואצאפ ועוד",
             "cta": "שתף קישור חברות",
-            "shareMessage": "היי! בוא נחלק הוצאות יחד דרך Kupa. אם תרשם דרך הקישור הזה — נהיה אוטומטית חברים: {{url}}",
+            "shareMessage": "היי! בוא נחלק הוצאות יחד דרך Kupay. אם תרשם דרך הקישור הזה — נהיה אוטומטית חברים: {{url}}",
             "rotate": "שנה קישור",
             "rotateConfirmTitle": "לשנות את קישור ההזמנה?",
             "rotateConfirmBody": "הקישור הקודם יפסיק לעבוד. כל מי שיש לו את הקישור הישן לא יוכל להפוך לחבר שלך עד שתשלח לו את החדש.",
             "rotated": "קישור ההזמנה עודכן",
             "findEmpty": "לא מצאת את מי שחיפשת?",
             "findEmptyCta": "הזמן חבר חדש דרך קישור",
-            "findInviteName": "הזמן את {{name}} ל-Kupa"
+            "findInviteName": "הזמן את {{name}} ל-Kupay"
         },
         "group": {
             "title": "שתף קישור לקופה",
-            "shareMessage": "הוספתי אותך לקופת '{{groupName}}' ב-Kupa. הצטרף דרך הקישור: {{url}}",
+            "shareMessage": "הוספתי אותך לקופת '{{groupName}}' ב-Kupay. הצטרף דרך הקישור: {{url}}",
             "rotate": "שנה קישור",
             "rotateConfirmTitle": "לשנות את קישור הקופה?",
             "rotateConfirmBody": "כל מי שיש לו את הקישור הנוכחי לא יוכל להצטרף עד שתשלח לו את החדש. חברים שכבר בקופה לא מושפעים.",
@@ -809,7 +848,7 @@
         }
     },
     "dashboard": {
-        "appTitle": "Kupa",
+        "appTitle": "Kupay",
         "youOwe": "אתה חייב",
         "youAreOwed": "חייבים לך",
         "balanceOverview": "סיכום יתרות",

@@ -1,4 +1,4 @@
-# SSOT — Single Source of Truth (Kupa)
+# SSOT — Single Source of Truth (Kupay)
 
 **Product:** Shared expense / cost-splitting app (Splitwise-like).  
 **Monorepo:** `cost-share-app/` (mobile, web, shared, Supabase).  
@@ -21,6 +21,7 @@
 | Types / DTOs / balance math | `packages/shared/` | [SRS.md](./SRS.md) glossary |
 | Database model (reference) | [DATABASE_ARCHITECTURE.md](../../DATABASE_ARCHITECTURE.md) | `supabase/schema.sql` |
 | Pre-merge checklist | `AI-CHECKLIST.md` | — |
+| Bugs, gaps, pre-launch blockers | [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) | [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) (deferrals only) |
 
 ---
 
@@ -31,6 +32,8 @@
 | 1 | [SRS.md](./SRS.md) | **What** — features, rules (`REQ-*`) |
 | 2 | [CODE QUALITY.md](./CODE QUALITY.md) | **How** — Supabase-only architecture |
 | 3 | [DATABASE_ARCHITECTURE.md](../../DATABASE_ARCHITECTURE.md) | **Data model** (reference; schema file is canonical for apply) |
+| — | [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) | **Bugs & gaps** — active issues, P0–P2, QA checklist |
+| — | [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) | **Deferred features** — intentional “not now” |
 | — | [SUPABASE_ENVIRONMENTS.md](./SUPABASE_ENVIRONMENTS.md) | **Which DB** per branch (`main` = prod, `dev` = dev) |
 
 **Conflict resolution:** SRS wins for product; CODE QUALITY wins for structure. Canonical SQL: `cost-share-app/supabase/schema.sql`.
@@ -40,7 +43,7 @@
 ## Repo map (quick)
 
 ```
-kupa/
+kupay/ (repo folder may still be named `kupa` locally)
 ├── docs/SSOT/
 ├── DATABASE_ARCHITECTURE.md
 └── cost-share-app/

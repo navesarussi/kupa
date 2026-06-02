@@ -14,13 +14,13 @@ describe('parseIncomingUrl', () => {
         });
     });
     it('parses custom-scheme friend link', () => {
-        expect(parseIncomingUrl('com.kupa.mobile://invite/i/ZZZ0000111')).toEqual({
+        expect(parseIncomingUrl('com.kupay.mobile://invite/i/ZZZ0000111')).toEqual({
             kind: 'friend',
             token: 'ZZZ0000111',
         });
     });
     it('parses custom-scheme group link', () => {
-        expect(parseIncomingUrl('com.kupa.mobile://invite/g/AAA1112223')).toEqual({
+        expect(parseIncomingUrl('com.kupay.mobile://invite/g/AAA1112223')).toEqual({
             kind: 'group',
             token: 'AAA1112223',
         });
@@ -28,7 +28,7 @@ describe('parseIncomingUrl', () => {
     it('returns unknown for unrelated URL', () => {
         expect(parseIncomingUrl('https://example.com/foo')).toEqual({ kind: 'unknown' });
     });
-    it('returns unknown for malformed kupa URL', () => {
+    it('returns unknown for malformed invite URL', () => {
         expect(parseIncomingUrl('https://kupa.pro/x/abc')).toEqual({ kind: 'unknown' });
     });
     it('handles trailing slash + query string', () => {

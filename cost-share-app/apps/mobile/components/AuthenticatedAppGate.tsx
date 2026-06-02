@@ -1,12 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { AppNavigator } from '../navigation/AppNavigator';
+import { navigationIntegration } from '../lib/sentry';
 import { OnboardingCreateGroupScreen } from '../screens/onboarding/OnboardingCreateGroupScreen';
 import {
     hasCompletedPostLoginOnboarding,
     markPostLoginOnboardingComplete,
 } from '../lib/onboardingStorage';
+import {
+    resolveAuthenticatedGateTarget,
+    shouldMarkPostOnboardingAfterGroups,
+} from '../lib/authenticatedGateResolve';
+import { useAuthenticatedInviteRedemption } from '../hooks/useAuthenticatedInviteRedemption';
 import { fetchGroups } from '../services/groups.service';
 import { colors } from '../theme';
 
@@ -14,24 +20,36 @@ type GateState = 'loading' | 'create' | 'main';
 
 export function AuthenticatedAppGate() {
     const [gate, setGate] = useState<GateState>('loading');
+    const navigationRef = useNavigationContainerRef();
+
+    const enterMainAfterGroupInvite = useCallback(async () => {
+        await markPostLoginOnboardingComplete();
+        setGate('main');
+    }, []);
+
+    useAuthenticatedInviteRedemption({ onGroupRedeemed: () => void enterMainAfterGroupInvite() });
 
     const resolveGate = useCallback(async () => {
-        if (await hasCompletedPostLoginOnboarding()) {
+        const postOnboardingComplete = await hasCompletedPostLoginOnboarding();
+        if (postOnboardingComplete) {
             setGate('main');
             return;
         }
+
+        let groupsCount = 0;
+        let fetchFailed = false;
         try {
             const groups = await fetchGroups();
-            if (groups.length > 0) {
-                await markPostLoginOnboardingComplete();
-                setGate('main');
-                return;
-            }
+            groupsCount = groups.length;
         } catch {
-            setGate('main');
-            return;
+            fetchFailed = true;
         }
-        setGate('create');
+
+        const input = { postOnboardingComplete, groupsCount, fetchFailed };
+        if (shouldMarkPostOnboardingAfterGroups(input)) {
+            await markPostLoginOnboardingComplete();
+        }
+        setGate(resolveAuthenticatedGateTarget(input));
     }, []);
 
     useEffect(() => {
@@ -51,7 +69,10 @@ export function AuthenticatedAppGate() {
     }
 
     return (
-        <NavigationContainer>
+        <NavigationContainer
+            ref={navigationRef}
+            onReady={() => navigationIntegration.registerNavigationContainer(navigationRef)}
+        >
             <AppNavigator />
         </NavigationContainer>
     );

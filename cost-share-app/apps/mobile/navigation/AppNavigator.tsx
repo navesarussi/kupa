@@ -17,8 +17,9 @@ import { useRtlLayout } from '../hooks/useRtlLayout';
 import { AppIcon, AppIconName } from '../components/AppIcon';
 import { colors } from '../theme';
 import { useInviteRedemption } from '../hooks/useInviteRedemption';
+import { usePendingNavigationFlush } from '../hooks/usePendingNavigationFlush';
 import { prefetchGroupsList } from '../hooks/queries/prefetchGroupsList';
-import { prefetchDashboard } from '../hooks/queries/prefetchDashboard';
+import { prefetchProfileWarmup } from '../hooks/queries/prefetchProfileWarmup';
 import { useActivityUnreadCount } from '../hooks/queries/useActivityUnreadCount';
 
 function HeaderBackButton({ onPress }: { onPress: () => void }) {
@@ -66,6 +67,7 @@ import { SettingsScreen } from '../screens/profile/SettingsScreen';
 import { FriendsScreen } from '../screens/profile/FriendsScreen';
 import { FindFriendsScreen } from '../screens/profile/FindFriendsScreen';
 import { AdminPortalScreen } from '../screens/admin/AdminPortalScreen';
+import { AdminOnboardingPreviewScreen } from '../screens/admin/AdminOnboardingPreviewScreen';
 import { AdminDeletedUsersScreen } from '../screens/admin/AdminDeletedUsersScreen';
 
 const Tab = createBottomTabNavigator();
@@ -248,6 +250,11 @@ function ProfileStack() {
                 options={{ title: t('admin.deletedUsers.title') }}
             />
             <Stack.Screen
+                name="AdminOnboardingPreview"
+                component={AdminOnboardingPreviewScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
                 name="Friends"
                 component={FriendsScreen}
                 options={{ title: t('friends.title') }}
@@ -264,11 +271,12 @@ function ProfileStack() {
 export function AppNavigator() {
     const { t } = useTranslation();
     useInviteRedemption();
+    usePendingNavigationFlush();
     const { data: unreadCount = 0 } = useActivityUnreadCount();
 
     useEffect(() => {
         prefetchGroupsList();
-        prefetchDashboard();
+        prefetchProfileWarmup();
     }, []);
 
     return (

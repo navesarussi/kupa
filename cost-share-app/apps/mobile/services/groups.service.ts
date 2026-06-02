@@ -27,15 +27,19 @@ import {
     simplifyDebts,
     UnbalancedLedgerError,
 } from '@cost-share/shared';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
 import { useAppStore } from '../store';
 import { queryClient } from '../lib/queryClient';
 import { queryKeys } from '../hooks/queries/keys';
 import { fetchBalanceSummary } from './users.service';
-import Toast from 'react-native-toast-message';
-import i18n from '../i18n';
-
+import {
+    showAppToast,
+    showErrorToast,
+    showSuccessMessage,
+    showSuccessToast,
+} from '../lib/appToast';
 type GroupArchiveState = { mine: boolean; auto: boolean };
 
 async function fetchGroupsArchiveState(): Promise<Map<string, GroupArchiveState>> {
@@ -223,13 +227,12 @@ export async function archiveGroup(groupId: string): Promise<ArchiveGroupError |
             : error.message?.includes('not_a_member')
                 ? 'not_a_member'
                 : 'unknown';
-        Toast.show({
+        showAppToast({
             type: 'error',
-            text1: i18n.t(
+            titleKey:
                 code === 'has_balance'
                     ? 'groups.archive.errorHasBalance'
                     : 'groups.archive.errorGeneric',
-            ),
         });
         return code;
     }
@@ -238,18 +241,14 @@ export async function archiveGroup(groupId: string): Promise<ArchiveGroupError |
     if (existing) {
         useAppStore.getState().updateGroup({ ...existing, isArchivedByMe: true });
     }
-    Toast.show({ type: 'success', text1: i18n.t('groups.archive.archivedToast') });
+    showSuccessMessage('groups.archive.archivedToast');
     return null;
 }
 
 export async function unarchiveGroup(groupId: string): Promise<boolean> {
     const { error } = await supabase.rpc('unarchive_group', { p_group_id: groupId });
     if (error) {
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('groups.archive.errorGeneric'),
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('groups.archive.errorGeneric', 'common.networkError');
         return false;
     }
 
@@ -257,7 +256,7 @@ export async function unarchiveGroup(groupId: string): Promise<boolean> {
     if (existing) {
         useAppStore.getState().updateGroup({ ...existing, isArchivedByMe: false });
     }
-    Toast.show({ type: 'success', text1: i18n.t('groups.archive.unarchivedToast') });
+    showSuccessMessage('groups.archive.unarchivedToast');
     return true;
 }
 
@@ -280,10 +279,7 @@ export async function createGroup(dto: CreateGroupDto): Promise<Group | null> {
         const requestedIds = dto.memberIds.filter(id => id !== createdBy);
         const activeMemberIds = await filterActiveMemberIds(requestedIds);
         if (activeMemberIds.length < requestedIds.length) {
-            Toast.show({
-                type: 'error',
-                text1: i18n.t('groups.inactiveMemberSkipped'),
-            });
+            showAppToast({ type: 'error', titleKey: 'groups.inactiveMemberSkipped' });
         }
 
         const { data: groupRow, error: groupErr } = await supabase
@@ -317,19 +313,15 @@ export async function createGroup(dto: CreateGroupDto): Promise<Group | null> {
             isAutoArchived: false,
         };
         useAppStore.getState().addGroup(group);
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('groups.createGroup'),
-        });
+        showSuccessToast('groups.groupCreated');
         return group;
     } catch (error) {
-        console.error('Failed to create group:', error);
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('groups.createError'),
-            text2: i18n.t('common.networkError'),
+        Sentry.captureException(error, {
+            tags: { service: 'groups', op: 'create' },
+            extra: { memberCount: dto.memberIds.length, groupType: dto.groupType },
         });
+        console.error('Failed to create group:', error);
+        showErrorToast('groups.createError', 'common.networkError');
         return null;
     }
 }
@@ -353,11 +345,11 @@ export async function updateGroup(id: string, dto: UpdateGroupDto): Promise<Grou
 
     if (error || !data) {
         console.error('Failed to update group:', error?.message ?? 'no rows updated');
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('groups.updateError'),
-            text2: error?.message ?? i18n.t('common.networkError'),
-        });
+        showErrorToast(
+            'groups.updateError',
+            error?.message ? undefined : 'common.networkError',
+            error?.message,
+        );
         return null;
     }
 
@@ -373,7 +365,7 @@ export async function updateGroup(id: string, dto: UpdateGroupDto): Promise<Grou
     if (dto.defaultCurrency !== undefined) {
         void fetchBalanceSummary();
     }
-    Toast.show({ type: 'success', text1: i18n.t('common.success'), text2: 'Group updated' });
+    showSuccessToast('groups.groupUpdated');
     return group;
 }
 
@@ -386,16 +378,12 @@ export async function deleteGroup(id: string): Promise<boolean> {
         .maybeSingle();
 
     if (error || !data) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to delete group',
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('groups.deleteError', 'common.networkError');
         return false;
     }
 
     useAppStore.getState().removeGroup(id);
-    Toast.show({ type: 'success', text1: 'Group deleted' });
+    showSuccessMessage('groups.groupDeleted');
     return true;
 }
 
@@ -487,16 +475,12 @@ export async function addGroupMember(groupId: string, userId: string): Promise<G
         .single();
 
     if (error || !data) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to add member',
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('groups.memberAddError', 'common.networkError');
         return null;
     }
 
     await syncGroupMembershipState(groupId);
-    Toast.show({ type: 'success', text1: 'Member added' });
+    showSuccessMessage('groups.memberAdded');
     return groupMemberFromRow(data);
 }
 
@@ -511,16 +495,12 @@ export async function removeGroupMember(groupId: string, userId: string): Promis
         .maybeSingle();
 
     if (error || !data) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to remove member',
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('groups.memberRemoveError', 'common.networkError');
         return false;
     }
 
     await syncGroupMembershipState(groupId);
-    Toast.show({ type: 'success', text1: 'Member removed' });
+    showSuccessMessage('groups.memberRemoved');
     return true;
 }
 
@@ -531,6 +511,10 @@ export async function getGroupContributions(
         const { expenses, splits, userIds } = await loadBalanceData(groupId);
         return calculateMemberContributions({ userIds, expenses, splits });
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'groups', op: 'getContributions' },
+            extra: { groupId },
+        });
         console.error('Failed to fetch member contributions:', error);
         return { totals: [], matrix: [], expenseCount: 0 };
     }
@@ -549,6 +533,10 @@ export async function getGroupBalancesByCurrency(
             settlements,
         });
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'groups', op: 'getBalancesByCurrency' },
+            extra: { groupId },
+        });
         console.error('Failed to fetch per-currency balances:', error);
         return [];
     }
@@ -614,6 +602,10 @@ export async function getGroupSimplifiedDebtsByCurrency(
         out.sort((a, b) => a.currency.localeCompare(b.currency));
         return out;
     } catch (error) {
+        Sentry.captureException(error, {
+            tags: { service: 'groups', op: 'getSimplifiedDebts' },
+            extra: { groupId },
+        });
         console.error('Failed to fetch simplified debts by currency:', error);
         return [];
     }
