@@ -21,7 +21,12 @@ import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
 import { markGroupExpensesHydrated } from '../lib/groupFeedCache';
 import { useAppStore } from '../store';
-import Toast from 'react-native-toast-message';
+import {
+    expenseSplitValidationMessage,
+    showErrorToast,
+    showSuccessMessage,
+    showSuccessToast,
+} from '../lib/appToast';
 import i18n from '../i18n';
 
 function resolveSplitAmounts(
@@ -73,11 +78,7 @@ export async function fetchExpenses(groupId?: string): Promise<ExpenseWithSplits
             extra: { groupId },
         });
         console.error('Failed to fetch expenses:', error);
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.loadError'),
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('history.loadError', 'common.networkError');
         return [];
     }
 }
@@ -119,11 +120,11 @@ export async function createExpense(dto: CreateExpenseDto): Promise<Expense | nu
 
     const validation = validateExpenseSplits(dto.amount, splits);
     if (!validation.valid) {
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.createError'),
-            text2: validation.message ?? i18n.t('common.networkError'),
-        });
+        showErrorToast(
+            'history.createError',
+            undefined,
+            expenseSplitValidationMessage(validation) || i18n.t('common.networkError'),
+        );
         return null;
     }
 
@@ -165,11 +166,7 @@ export async function createExpense(dto: CreateExpenseDto): Promise<Expense | nu
             createdAt: expense.createdAt,
         }));
         useAppStore.getState().addExpense({ ...expense, splits: splitsForStore });
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('expenses.addExpense'),
-        });
+        showSuccessToast('expenses.expenseCreated');
         return expense;
     } catch (error) {
         Sentry.captureException(error, {
@@ -177,11 +174,7 @@ export async function createExpense(dto: CreateExpenseDto): Promise<Expense | nu
             extra: { groupId: dto.groupId, amount: dto.amount, currency: dto.currency },
         });
         console.error('Failed to create expense:', error);
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.createError'),
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('history.createError', 'common.networkError');
         return null;
     }
 }
@@ -198,11 +191,11 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             resolvedSplits = resolveSplitAmounts(amount, dto.splits);
             const validation = validateExpenseSplits(amount, resolvedSplits);
             if (!validation.valid) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Failed to update expense',
-                    text2: validation.message,
-                });
+                showErrorToast(
+                    'expenses.updateError',
+                    undefined,
+                    expenseSplitValidationMessage(validation),
+                );
                 return null;
             }
 
@@ -260,11 +253,7 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             : useAppStore.getState().expenses.find(e => e.id === id)?.splits ?? [];
 
         useAppStore.getState().updateExpense({ ...baseExpense, splits: storeSplits });
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: 'Expense updated',
-        });
+        showSuccessToast('expenses.expenseUpdated');
         return baseExpense;
     } catch (error) {
         Sentry.captureException(error, {
@@ -272,11 +261,7 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             extra: { expenseId: id, patchKeys: Object.keys(dto) },
         });
         console.error('Failed to update expense:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to update expense',
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('expenses.updateError', 'common.networkError');
         return null;
     }
 }
@@ -290,16 +275,12 @@ export async function deleteExpense(id: string): Promise<boolean> {
         .maybeSingle();
 
     if (error || !data) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to delete expense',
-            text2: i18n.t('common.networkError'),
-        });
+        showErrorToast('expenses.deleteError', 'common.networkError');
         return false;
     }
 
     useAppStore.getState().removeExpense(id);
-    Toast.show({ type: 'success', text1: 'Expense deleted' });
+    showSuccessMessage('expenses.expenseDeleted');
     return true;
 }
 

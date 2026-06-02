@@ -6,7 +6,7 @@ import React, { useCallback, useState } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { platformAlert } from '../../lib/platformAlert';
 import { useTranslation } from 'react-i18next';
-import { GroupType, DEFAULT_CURRENCY, User } from '@cost-share/shared';
+import { GroupType, User } from '@cost-share/shared';
 import Toast from 'react-native-toast-message';
 import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
@@ -19,40 +19,41 @@ import { AppIcon } from '../../components/AppIcon';
 import { AddMembersSheet } from '../../components/AddMembersSheet';
 import { CreateGroupFormShell } from '../../components/groups/CreateGroupFormShell';
 import { CreateGroupFormFields } from '../../components/groups/CreateGroupFormFields';
-import { CreateGroupGuidancePanel } from '../../components/groups/CreateGroupGuidancePanel';
+import { OnboardingCreateGroupHero } from '../../components/onboarding/OnboardingCreateGroupHero';
+import { OnboardingNameSuggestions } from '../../components/onboarding/OnboardingNameSuggestions';
 import { colors } from '../../theme';
-import { useRtlLayout } from '../../hooks/useRtlLayout';
+import { useAppLanguage, useRtlLayout } from '../../hooks/useRtlLayout';
+import { initialCreateGroupCurrency } from '../../lib/appDefaultCurrency';
 
 type Props = {
     onDone: () => void;
+    /** Admin preview — do not persist onboarding completion. */
+    previewMode?: boolean;
 };
 
-export function OnboardingCreateGroupScreen({ onDone }: Props) {
+export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Props) {
     const { t } = useTranslation();
     const isRtl = useRtlLayout();
+    const appLanguage = useAppLanguage();
     const currentUser = useAppStore((s) => s.currentUser);
     const { isLoading, startLoading, stopLoading } = useLoading();
 
     const [name, setName] = useState('');
     const [nameError, setNameError] = useState('');
     const [groupType, setGroupType] = useState<GroupType>('trip');
-    const [currency, setCurrency] = useState(currentUser?.defaultCurrency ?? DEFAULT_CURRENCY);
+    const [currency, setCurrency] = useState(() =>
+        initialCreateGroupCurrency(appLanguage, currentUser),
+    );
     const [localImageUri, setLocalImageUri] = useState<string | null>(null);
     const [members, setMembers] = useState<User[]>([]);
     const [addMembersOpen, setAddMembersOpen] = useState(false);
 
     const finish = useCallback(async () => {
-        await markPostLoginOnboardingComplete();
+        if (!previewMode) {
+            await markPostLoginOnboardingComplete();
+        }
         onDone();
-    }, [onDone]);
-
-    const handleFindFriends = useCallback(() => {
-        setAddMembersOpen(false);
-        Toast.show({
-            type: 'info',
-            text1: t('onboarding.create.findFriendsAfterCreate'),
-        });
-    }, [t]);
+    }, [onDone, previewMode]);
 
     const handleSkip = useCallback(() => {
         platformAlert(
@@ -68,6 +69,22 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
             ],
         );
     }, [finish, t]);
+
+    const handleExit = useCallback(() => {
+        if (previewMode) {
+            onDone();
+            return;
+        }
+        handleSkip();
+    }, [previewMode, onDone, handleSkip]);
+
+    const handleFindFriends = useCallback(() => {
+        setAddMembersOpen(false);
+        Toast.show({
+            type: 'info',
+            text1: t('onboarding.create.findFriendsAfterCreate'),
+        });
+    }, [t]);
 
     const handleCreate = useCallback(async () => {
         if (!name.trim()) {
@@ -110,6 +127,8 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
     ]);
 
     const displayMembers = currentUser ? [currentUser, ...members] : members;
+    const hasName = name.trim().length > 0;
+    const hasExtraMembers = members.length > 0;
     const memberIdsForSheet = [
         ...(currentUser ? [currentUser.id] : []),
         ...members.map((m) => m.id),
@@ -120,10 +139,15 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
             <CreateGroupFormShell
                 testID="onboarding-create-group-screen"
                 title={t('onboarding.create.header')}
-                guidance={<CreateGroupGuidancePanel />}
+                guidance={
+                    <OnboardingCreateGroupHero
+                        hasName={hasName}
+                        hasExtraMembers={hasExtraMembers}
+                    />
+                }
                 headerStart={
                     <TouchableOpacity
-                        onPress={handleSkip}
+                        onPress={handleExit}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         testID="onboarding-create-back"
                         accessibilityRole="button"
@@ -141,18 +165,22 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
                 }
                 headerEnd={
                     <TouchableOpacity
-                        onPress={handleSkip}
+                        onPress={handleExit}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         testID="onboarding-create-skip"
                     >
                         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.gray500 }}>
-                            {t('onboarding.skip')}
+                            {t(previewMode ? 'common.close' : 'onboarding.skip')}
                         </Text>
                     </TouchableOpacity>
                 }
                 footer={
                     <Button
-                        title={t('onboarding.create.submit')}
+                        title={t(
+                            hasName
+                                ? 'onboarding.create.submitReady'
+                                : 'onboarding.create.submit',
+                        )}
                         onPress={() => void handleCreate()}
                         loading={isLoading}
                         disabled={isLoading || !name.trim()}
@@ -180,6 +208,16 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
                     onAddMembers={() => setAddMembersOpen(true)}
                     onRemoveMember={(m) =>
                         setMembers((prev) => prev.filter((x) => x.id !== m.id))
+                    }
+                    membersHintKey="onboarding.create.membersHint"
+                    nameAccessory={
+                        <OnboardingNameSuggestions
+                            visible={!hasName}
+                            onSelect={(suggested) => {
+                                setName(suggested);
+                                if (nameError) setNameError('');
+                            }}
+                        />
                     }
                 />
             </CreateGroupFormShell>

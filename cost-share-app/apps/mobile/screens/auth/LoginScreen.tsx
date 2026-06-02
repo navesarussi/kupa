@@ -9,7 +9,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     View,
     TouchableOpacity,
-    Modal,
     StyleSheet,
     ActivityIndicator,
 } from 'react-native';
@@ -26,22 +25,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLoading } from '../../hooks/useLoading';
 import { signInWithGoogle } from '../../services/auth.service';
-import { Button } from '../../components/Button';
 import Toast from 'react-native-toast-message';
-import { changeLanguage } from '../../i18n';
+import { LanguageSheet } from '../../components/settings/LanguageSheet';
+import { useChangeAppLanguage } from '../../hooks/useChangeAppLanguage';
+import { centeredTextStyle, useAppLanguage } from '../../hooks/useRtlLayout';
 import { useAppStore } from '../../store';
 import {
     clearDeactivationNoticePending,
     consumeDeactivationNoticePending,
 } from '../../lib/deactivationNoticeStorage';
 import { getSupportEmail, openSupportContact } from '../../lib/openMailto';
-import { rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
 
 export function LoginScreen() {
     const { t } = useTranslation();
-    const isRtl = useRtlLayout();
-    const language = useAppStore((state) => state.language);
-    const setLanguage = useAppStore((state) => state.setLanguage);
+    const language = useAppLanguage();
+    const changeAppLanguage = useChangeAppLanguage();
     const pendingDeactivationNotice = useAppStore((state) => state.pendingDeactivationNotice);
     const setPendingDeactivationNotice = useAppStore((state) => state.setPendingDeactivationNotice);
     const { isLoading, startLoading, stopLoading } = useLoading();
@@ -81,14 +79,9 @@ export function LoginScreen() {
     const handleLanguageChange = useCallback(
         async (lang: 'en' | 'he') => {
             setLanguagePickerVisible(false);
-            try {
-                await changeLanguage(lang);
-                setLanguage(lang);
-            } catch {
-                platformAlert(t('common.error'), t('profile.languageChangeError'));
-            }
+            await changeAppLanguage(lang);
         },
-        [setLanguage, t],
+        [changeAppLanguage],
     );
 
     const handleSignIn = async () => {
@@ -143,22 +136,18 @@ export function LoginScreen() {
                 <View className="flex-1 justify-center px-7">
                     <View style={styles.hero}>
                         <View style={styles.logoRing}>
-                            <AppLogo size={96} />
+                            <AppLogo size={108} />
                         </View>
                         <AppBrandTitle className="mt-5 mb-1" />
                         <Text
-                            className={rtlTextClassName(
-                                isRtl,
-                                'text-xl font-bold text-primary-dark text-center',
-                            )}
+                            className="text-xl font-bold text-primary-dark text-center"
+                            style={centeredTextStyle}
                         >
                             {t('auth.tagline')}
                         </Text>
                         <Text
-                            className={rtlTextClassName(
-                                isRtl,
-                                'text-[15px] leading-relaxed text-gray-500 text-center mt-3 px-1',
-                            )}
+                            className="text-[15px] leading-relaxed text-gray-500 text-center mt-3 px-1"
+                            style={centeredTextStyle}
                         >
                             {t('auth.description')}
                         </Text>
@@ -176,7 +165,10 @@ export function LoginScreen() {
                     {isLoading ? (
                         <View style={styles.signingHint}>
                             <ActivityIndicator size="small" color={colors.primary} />
-                            <Text className="text-sm text-gray-400 mt-2 text-center">
+                            <Text
+                                className="text-sm text-gray-400 mt-2 text-center"
+                                style={centeredTextStyle}
+                            >
                                 {t('auth.signingIn')}
                             </Text>
                         </View>
@@ -198,40 +190,13 @@ export function LoginScreen() {
                 }}
             />
 
-            <Modal
+            <LanguageSheet
+                testID="login-language-picker"
                 visible={languagePickerVisible}
-                animationType="fade"
-                transparent
-                onRequestClose={() => setLanguagePickerVisible(false)}
-            >
-                <View className="flex-1 bg-black/50 justify-end">
-                    <View
-                        testID="login-language-picker"
-                        className="bg-white rounded-t-2xl px-4 pt-4 pb-8"
-                    >
-                        <Text className="text-lg font-bold text-gray-900 mb-4 px-1">
-                            {t('settings.language')}
-                        </Text>
-                        <View className="gap-2">
-                            <Button
-                                title={t('profile.english')}
-                                onPress={() => handleLanguageChange('en')}
-                                variant={language === 'en' ? 'primary' : 'outline'}
-                            />
-                            <Button
-                                title={t('profile.hebrew')}
-                                onPress={() => handleLanguageChange('he')}
-                                variant={language === 'he' ? 'primary' : 'outline'}
-                            />
-                            <Button
-                                title={t('common.cancel')}
-                                onPress={() => setLanguagePickerVisible(false)}
-                                variant="outline"
-                            />
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+                current={language}
+                onSelect={handleLanguageChange}
+                onClose={() => setLanguagePickerVisible(false)}
+            />
         </View>
     );
 }
@@ -253,6 +218,8 @@ const styles = StyleSheet.create({
     },
     hero: {
         alignItems: 'center',
+        alignSelf: 'stretch',
+        width: '100%',
     },
     logoRing: {
         padding: 20,

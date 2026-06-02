@@ -7,6 +7,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 import Toast from 'react-native-toast-message';
+import { toastConfig } from './lib/toastConfig';
 import { handleAuthRedirectUrl, isAuthCallbackUrl } from './services/auth.service';
 import { AuthenticatedAppGate } from './components/AuthenticatedAppGate';
 import { LoginScreen } from './screens/auth/LoginScreen';
@@ -61,7 +62,8 @@ function WebFrame({ children }: { children: React.ReactNode }) {
 function App() {
   const [isReady, setIsReady] = useState(false);
   const [preOnboardingDone, setPreOnboardingDone] = useState<boolean | null>(null);
-  const { session, setSession } = useAppStore();
+  const session = useAppStore((s) => s.session);
+  const setSession = useAppStore((s) => s.setSession);
   const currentUser = useAppStore((s) => s.currentUser);
   const currentUserId = currentUser?.id ?? null;
   const language = useAppStore((s) => s.language);
@@ -92,15 +94,6 @@ function App() {
     await clearStaleAuthSession();
     setSession(null);
   }, [setPendingDeactivationNotice, setSession]);
-
-  const acceptSessionIfAllowed = useCallback(
-    (nextSession: Session | null, mode: 'fresh' | 'hydration') =>
-      acceptSessionIfAllowedImpl(nextSession, mode, {
-        setSession,
-        setPendingDeactivationNotice,
-      }),
-    [setSession, setPendingDeactivationNotice],
-  );
 
   const processOAuthCallbackUrl = useCallback(async (url: string) => {
     const { error } = await handleAuthRedirectUrl(url);
@@ -138,11 +131,29 @@ function App() {
     }
   }, [rejectDeactivatedSession]);
 
+  // Boot-only: do not list auth callbacks in deps — they must not re-run init and stack listeners.
   useEffect(() => {
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
 
     const init = async () => {
+      const store = useAppStore.getState();
+
+      const acceptSession = (nextSession: Session | null, mode: 'fresh' | 'hydration') =>
+        acceptSessionIfAllowedImpl(nextSession, mode, {
+          setSession: store.setSession,
+          setPendingDeactivationNotice: store.setPendingDeactivationNotice,
+        });
+
+      const processOAuth = async (url: string) => {
+        const { error } = await handleAuthRedirectUrl(url);
+        if (error?.code === 'account_deleted') {
+          void signalDeactivatedAccount(store.setPendingDeactivationNotice);
+          await clearStaleAuthSession();
+          store.setSession(null);
+        }
+      };
+
       try {
         configureNativeGoogleSignIn();
         await initializeLanguage();
@@ -152,7 +163,7 @@ function App() {
         if (Platform.OS === 'web' && typeof globalThis.location !== 'undefined') {
           const callbackUrl = globalThis.location.href;
           if (isAuthCallbackUrl(callbackUrl)) {
-            await processOAuthCallbackUrl(callbackUrl);
+            await processOAuth(callbackUrl);
             globalThis.history.replaceState({}, '', '/');
           }
         }
@@ -161,9 +172,9 @@ function App() {
         if (!mounted) return;
 
         if (hydratedSession) {
-          await acceptSessionIfAllowed(hydratedSession, 'hydration');
+          await acceptSession(hydratedSession, 'hydration');
         } else {
-          setSession(null);
+          store.setSession(null);
         }
 
         setupSupabaseAuthAutoRefresh();
@@ -171,25 +182,31 @@ function App() {
         // Register after hydrateAuthSession so we are the only boot-time listener and
         // do not clear the store on a premature null before AsyncStorage is read.
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-          if (!nextSession) {
-            setSession(null);
+          if (event === 'INITIAL_SESSION') return;
+
+          if (event === 'SIGNED_OUT') {
+            useAppStore.getState().setSession(null);
             return;
           }
 
+          if (!nextSession) return;
+
           if (event === 'SIGNED_IN') {
             setTimeout(() => {
-              void acceptSessionIfAllowed(nextSession, 'fresh');
+              void acceptSession(nextSession, 'fresh');
             }, 0);
             return;
           }
 
-          setSession(nextSession);
+          if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            useAppStore.getState().setSession(nextSession);
+          }
         });
         authSubscription = subscription;
       } catch (e) {
         if (isInvalidRefreshTokenError(e)) {
           await clearStaleAuthSession();
-          if (mounted) setSession(null);
+          if (mounted) useAppStore.getState().setSession(null);
         } else {
           console.error('Init error:', e);
         }
@@ -205,7 +222,7 @@ function App() {
       mounted = false;
       authSubscription?.unsubscribe();
     };
-  }, [acceptSessionIfAllowed, processOAuthCallbackUrl, setSession]);
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
@@ -247,7 +264,7 @@ function App() {
               <LoginScreen />
             )}
           </WebFrame>
-          <Toast />
+          <Toast config={toastConfig} topOffset={56} />
         </RtlLayoutProvider>
       </SafeAreaProvider>
     );
@@ -260,7 +277,7 @@ function App() {
           <WebFrame>
             <AuthenticatedAppGate />
           </WebFrame>
-          <Toast />
+          <Toast config={toastConfig} topOffset={56} />
         </RtlLayoutProvider>
       </SafeAreaProvider>
     </QueryClientProvider>

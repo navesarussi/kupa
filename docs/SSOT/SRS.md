@@ -1,4 +1,4 @@
-# Software Requirements Specification (SRS) — Kupa
+# Software Requirements Specification (SRS) — Kupay
 
 **Status:** Living document (v0.1 — derived from current codebase).  
 **Audience:** Humans and AI agents.  
@@ -10,7 +10,7 @@
 
 ## 1. Product summary
 
-Kupa helps groups of people track shared expenses, split costs fairly, see who owes whom, and record settlements (payments between members). Think Splitwise: groups, expenses, splits, balances, settle-up.
+Kupay helps groups of people track shared expenses, split costs fairly, see who owes whom, and record settlements (payments between members). Think Splitwise: groups, expenses, splits, balances, settle-up.
 
 **Primary client:** React Native (Expo) mobile app.  
 **Backend:** Supabase (Postgres + Auth + Storage); mobile/web use `@supabase/supabase-js` with RLS.  
@@ -106,6 +106,12 @@ Balance formula (authoritative): see `CalculationsService` and [DATABASE_ARCHITE
 | REQ-NFR-04 | ✅ | Row Level Security (Supabase) | RLS enabled; mobile uses anon key + user JWT |
 | REQ-NFR-05 | ⬜ | Offline support | Local queue + sync without screen refactor |
 | REQ-NFR-06 | ⬜ | Push notifications | — |
+
+### 3.7 Admin
+
+| ID | Status | Requirement | Acceptance criteria |
+|----|--------|-------------|---------------------|
+| REQ-ADMIN-01 | ⬜ | App admin platform metrics | Admin portal shows registered user count and active vs auto-archived group counts from `admin_get_platform_metrics()`; non-admins get `not_authorized` |
 
 ---
 

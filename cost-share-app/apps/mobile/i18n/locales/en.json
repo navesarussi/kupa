@@ -45,7 +45,9 @@
             "balances": "Balances"
         },
         "signInError": "Sign in failed. Please try again.",
-        "signingIn": "Signing in..."
+        "signingIn": "Signing in...",
+        "googleSignInSheetTitle": "Sign in with Google",
+        "googleSignInSheetHint": "Tap below — account selection opens on top of this sheet."
     },
     "onboarding": {
         "skip": "Skip",
@@ -107,25 +109,33 @@
             "balanceDefaultLabel": "Your balance"
         },
         "create": {
-            "header": "New group",
-            "namePlaceholder": "Group name",
-            "nameInputPlaceholder": "Beach trip · Dinner · Shared flat...",
-            "backgroundLabel": "Cover image",
-            "heroSea": "Sea",
-            "heroMountains": "Mountains",
-            "heroForest": "Forest",
-            "heroFlowers": "Flowers",
-            "heroWaves": "Waves",
-            "uploadHint": "Upload photo",
-            "membersLabel": "Group members",
-            "adminHint": "Group admin",
-            "addMembers": "Add members",
-            "inviteHint": "WhatsApp, link, or contacts — get everyone into the group",
+            "header": "Your first group",
+            "hero": {
+                "eyebrow": "Last step",
+                "title": "Create your first group and start splitting expenses with friends",
+                "subtitle": "Name, type, and currency. Friends can join after you open it.",
+                "checkName": "Group name",
+                "checkDefaults": "Type & currency (defaults)",
+                "checkMembers": "Invite members",
+                "optional": "Optional",
+                "win1": "Splits calculate for you",
+                "win2": "Type & currency — editable",
+                "win3": "Invite via link or WhatsApp"
+            },
+            "suggestions": {
+                "label": "Name ideas",
+                "trip": "Beach trip",
+                "flat": "Flatmates",
+                "games": "Game night",
+                "friday": "Friday dinner"
+            },
+            "membersHint": "Invite now — or after the group is open.",
             "submit": "Create group",
+            "submitReady": "Open it",
             "skipTitle": "Skip creating a group?",
-            "skipMessage": "You can create a group later from the Groups tab.",
-            "skipConfirm": "Skip for now",
-            "findFriendsAfterCreate": "Right after you create the group — find friends and send invites"
+            "skipMessage": "No group means no expenses. You can open one anytime from Groups.",
+            "skipConfirm": "Skip",
+            "findFriendsAfterCreate": "After opening the group — link, WhatsApp, or contacts."
         }
     },
     "groups": {
@@ -170,6 +180,9 @@
         "createError": "Failed to create group",
         "inactiveMemberSkipped": "Deleted users can't be added to a group",
         "updateError": "Failed to update group",
+        "deleteError": "Failed to delete group",
+        "memberAddError": "Failed to add member",
+        "memberRemoveError": "Failed to remove member",
         "deleteGroup": "Delete Group",
         "deleteForEveryone": "Delete group for everyone",
         "deleteGroupConfirm": "Are you sure you want to delete this group? This action cannot be undone.",
@@ -438,6 +451,7 @@
         "loadError": "Failed to load expenses",
         "createError": "Failed to create expense",
         "updateError": "Failed to update expense",
+        "deleteError": "Failed to delete expense",
         "receipt": "Receipt",
         "addReceipt": "Add a receipt photo",
         "replaceReceipt": "Replace",
@@ -576,7 +590,16 @@
         "portal": {
             "title": "Admin Portal",
             "sectionLabel": "Tools",
-            "deletedUsersRow": "Deleted users"
+            "deletedUsersRow": "Deleted users",
+            "resetOnboardingRow": "Reset onboarding",
+            "previewCreateGroupRow": "Preview first-group screen"
+        },
+        "onboarding": {
+            "resetTitle": "Reset onboarding?",
+            "resetMessage": "Flags will be cleared and the first-group screen opens. Pre-login onboarding requires signing out and restarting the app.",
+            "resetConfirm": "Reset",
+            "resetSuccess": "Onboarding reset",
+            "previewTitle": "Preview"
         },
         "deletedUsers": {
             "title": "Deleted users",
@@ -708,6 +731,10 @@
         "toastRecorded": "Payment recorded",
         "toastUpdated": "Payment updated",
         "toastDeleted": "Payment deleted",
+        "loadError": "Failed to load payments",
+        "recordError": "Failed to record payment",
+        "updateError": "Failed to update payment",
+        "deleteError": "Failed to delete payment",
         "notInvolved": "You're not in this debt",
         "othersToggle": "Settlements that don't involve you ({{count}})",
         "detailHeaderLabel": "Settlement",

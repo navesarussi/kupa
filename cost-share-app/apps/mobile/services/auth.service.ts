@@ -8,11 +8,9 @@ import { queryClient } from '../lib/queryClient';
 import { clearStaleAuthSession } from '../lib/authSessionLifecycle';
 import { clearNavigationState } from '../lib/navigationPersistence';
 import { isAuthSessionAllowed } from '../lib/auth';
-import {
-  isNativeGoogleSignInEnabled,
-  signInWithGoogleNative,
-  signOutNativeGoogle,
-} from '../lib/googleSignInNative';
+import { openOAuthSession } from '../lib/openOAuthSession';
+import { signOutNativeGoogle } from '../lib/googleSignInNative';
+import { APP_WEB_ORIGIN } from '@cost-share/shared';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store';
 
@@ -90,7 +88,7 @@ function resolveWebOAuthRedirectUri(): string {
     return `${origin}/${AUTH_CALLBACK_PATH}`;
   }
 
-  return `https://kupa.pro/${AUTH_CALLBACK_PATH}`;
+  return `${APP_WEB_ORIGIN}/${AUTH_CALLBACK_PATH}`;
 }
 
 /**
@@ -195,57 +193,43 @@ async function signInWithGoogleBrowser(): Promise<{ error: AuthError | null }> {
     return { error: toAuthError(error ?? new Error('No OAuth URL returned')) };
   }
 
-  const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirect, {
-    preferEphemeralSession: true,
-  });
+  const result = await openOAuthSession(data.url, oauthRedirect);
 
+  return resolveOAuthBrowserResult(result, oauthRedirect);
+}
+
+type OAuthBrowserResult =
+  | { type: 'success'; url: string }
+  | { type: 'cancel' | 'dismiss' | 'opened' | 'locked' };
+
+function resolveOAuthBrowserResult(
+  result: OAuthBrowserResult,
+  oauthRedirect: string,
+): Promise<{ error: AuthError | null }> {
   if (result.type === 'cancel' || result.type === 'dismiss') {
-    return { error: toAuthError('Sign-in was cancelled') };
+    return Promise.resolve({ error: toAuthError('Sign-in was cancelled') });
   }
 
   if (result.type !== 'success') {
-    return { error: toAuthError(`Unexpected browser result: ${result.type}`) };
+    return Promise.resolve({ error: toAuthError(`Unexpected browser result: ${result.type}`) });
   }
 
-  // Supabase rejects unknown redirect_to values and falls back to Site URL (kupa.pro web).
+  // Supabase rejects unknown redirect_to values and falls back to Site URL (production web).
   if (result.url.startsWith('http://') || result.url.startsWith('https://')) {
-    return {
+    return Promise.resolve({
       error: toAuthError(
         `OAuth returned to the web app (${result.url.split('?')[0]}). `
         + `Add ${oauthRedirect} to Supabase → Authentication → URL Configuration → Redirect URLs.`,
       ),
-    };
+    });
   }
 
   return handleAuthRedirectUrl(result.url);
 }
 
-async function signInWithGoogleAndroidNative(): Promise<{ error: AuthError | null }> {
-  const native = await signInWithGoogleNative();
-  if ('error' in native) {
-    return { error: toAuthError(native.error) };
-  }
-
-  const { error } = await supabase.auth.signInWithIdToken({
-    provider: 'google',
-    token: native.idToken,
-  });
-  if (error) return { error: toAuthError(error) };
-
-  const allowed = await isAuthSessionAllowed();
-  if (!allowed) {
-    return { error: { code: 'account_deleted', message: 'account deleted' } satisfies AuthError };
-  }
-
-  return { error: null };
-}
-
 export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
-  if (isNativeGoogleSignInEnabled()) {
-    if (__DEV__) {
-      console.info('[Auth] Using native Google Sign-In (Android)');
-    }
-    return signInWithGoogleAndroidNative();
+  if (Platform.OS === 'android' && __DEV__) {
+    console.info('[Auth] Google OAuth in partial Chrome bottom sheet (~80%)');
   }
 
   return signInWithGoogleBrowser();
