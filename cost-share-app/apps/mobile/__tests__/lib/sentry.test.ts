@@ -1,9 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import { applySentryUser, applySentryLanguage } from '../../lib/sentryIdentity';
+import { captureError } from '../../lib/captureError';
 
 const outerSentry = Sentry as unknown as {
     setUser: jest.Mock;
     setTag: jest.Mock;
+    captureException: jest.Mock;
 };
 
 describe('Sentry init module', () => {
@@ -67,6 +69,53 @@ describe('Sentry identity helpers', () => {
     it('applySentryLanguage sets the app_language tag', () => {
         applySentryLanguage('he');
         expect(outerSentry.setTag).toHaveBeenCalledWith('app_language', 'he');
+    });
+});
+
+describe('captureError helper', () => {
+    beforeEach(() => {
+        outerSentry.captureException.mockClear();
+    });
+
+    it('passes a real Error through unchanged (no originalError in extra)', () => {
+        const real = new Error('boom');
+        captureError(real, { tags: { service: 'x' } });
+        expect(outerSentry.captureException).toHaveBeenCalledTimes(1);
+        const [thrown, ctx] = outerSentry.captureException.mock.calls[0];
+        expect(thrown).toBe(real);
+        expect(ctx.tags).toEqual({ service: 'x' });
+        expect(ctx.extra?.originalError).toBeUndefined();
+    });
+
+    it('wraps a Supabase-shaped object in a real Error using its message + preserves the original', () => {
+        const supaErr = {
+            code: '23505',
+            details: 'Key (id)=(1) already exists.',
+            hint: null,
+            message: 'duplicate key value violates unique constraint',
+        };
+        captureError(supaErr, { tags: { service: 'expenses', op: 'create' }, extra: { groupId: 'g1' } });
+        expect(outerSentry.captureException).toHaveBeenCalledTimes(1);
+        const [thrown, ctx] = outerSentry.captureException.mock.calls[0];
+        expect(thrown).toBeInstanceOf(Error);
+        expect((thrown as Error).message).toBe('duplicate key value violates unique constraint');
+        expect(ctx.tags).toEqual({ service: 'expenses', op: 'create' });
+        expect(ctx.extra).toMatchObject({ groupId: 'g1', originalError: supaErr });
+    });
+
+    it('falls back to a key listing when the object has no message', () => {
+        captureError({ foo: 1, bar: 2 });
+        const [thrown] = outerSentry.captureException.mock.calls[0];
+        expect(thrown).toBeInstanceOf(Error);
+        expect((thrown as Error).message).toContain('foo');
+        expect((thrown as Error).message).toContain('bar');
+    });
+
+    it('wraps a thrown string', () => {
+        captureError('network down');
+        const [thrown] = outerSentry.captureException.mock.calls[0];
+        expect(thrown).toBeInstanceOf(Error);
+        expect((thrown as Error).message).toBe('network down');
     });
 });
 
