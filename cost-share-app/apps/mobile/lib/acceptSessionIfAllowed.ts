@@ -36,7 +36,7 @@ export async function acceptSessionIfAllowed(
 
     const status = await assertProfileActiveWithTimeout();
 
-    if (status === 'deactivated') {
+    if (status === 'deactivated' || (status === 'unknown' && mode === 'fresh')) {
         void signalDeactivatedAccount(setPendingDeactivationNotice);
         await clearStaleAuthSession();
         setSession(null);
