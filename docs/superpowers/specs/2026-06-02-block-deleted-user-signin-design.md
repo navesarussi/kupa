@@ -78,10 +78,18 @@ Idempotent — re-running yields zero deletions.
 
 ## Deployment
 
-1. New migration file `cost-share-app/supabase/migrations/<YYYYMMDDhhmmss>_revoke_sessions_on_delete.sql` (exact timestamp filled in at apply time, matching the existing `YYYYMMDDhhmmss_*.sql` convention in that directory) containing: updated `delete_my_account()` definition plus the backfill `DELETE`s.
-2. Apply to dev via Supabase MCP `apply_migration` and run a manual smoke (sign in → delete → attempt sign-in → confirm notice).
-3. Apply to production manually via Supabase SQL Editor (per the `dev → main` Supabase branch policy in `/AGENTS.md`).
-4. Client tightening in `App.tsx` ships with the next mobile build on `general-fixes` → `dev` → `main`.
+This project uses CI-driven migrations (see `docs/SSOT/SUPABASE_ENVIRONMENTS.md`). Only files under `cost-share-app/supabase/migrations/` are auto-applied; loose `.sql` files elsewhere are not.
+
+1. From `cost-share-app/`, create the migration with the project convention:
+
+   ```bash
+   supabase migration new revoke_sessions_on_delete
+   ```
+
+   This produces `cost-share-app/supabase/migrations/<YYYYMMDDhhmmss>_revoke_sessions_on_delete.sql`. Fill it with the updated `CREATE OR REPLACE FUNCTION delete_my_account()` plus the one-time backfill `DELETE`s. The file must be idempotent (safe to re-run).
+2. Open the PR on the `general-fixes` branch targeting `dev`. On merge, `.github/workflows/deploy-staging.yml` auto-applies the migration to the dev project (`drxfbicunusmipdgbgdk`). Smoke-test on dev: sign in → delete → attempt sign-in → confirm notice dialog and zero rows in `auth.sessions` / `auth.refresh_tokens` for that user.
+3. Merge `dev` → `main`. `.github/workflows/deploy-production.yml` auto-applies the migration to production (`jfqxjjjbpxbwwvoygahu`). No manual SQL Editor step.
+4. Client tightening in `App.tsx` ships alongside, riding the normal mobile release on `general-fixes` → `dev` → `main`.
 
 ## Out of scope
 
