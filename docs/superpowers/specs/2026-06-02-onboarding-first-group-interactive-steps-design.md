@@ -1,0 +1,104 @@
+# First-group onboarding — interactive steps — design spec
+
+**Status:** Approved (design) — pending implementation
+**Date:** 2026-06-02
+**Supersedes:** the "Create first group (simplified)" screen from
+[2026-06-01-onboarding-flow-design.md](2026-06-01-onboarding-flow-design.md) (post-login phase). That flow is unchanged; only the create-group screen's layout is reworked.
+
+## Problem
+
+Today `OnboardingCreateGroupScreen` shows two disconnected blocks:
+
+1. `CreateGroupGuidancePanel` — a static card with 3 numbered tips (1·2·3), text only.
+2. `CreateGroupFormFields` — a flat form with all inputs at once (cover, name, type, currency, members).
+
+The numbered "steps" and the actual inputs are separate, so the guidance does not feel actionable.
+
+## Goal
+
+Turn the first-group screen into an **interactive accordion stepper**: each step is a tappable card whose input is revealed inline beneath it. Merge each guidance tip into its matching step. Onboarding screen only — the regular `CreateGroupScreen` is untouched.
+
+## Approved approach — accordion stepper
+
+One step open at a time; tapping a step header expands it and collapses the others. Step 1 (name) open by default. Rejected alternatives: all-steps-always-open (cluttered, long scroll) and full-screen wizard (too heavy for 5 short fields).
+
+### Layout (top → bottom)
+
+```
+‹  קופה חדשה                       דלג     ← existing header (back / skip)
+בואו נפתח את הקופה הראשונה                  ← slim one-line intro (replaces tips panel)
+
+① שם הקופה                       [open] ▲
+   ┌─────────────────────────────┐
+   │  name input                 │        ← input inline, inside the step
+   └─────────────────────────────┘
+   תנו שם שכולם מזהים…                      ← former tip1, now step helper
+
+② קטגוריה                      טיול   ▼   ← collapsed: shows current value + chevron
+③ מטבע                          ILS   ▼
+④ תמונת כריכה              אופציונלי   ▼
+⑤ הזמנת חברים              אופציונלי   ▼
+
+            [ צרו את הקופה ]               ← disabled until name is non-empty
+```
+
+### Steps, order, and content
+
+| # | Step | Input (reused component) | Required | Collapsed summary | Helper (from old copy) |
+|---|------|--------------------------|----------|-------------------|------------------------|
+| 1 | שם הקופה | `Input` | **Yes** | entered name | tip1 |
+| 2 | קטגוריה (group type) | `GroupTypeSelector` | No (default `trip`) | selected type label | tip2 |
+| 3 | מטבע | `CurrencyPicker` | No (default `ILS`) | currency code | — |
+| 4 | תמונת כריכה | `CreateGroupCoverPreview` + remove | No (optional) | thumbnail / "ברירת מחדל" | — |
+| 5 | הזמנת חברים | member avatars + add (opens `AddMembersSheet`) | No (optional) | "{n} חברים" | tip3 / membersHint |
+
+Order is name → category → currency → image → members. Only **name** gates the submit button (unchanged from today). Image and members carry an "אופציונלי" tag.
+
+### Step states
+
+- Numbered badge ① shows the index; once the step holds a meaningful value it flips to a ✓ check.
+  - name: complete when non-empty. category/currency: have defaults → shown complete. image/members: complete only when provided (otherwise plain, no number-vs-check pressure since optional).
+- Collapsed header shows the current value on the trailing side so progress is visible at a glance.
+- Image-as-step: opening step 4 reveals the existing live cover hero (`CreateGroupCoverPreview`, gradient + camera badge) as the picker. This satisfies "image is a step" while keeping the signature hero visual. The hero updates live from name/type even while collapsed.
+
+### Animation
+
+`react-native-reanimated` (already used across onboarding, see `theme/onboardingMotion.ts`): smooth height/opacity expand-collapse and chevron rotation. Respect existing motion timings.
+
+## Visual style (matches current app)
+
+- Step cards mirror `GroupFormSection`: white, `rounded-2xl`, `border-slate-200/80`, soft shadow, on `#F8FAFC`.
+- Accent `primary` `#60A5FA`; active/selected use `primary-extra-light` bg + `primary-dark` text/number; completed check uses `success`.
+- Numbered badge mirrors the guidance panel badge (`rounded-full bg-primary`, white bold numeral); check swaps the numeral for a check icon.
+- Chevron via `AppIcon`; RTL-aware via `useRtlLayout` / logical styles.
+
+## Architecture
+
+- **New** `components/groups/OnboardingStepCard.tsx` — presentational: header (badge/check, title, optional tag, trailing summary, chevron) + animated collapsible body (`children`). Props: `index`, `title`, `helper?`, `summary?`, `optional?`, `complete`, `expanded`, `onToggle`, `children`, `testID`.
+- `OnboardingCreateGroupScreen` owns `openStep` state (which step is expanded) and composes the **existing** inputs (`Input`, `GroupTypeSelector`, `CurrencyPicker`, `CreateGroupCoverPreview`, members block) as `children` of each `OnboardingStepCard`. It stops rendering `CreateGroupFormFields` and `CreateGroupGuidancePanel`.
+- Inputs themselves are **not modified**. Submit/skip/create logic (`handleCreate`, gating on `name`, image upload, `AddMembersSheet`) is preserved as-is.
+- `CreateGroupFormShell` is reused for header/scroll/footer.
+- `CreateGroupGuidancePanel` is used only here → becomes dead code; remove it.
+
+## i18n
+
+- New keys under `onboarding.create.steps.*` (titles, helpers, "אופציונלי", "{n} חברים" summary) in both `i18n/locales/he.json` and `en.json`. Reuse existing copy where possible (tip1/tip2/tip3, `membersHint`, type labels, currency code).
+- All Hebrew; RTL preserved (REQ-PROF-03).
+
+## Testing
+
+- Unit test `OnboardingStepCard`: renders title/summary, toggles expanded, shows ✓ when `complete`, shows "אופציונלי" when `optional`.
+- Extend the onboarding create-group screen test: name still gates submit; steps render; tapping a header expands it / collapses others; create still calls `createGroup` with name/type/currency/members.
+
+## SRS / SSOT reconciliation
+
+- **REQ-GRP-02** — still calls `createGroup`; field set and submit behavior unchanged.
+- **REQ-PROF-03** — Hebrew + RTL preserved.
+- Post-login onboarding flow (2026-06-01 spec) unchanged except this screen's internal layout.
+
+## Not in scope (YAGNI)
+
+- No hard step gating / forced sequential completion (free to open any step).
+- No change to the standard `CreateGroupScreen` or to any input component's internals.
+- No new persisted fields; no DB/schema change.
+- No re-show-onboarding-from-settings (still out, per 2026-06-01 spec).
