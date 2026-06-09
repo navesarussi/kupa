@@ -1,4 +1,4 @@
-# SSOT — Single Source of Truth (Kupa)
+# SSOT — Single Source of Truth (Kupay)
 
 **Product:** Shared expense / cost-splitting app (Splitwise-like).  
 **Monorepo:** `cost-share-app/` (mobile, web, shared, Supabase).  

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-open the Kupa dev client on a running Android emulator with the current Metro URL.
+# Re-open the Kupay dev client on a running Android emulator with the current Metro URL.
 # Requires a local dev build: npm run android:run (once) before using android:open.
 
 set -euo pipefail
@@ -41,7 +41,7 @@ if [[ $tries -eq 0 ]]; then
   exit 1
 fi
 
-echo "Opening Kupa dev client on Android (Metro :${PORT})..."
+echo "Opening Kupay dev client on Android (Metro :${PORT})..."
 adb -s "$device" reverse "tcp:${PORT}" "tcp:${PORT}" 2>/dev/null || true
 adb -s "$device" shell am force-stop "$PACKAGE" 2>/dev/null || true
 sleep 0.5

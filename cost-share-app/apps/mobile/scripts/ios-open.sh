@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-open the Kupa dev client on the booted iOS simulator with the current Metro URL.
+# Re-open the Kupay dev client on the booted iOS simulator with the current Metro URL.
 # Requires a local dev build: npm run ios:run (once) before using ios:open.
 
 set -euo pipefail
@@ -31,7 +31,7 @@ if [[ $tries -eq 0 ]]; then
   exit 1
 fi
 
-echo "Opening Kupa dev client (Metro :${PORT})..."
+echo "Opening Kupay dev client (Metro :${PORT})..."
 xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true
 sleep 0.5
 

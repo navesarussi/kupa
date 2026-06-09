@@ -24,7 +24,7 @@
 | `cost-share-app/apps/mobile/components/dashboard/{BalanceHeroCard,StatTile,FriendBalanceRow,ProfileHeaderRow}.tsx` | Dashboard atoms |
 | `cost-share-app/apps/mobile/components/settings/{SettingsSection,SettingsRow,LegalSheet,LanguageSheet}.tsx` | Settings atoms |
 | `cost-share-app/apps/mobile/i18n/locales/en.json` + `he.json` | New `dashboard`, expanded `settings`, new `legal` keys |
-| `cost-share-app/apps/mobile/navigation/AppNavigator.tsx` | Header title for ProfileMain → "Kupa", centered |
+| `cost-share-app/apps/mobile/navigation/AppNavigator.tsx` | Header title for ProfileMain → "Kupay", centered |
 | `cost-share-app/apps/mobile/.env.example` | New `EXPO_PUBLIC_APP_STORE_URL`, `EXPO_PUBLIC_PLAY_STORE_URL`, `EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER` |
 | `docs/SSOT/SRS.md` | Add REQ-PROF-04, REQ-PROF-05 |
 
@@ -399,7 +399,7 @@ git commit -m "feat(mobile): add fetchDashboard via supabase.rpc('get_user_dashb
 ```json
 ,
 "dashboard": {
-    "appTitle": "Kupa",
+    "appTitle": "Kupay",
     "youOwe": "You owe",
     "youAreOwed": "You're owed",
     "viewBreakdown": "View per-currency breakdown",
@@ -1004,7 +1004,7 @@ export function ProfileScreen() {
 
 - [ ] **Step 5:** Run all mobile tests — `cd cost-share-app/apps/mobile && npm test`.
 
-- [ ] **Step 6:** Manual smoke (Expo dev client): header "Kupa" centered, settings icon trailing, profile row card, hero, tiles, friends, pull-to-refresh.
+- [ ] **Step 6:** Manual smoke (Expo dev client): header "Kupay" centered, settings icon trailing, profile row card, hero, tiles, friends, pull-to-refresh.
 
 - [ ] **Step 7:** Commit:
 
@@ -1071,9 +1071,9 @@ git commit -m "chore(mobile): add expo-application + expo-store-review + setting
 ,
 "legal": {
     "termsTitle": "Terms of Service",
-    "termsBody": "By using Kupa you agree to share expenses responsibly. We do not process payments — we only track balances between users.\n\nYour data is stored securely and is never sold to third parties. You may delete your account at any time by contacting support.\n\nKupa is provided as-is, without warranty.",
+    "termsBody": "By using Kupay you agree to share expenses responsibly. We do not process payments — we only track balances between users.\n\nYour data is stored securely and is never sold to third parties. You may delete your account at any time by contacting support.\n\nKupay is provided as-is, without warranty.",
     "privacyTitle": "Privacy Policy",
-    "privacyBody": "Kupa stores your profile (name, email, avatar) and the groups, expenses, and settlements you create. We use your email only for authentication.\n\nWe do not sell your data. We may share anonymous aggregate analytics. You can request deletion of your data at any time.\n\nContact: support via WhatsApp +972528616878.",
+    "privacyBody": "Kupay stores your profile (name, email, avatar) and the groups, expenses, and settlements you create. We use your email only for authentication.\n\nWe do not sell your data. We may share anonymous aggregate analytics. You can request deletion of your data at any time.\n\nContact: support via WhatsApp +972528616878.",
     "close": "Close"
 }
 ```
@@ -1645,7 +1645,7 @@ git commit -m "docs(srs): add REQ-PROF-04/05 for dashboard + settings redesign"
 ### Task 3.3: Final manual smoke (on device)
 
 - [ ] Sign in.
-- [ ] Profile header "Kupa" centered + settings gear trailing.
+- [ ] Profile header "Kupay" centered + settings gear trailing.
 - [ ] Profile row → EditProfile via edit icon.
 - [ ] Hero card: single-currency → headlines; multi-currency → "—" + breakdown open.
 - [ ] Two stat tiles render correct counts; tap → Groups list.

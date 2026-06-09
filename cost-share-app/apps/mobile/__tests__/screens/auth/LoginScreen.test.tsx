@@ -45,7 +45,7 @@ describe('LoginScreen', () => {
     it('renders the app logo, name and subtitle', () => {
         const { getByText, getByTestId } = render(<LoginScreen />);
         expect(getByTestId('app-logo')).toBeTruthy();
-        expect(getByText('Kupa')).toBeTruthy();
+        expect(getByText('Kupay')).toBeTruthy();
         expect(getByText('auth.subtitle')).toBeTruthy();
     });
 

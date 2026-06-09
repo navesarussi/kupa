@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kupa dev launcher — preflight, then web (+ shared watch) in background, Expo in foreground.
+# Kupay dev launcher — preflight, then web (+ shared watch) in background, Expo in foreground.
 #
 # Usage (bash or npm run dev:start):
 #   scripts/dev-start.sh
@@ -278,7 +278,7 @@ check_supabase_schema() {
 run_checks() {
   echo ""
   echo "══════════════════════════════════════════"
-  echo "  Kupa — preflight checks"
+  echo "  Kupay — preflight checks"
   echo "══════════════════════════════════════════"
   echo ""
 
@@ -410,7 +410,7 @@ start_expo_foreground() {
 
 start_services() {
   echo "══════════════════════════════════════════"
-  echo "  Kupa — starting dev stack"
+  echo "  Kupay — starting dev stack"
   echo "══════════════════════════════════════════"
   echo ""
   if [[ "$WITH_WEB" == true ]]; then

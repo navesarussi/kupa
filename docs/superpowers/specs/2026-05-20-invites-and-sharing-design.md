@@ -8,7 +8,7 @@ Status: **approved by user, not yet implemented**
 
 Add a link-based invitation layer on top of the existing friends system so users can:
 
-1. **Invite anyone to Kupa as a friend** via a shareable link (WhatsApp/SMS/Telegram/etc.) — even people who don't have the app yet. Sign-up through the link auto-creates the friendship.
+1. **Invite anyone to Kupay as a friend** via a shareable link (WhatsApp/SMS/Telegram/etc.) — even people who don't have the app yet. Sign-up through the link auto-creates the friendship.
 2. **Invite anyone to a specific group** via a shareable link. Sign-up or sign-in through the link auto-adds the user to `group_members` (and the existing auto-friend trigger handles friendships).
 3. **Surface the "send link" affordance everywhere people search for or pick friends**, so the product feels social-app smooth.
 
@@ -75,7 +75,7 @@ Three layers:
 User taps https://kupa.pro/g/A7XzB2K9 in WhatsApp
    │
    ├─ App installed + iOS/Android recognize domain as Universal Link
-   │     → Kupa opens; token passed to deepLinks handler
+   │     → Kupay opens; token passed to deepLinks handler
    │       → calls RPC redeem_group_invite(token)
    │       → navigates to GroupDetailScreen for joined group
    │
@@ -215,8 +215,8 @@ Uses `expo-sharing` (already a project dependency).
 
 Pre-filled share-sheet copy (from i18n; placeholders):
 
-- Friend: `"היי! בוא נחלק הוצאות יחד דרך Kupa. אם תרשם דרך הקישור הזה — נהיה אוטומטית חברים: {url}"`
-- Group: `"הוספתי אותך לקבוצת '{groupName}' ב-Kupa. הצטרף דרך הקישור: {url}"`
+- Friend: `"היי! בוא נחלק הוצאות יחד דרך Kupay. אם תרשם דרך הקישור הזה — נהיה אוטומטית חברים: {url}"`
+- Group: `"הוספתי אותך לקבוצת '{groupName}' ב-Kupay. הצטרף דרך הקישור: {url}"`
 
 ### Hook: `useInviteLink`
 
@@ -257,7 +257,7 @@ Renders:
 
 New "Invite a friend" block at the top of the screen:
 
-- Row "👥 Invite a friend to Kupa" → directly opens the share sheet.
+- Row "👥 Invite a friend to Kupay" → directly opens the share sheet.
 - `<InviteLinkBlock mode="expanded" kind="friend" />` underneath — shows the URL, Copy, Share, Rotate.
 
 #### `EditProfileScreen`
@@ -279,7 +279,7 @@ Tap → directly opens share sheet (no intermediate screen).
 
 Two affordances:
 
-- **Empty results state** (no matches after search): show a prominent "Invite {query} to Kupa" button. If the query parses as a name, embed the name; otherwise generic "Invite a new friend".
+- **Empty results state** (no matches after search): show a prominent "Invite {query} to Kupay" button. If the query parses as a name, embed the name; otherwise generic "Invite a new friend".
 - **Persistent footer** (any search state): subtle bottom-of-list row "Didn't find who you're looking for? — Invite a new friend by link".
 
 Both call `shareFriendInvite()`.
@@ -396,9 +396,9 @@ GET /g/B8YcK3M2
 ### HTML content — friend invite
 
 - Inviter's avatar (if available).
-- Heading: "{inviterName} wants to share expenses with you on Kupa".
-- Short subheading explaining what Kupa is.
-- Primary CTA: "Open Kupa" (deep-link try).
+- Heading: "{inviterName} wants to share expenses with you on Kupay".
+- Short subheading explaining what Kupay is.
+- Primary CTA: "Open Kupay" (deep-link try).
 - Platform CTA: "Download from App Store" or "Download from Google Play".
 - Footer: "After installing, return to this link".
 

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Kupa",
+    "name": "Kupay",
     "slug": "mobile",
     "scheme": "com.kupa.mobile",
     "version": "1.0.0",
@@ -23,13 +23,13 @@
       ],
       "icon": "./assets/icon.png",
       "infoPlist": {
-        "CFBundleDisplayName": "Kupa",
-        "CFBundleName": "Kupa"
+        "CFBundleDisplayName": "Kupay",
+        "CFBundleName": "Kupay"
       }
     },
     "android": {
       "package": "com.kupa.mobile",
-      "label": "Kupa",
+      "label": "Kupay",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -61,8 +61,8 @@
       ]
     },
     "web": {
-      "name": "Kupa",
-      "shortName": "Kupa",
+      "name": "Kupay",
+      "shortName": "Kupay",
       "description": "Split expenses with friends",
       "themeColor": "#3B82F6",
       "backgroundColor": "#ffffff",

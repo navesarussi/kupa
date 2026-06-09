@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the highest-risk test gaps in the Kupa mobile app and shared calculations layer so every critical user flow (auth, expenses, settlements, groups, invites, balances, realtime sync) has unit/integration tests with deterministic mocks.
+**Goal:** Close the highest-risk test gaps in the Kupay mobile app and shared calculations layer so every critical user flow (auth, expenses, settlements, groups, invites, balances, realtime sync) has unit/integration tests with deterministic mocks.
 
 **Architecture:** Follow existing patterns in `cost-share-app/apps/mobile/__tests__/`: mock `lib/supabase`, `lib/auth`, `react-native-toast-message`, and `i18n`; test pure logic under `__tests__/shared/`; test hooks with a new `renderHookWithQuery` helper. No production refactors unless a function is untestable without extraction. Each phase is an independent PR.
 

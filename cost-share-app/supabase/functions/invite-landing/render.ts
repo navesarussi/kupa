@@ -3,9 +3,9 @@
 
 // App Store URL is read from an env var because Apple assigns the numeric ID at
 // publication time; before publication, the env var falls back to the marketing
-// site itself. Set KUPA_APP_STORE_URL once the app is published.
-const APP_STORE_URL = Deno.env.get('KUPA_APP_STORE_URL') ?? 'https://kupa.pro/';
-const PLAY_STORE_URL = Deno.env.get('KUPA_PLAY_STORE_URL') ?? 'https://play.google.com/store/apps/details?id=com.kupa.mobile';
+// site itself. Set KUPAY_APP_STORE_URL once the app is published.
+const APP_STORE_URL = Deno.env.get('KUPAY_APP_STORE_URL') ?? 'https://kupa.pro/';
+const PLAY_STORE_URL = Deno.env.get('KUPAY_PLAY_STORE_URL') ?? 'https://play.google.com/store/apps/details?id=com.kupa.mobile';
 
 function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => ({
@@ -74,7 +74,7 @@ function shell({
 </body></html>`;
 }
 
-const APP_BRAND_TITLE = 'Kupa';
+const APP_BRAND_TITLE = 'Kupay';
 
 function brandName(): string {
     return `<span class="brand-name">${APP_BRAND_TITLE}</span>`;
@@ -103,8 +103,8 @@ export function renderFriendInvite(
         <p class="footnote">אחרי ההורדה — חזור לקישור הזה.</p>
     `;
     return shell({
-        title: `${preview.inviter.name} הזמין אותך ל-Kupa`,
-        description: 'הצטרף ל-Kupa וחלוק הוצאות בקלות.',
+        title: `${preview.inviter.name} הזמין אותך ל-Kupay`,
+        description: 'הצטרף ל-Kupay וחלוק הוצאות בקלות.',
         canonical: `https://kupa.pro/i/${token}`,
         body,
     });
@@ -141,7 +141,7 @@ export function renderGroupInvite(
         <p class="footnote">אחרי ההורדה — חזור לקישור הזה.</p>
     `;
     return shell({
-        title: `הוזמנת לקופת '${g.name}' ב-Kupa`,
+        title: `הוזמנת לקופת '${g.name}' ב-Kupay`,
         description: `${g.member_count} חברים · מטבע ${g.currency} · הצטרף בקלות`,
         canonical: `https://kupa.pro/g/${token}`,
         body,
