@@ -75,7 +75,7 @@ Expand/collapse uses React Native `LayoutAnimation` (configured on each toggle);
 ## Architecture
 
 - **New** `components/groups/OnboardingStepCard.tsx` — presentational: header (badge/check, title, optional tag, trailing summary, chevron) + animated collapsible body (`children`). Props: `index`, `title`, `helper?`, `summary?`, `optionalLabel?`, `complete`, `expanded`, `onToggle`, `children`, `testID`.
-- **New** `components/groups/GroupMembersField.tsx` — the member-avatars + add row, extracted so the onboarding members step stays focused. Used by onboarding now. The standard `CreateGroupFormFields` keeps its own copy this round (zero-risk); deduping it to use `GroupMembersField` is a tracked follow-up.
+- **New** `components/groups/GroupMembersField.tsx` — the member-avatars + add row, extracted so the onboarding members step stays focused. Used by **both** the onboarding members step and `CreateGroupFormFields` (behavior-preserving dedupe, guarded by the existing `CreateGroupScreen.test.tsx`).
 - `OnboardingCreateGroupScreen` owns `openStep` state (which step is expanded) and composes the **existing** inputs (`Input`, `GroupTypeSelector`, `CurrencyPicker`, `CreateGroupCoverPreview`, members block) as `children` of each `OnboardingStepCard`. It stops rendering `CreateGroupFormFields` and `CreateGroupGuidancePanel`.
 - Inputs themselves are **not modified**. Submit/skip/create logic (`handleCreate`, gating on `name`, image upload, `AddMembersSheet`) is preserved as-is.
 - `CreateGroupFormShell` is reused for header/scroll/footer.
@@ -85,6 +85,7 @@ Expand/collapse uses React Native `LayoutAnimation` (configured on each toggle);
 
 - `onboarding.create.header` copy changes from "קופה חדשה" to **"הקופה הראשונה"** (en equivalent, e.g. "Your first kupa"). Scoped to onboarding; the standard `CreateGroupScreen` uses its own title.
 - New keys under `onboarding.create.steps.*` (titles, helpers, "אופציונלי", "{n} חברים" summary) in both `i18n/locales/he.json` and `en.json`. Reuse existing copy where possible (tip1/tip2/tip3, `membersHint`, type labels, currency code).
+- The now-orphaned `groups.createForm.guidance` keys (`title`, `subtitle`, `tip1`–`tip3`) are removed once the panel is deleted — their tip copy moves into the step helpers.
 - All Hebrew; RTL preserved (REQ-PROF-03).
 
 ## Testing
@@ -101,6 +102,6 @@ Expand/collapse uses React Native `LayoutAnimation` (configured on each toggle);
 ## Not in scope (YAGNI)
 
 - No hard step gating / forced sequential completion (free to open any step).
-- No change to the standard `CreateGroupScreen` or to any input component's internals.
+- No behavioral or visual change to the standard `CreateGroupScreen` (its `CreateGroupFormFields` gets only a behavior-preserving internal swap to `GroupMembersField`, verified by `CreateGroupScreen.test.tsx`).
 - No new persisted fields; no DB/schema change.
 - No re-show-onboarding-from-settings (still out, per 2026-06-01 spec).

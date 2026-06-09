@@ -6,7 +6,7 @@
 
 **Architecture:** A new presentational `OnboardingStepCard` (tappable header + collapsible body, RN core `Animated` chevron + `LayoutAnimation` expand) wraps the existing inputs (`Input`, `GroupTypeSelector`, `CurrencyPicker`, `CreateGroupCoverPreview`, and an extracted `GroupMembersField`). The screen owns which step is open. The static `CreateGroupGuidancePanel` and the flat `CreateGroupFormFields` usage are removed from onboarding; the standard `CreateGroupScreen` is untouched.
 
-**Tech Stack:** React Native (Expo SDK 55), TypeScript, NativeWind, react-i18next, Jest + @testing-library/react-native.
+**Tech Stack:** React Native 0.81 / Expo SDK 54 (per `package.json`), TypeScript, NativeWind, react-i18next, Jest + @testing-library/react-native.
 
 **Spec:** [docs/superpowers/specs/2026-06-02-onboarding-first-group-interactive-steps-design.md](../specs/2026-06-02-onboarding-first-group-interactive-steps-design.md)
 
@@ -19,13 +19,24 @@
 
 ---
 
+## Council review (2026-06-02) — applied revisions
+
+A 4-reviewer council vetted this plan. Outcome:
+
+- **Rejected (verified false):** two reviewers claimed the rewrite deletes shipped features (`previewMode`, language toggle, hero, name suggestions, floating button, locale-aware currency, safe-area inset, `submitReady`, toast helpers). Verified against the **actual** `screens/onboarding/OnboardingCreateGroupScreen.tsx` (202 lines) and its sole caller `components/AuthenticatedAppGate.tsx:50` (passes `onDone` only): **none of those exist**. The rewrite below is faithful to the real screen. (Systematic agent hallucination — spot-checked and discarded.)
+- **Applied:** (1) dedupe `GroupMembersField` into `CreateGroupFormFields` now — it is guarded by `CreateGroupScreen.test.tsx` (Task 2); (2) remove now-dead `groups.createForm.guidance` i18n keys (Task 5); (3) add `expo-image-picker` + `AddMembersSheet` test mocks and three behavior tests — empty-name, image-upload, members (Task 4); (4) step-card accessibility label + title truncation + body fade + expanded-border polish (Task 3); (5) verification matches CI (`npm test --workspace=@cost-share/mobile -- --ci`) and requires `npm install` first (Task 5).
+- **Deferred (follow-ups):** scroll-to-opened-step (needs a ScrollView ref through `CreateGroupFormShell`), drop the cover hero's shadow/margin when embedded, dedupe `pickImage`.
+
+---
+
 ## File Structure
 
-- Create: `components/groups/GroupMembersField.tsx` — member-avatars + add row (extracted).
+- Create: `components/groups/GroupMembersField.tsx` — member-avatars + add row (extracted, used by onboarding AND `CreateGroupFormFields`).
 - Create: `components/groups/OnboardingStepCard.tsx` — accordion step card.
+- Modify: `components/groups/CreateGroupFormFields.tsx` — render `GroupMembersField` (behavior-preserving dedupe).
 - Modify: `screens/onboarding/OnboardingCreateGroupScreen.tsx` — compose 5 step cards.
 - Delete: `components/groups/CreateGroupGuidancePanel.tsx` — now unused.
-- Modify: `i18n/locales/he.json`, `i18n/locales/en.json` — header rename + `onboarding.create.steps.*`.
+- Modify: `i18n/locales/he.json`, `i18n/locales/en.json` — header rename, add `onboarding.create.steps.*`, remove dead `groups.createForm.guidance`.
 - Create tests: `__tests__/components/groups/GroupMembersField.test.tsx`, `__tests__/components/groups/OnboardingStepCard.test.tsx`, `__tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`.
 
 ---
@@ -305,11 +316,47 @@ export function GroupMembersField({
 Run: `npx jest __tests__/components/groups/GroupMembersField.test.tsx`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Refactor `CreateGroupFormFields` to use `GroupMembersField`** (behavior-preserving — guarded by `CreateGroupScreen.test.tsx`).
+
+In `components/groups/CreateGroupFormFields.tsx`, replace the import block (the `import` lines at the top, currently lines 5–20) with the following — it drops the now-unused `View`, `ScrollView`, `MemberAvatar`, `AppIcon`, `colors`, `getAvatarUrl`, `getDisplayName` and adds `GroupMembersField`:
+```tsx
+import React, { useCallback } from 'react';
+import { TouchableOpacity } from 'react-native';
+import { platformAlert } from '../../lib/platformAlert';
+import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
+import { GroupType, User } from '@cost-share/shared';
+import { Input } from '../Input';
+import { GroupTypeSelector } from '../GroupTypeSelector';
+import { CurrencyPicker } from '../CurrencyPicker';
+import { Text } from '../AppText';
+import { CreateGroupCoverPreview } from './CreateGroupCoverPreview';
+import { GroupFormSection } from './CreateGroupFormShell';
+import { GroupMembersField } from './GroupMembersField';
+```
+
+Then, inside the members `GroupFormSection`, replace the entire `<ScrollView horizontal ...> ... </ScrollView>` block with:
+```tsx
+                <GroupMembersField
+                    displayMembers={displayMembers}
+                    currentUserId={currentUserId}
+                    currentUser={currentUser}
+                    onAddMembers={onAddMembers}
+                    onRemoveMember={onRemoveMember}
+                />
+```
+Leave the wrapping `<GroupFormSection title={t('groups.members.title')} testID="group-form-members-section">` and its `membersHint` `<Text>` unchanged. (The `group-form-add-member` / `group-form-member-*` testIDs are identical in `GroupMembersField`, so behavior is preserved.)
+
+- [ ] **Step 6: Run the guarding test to confirm no regression**
+
+Run: `npx jest __tests__/screens/groups/CreateGroupScreen.test.tsx`
+Expected: PASS — unchanged behavior.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add components/groups/GroupMembersField.tsx __tests__/components/groups/GroupMembersField.test.tsx
-git commit -m "feat: extract GroupMembersField (member avatars + add row)"
+git add components/groups/GroupMembersField.tsx __tests__/components/groups/GroupMembersField.test.tsx components/groups/CreateGroupFormFields.tsx
+git commit -m "refactor: extract GroupMembersField and reuse in CreateGroupFormFields"
 ```
 
 ---
@@ -382,6 +429,16 @@ describe('OnboardingStepCard', () => {
             <OnboardingStepCard {...base} optionalLabel="אופציונלי" />,
         );
         expect(getByText('אופציונלי')).toBeTruthy();
+    });
+
+    it('exposes an accessibility label with the number, title and summary', () => {
+        const { getByTestId } = render(
+            <OnboardingStepCard {...base} index={3} title="מטבע" summary="ILS" />,
+        );
+        const label = getByTestId('step-name-header').props.accessibilityLabel;
+        expect(label).toContain('3');
+        expect(label).toContain('מטבע');
+        expect(label).toContain('ILS');
     });
 });
 ```
@@ -476,11 +533,12 @@ export function OnboardingStepCard({
             testID={testID}
             className="mb-3 rounded-2xl bg-white border border-slate-200/80 px-4 py-3.5"
             style={{
+                borderColor: expanded ? 'rgba(96,165,250,0.55)' : undefined,
                 shadowColor: '#0F172A',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.04,
-                shadowRadius: 12,
-                elevation: 2,
+                shadowOffset: { width: 0, height: expanded ? 8 : 4 },
+                shadowOpacity: expanded ? 0.08 : 0.04,
+                shadowRadius: expanded ? 16 : 12,
+                elevation: expanded ? 4 : 2,
             }}
         >
             <TouchableOpacity
@@ -488,6 +546,9 @@ export function OnboardingStepCard({
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityState={{ expanded }}
+                accessibilityLabel={[`${index}.`, title, summary, optionalLabel]
+                    .filter(Boolean)
+                    .join(' ')}
                 testID={testID ? `${testID}-header` : undefined}
                 className="flex-row items-center gap-3"
             >
@@ -517,7 +578,11 @@ export function OnboardingStepCard({
                 <View className="flex-1">
                     <View className="flex-row items-center gap-2">
                         <Text
-                            className={rtlTextClassName(isRtl, 'text-base font-bold')}
+                            numberOfLines={1}
+                            className={rtlTextClassName(
+                                isRtl,
+                                'text-base font-bold flex-shrink',
+                            )}
                             style={{ color: colors.text.primary }}
                         >
                             {title}
@@ -548,7 +613,10 @@ export function OnboardingStepCard({
             </TouchableOpacity>
 
             {expanded ? (
-                <View className="mt-3" testID={testID ? `${testID}-body` : undefined}>
+                <Animated.View
+                    style={{ marginTop: 12, opacity: rotate }}
+                    testID={testID ? `${testID}-body` : undefined}
+                >
                     {helper ? (
                         <Text
                             className={rtlTextClassName(
@@ -561,7 +629,7 @@ export function OnboardingStepCard({
                         </Text>
                     ) : null}
                     {children}
-                </View>
+                </Animated.View>
             ) : null}
         </View>
     );
@@ -571,7 +639,7 @@ export function OnboardingStepCard({
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx jest __tests__/components/groups/OnboardingStepCard.test.tsx`
-Expected: PASS (5 tests). If `LayoutAnimation` throws in jest (unlikely with jest-expo), add to the top of the test file: `jest.mock('react-native/Libraries/LayoutAnimation/LayoutAnimation', () => ({ configureNext: jest.fn(), Presets: { easeInEaseOut: {} } }));`
+Expected: PASS (6 tests). If `LayoutAnimation` throws in jest (unlikely with jest-expo), add to the top of the test file: `jest.mock('react-native/Libraries/LayoutAnimation/LayoutAnimation', () => ({ configureNext: jest.fn(), Presets: { easeInEaseOut: {} } }));`
 
 - [ ] **Step 5: Commit**
 
@@ -606,19 +674,46 @@ jest.mock('../../../services/storage.service', () => ({
 jest.mock('../../../lib/onboardingStorage', () => ({
     markPostLoginOnboardingComplete: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../../../components/AddMembersSheet', () => ({
-    AddMembersSheet: () => null,
+jest.mock('expo-image-picker', () => ({
+    requestMediaLibraryPermissionsAsync: jest
+        .fn()
+        .mockResolvedValue({ granted: true }),
+    launchImageLibraryAsync: jest
+        .fn()
+        .mockResolvedValue({ canceled: false, assets: [{ uri: 'file://cover.jpg' }] }),
 }));
+// Mock the members sheet as a button that confirms a fixed selection (Bob, u2).
+jest.mock('../../../components/AddMembersSheet', () => {
+    const React = require('react');
+    const { Pressable, Text } = require('react-native');
+    function AddMembersSheet({ onConfirmSelection }: any) {
+        return (
+            <Pressable
+                testID="mock-confirm-members"
+                onPress={() => onConfirmSelection([{ id: 'u2', name: 'Bob' }])}
+            >
+                <Text>confirm</Text>
+            </Pressable>
+        );
+    }
+    return { AddMembersSheet };
+});
 
 import { OnboardingCreateGroupScreen } from '../../../screens/onboarding/OnboardingCreateGroupScreen';
-import { createGroup } from '../../../services/groups.service';
+import { createGroup, updateGroup } from '../../../services/groups.service';
+import { uploadGroupImage } from '../../../services/storage.service';
 import { markPostLoginOnboardingComplete } from '../../../lib/onboardingStorage';
 import { useAppStore } from '../../../store';
 
 const mockCreateGroup = createGroup as jest.MockedFunction<typeof createGroup>;
+const mockUpdateGroup = updateGroup as jest.MockedFunction<typeof updateGroup>;
+const mockUploadGroupImage =
+    uploadGroupImage as jest.MockedFunction<typeof uploadGroupImage>;
 
 beforeEach(() => {
     mockCreateGroup.mockReset();
+    mockUpdateGroup.mockReset();
+    mockUploadGroupImage.mockReset();
     (markPostLoginOnboardingComplete as jest.Mock).mockClear();
     useAppStore.setState({
         currentUser: {
@@ -689,6 +784,57 @@ describe('OnboardingCreateGroupScreen — interactive steps', () => {
             expect(markPostLoginOnboardingComplete).toHaveBeenCalled(),
         );
         await waitFor(() => expect(onDone).toHaveBeenCalled());
+    });
+
+    it('keeps submit disabled and does not create when the name is empty', () => {
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        const submit = getByTestId('onboarding-create-submit');
+        expect(submit.props.accessibilityState?.disabled).toBe(true);
+        fireEvent.press(submit);
+        expect(mockCreateGroup).not.toHaveBeenCalled();
+    });
+
+    it('uploads the picked cover image and updates the group', async () => {
+        mockCreateGroup.mockResolvedValueOnce({ id: 'g1' } as any);
+        mockUploadGroupImage.mockResolvedValueOnce('https://cdn/cover.jpg');
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        // Open the image step, then tap the cover to pick a photo (picker mock returns a uri).
+        fireEvent.press(getByTestId('onboarding-step-image-header'));
+        fireEvent.press(getByTestId('onboarding-step-cover'));
+        // The remove link only renders once a local image is set — wait for it.
+        await waitFor(() =>
+            expect(getByTestId('onboarding-step-cover-remove')).toBeTruthy(),
+        );
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        await waitFor(() =>
+            expect(mockUploadGroupImage).toHaveBeenCalledWith('g1', 'file://cover.jpg'),
+        );
+        await waitFor(() =>
+            expect(mockUpdateGroup).toHaveBeenCalledWith('g1', {
+                imageUrl: 'https://cdn/cover.jpg',
+            }),
+        );
+    });
+
+    it('includes added members in the createGroup memberIds', async () => {
+        mockCreateGroup.mockResolvedValueOnce({ id: 'g1' } as any);
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        // The mocked AddMembersSheet confirms a fixed member (Bob, id u2).
+        fireEvent.press(getByTestId('mock-confirm-members'));
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        await waitFor(() =>
+            expect(mockCreateGroup).toHaveBeenCalledWith(
+                expect.objectContaining({ memberIds: ['u2'] }),
+            ),
+        );
     });
 });
 ```
@@ -943,7 +1089,7 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
                     title={t('onboarding.create.steps.category.title')}
                     helper={t('onboarding.create.steps.category.helper')}
                     summary={t(`groups.types.${groupType}`)}
-                    complete={true}
+                    complete={!!groupType}
                     expanded={openStep === 'category'}
                     onToggle={() => toggleStep('category')}
                     testID="onboarding-step-category"
@@ -955,7 +1101,7 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
                     index={3}
                     title={t('onboarding.create.steps.currency.title')}
                     summary={currency}
-                    complete={true}
+                    complete={!!currency}
                     expanded={openStep === 'currency'}
                     onToggle={() => toggleStep('currency')}
                     testID="onboarding-step-currency"
@@ -1050,7 +1196,7 @@ export function OnboardingCreateGroupScreen({ onDone }: Props) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx jest __tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`
-Expected: PASS (4 tests).
+Expected: PASS (7 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -1061,40 +1207,55 @@ git commit -m "feat: interactive accordion steps for first-group onboarding"
 
 ---
 
-## Task 5: Remove the dead guidance panel + full verification
+## Task 5: Remove dead code/keys + full verification
 
 **Files:**
 - Delete: `components/groups/CreateGroupGuidancePanel.tsx`
+- Modify: `i18n/locales/he.json`, `i18n/locales/en.json` (remove orphaned `groups.createForm.guidance`)
 
-- [ ] **Step 1: Confirm no remaining references**
+> **Prerequisite:** this worktree may have no `node_modules`. If `npx jest` / `npx tsc` fail with "command not found" or missing modules, run `npm install` at the monorepo root (`cost-share-app/`) first.
+
+- [ ] **Step 1: Confirm the guidance panel has no remaining references**
 
 Run:
 ```bash
 grep -rn "CreateGroupGuidancePanel" --include='*.ts' --include='*.tsx' . | grep -v node_modules
 ```
-Expected: no output (the screen no longer imports it). If anything prints, fix the importer before deleting.
+Expected: no output. If anything prints, fix the importer before deleting.
 
-- [ ] **Step 2: Delete the file**
+- [ ] **Step 2: Delete the panel**
 
 ```bash
 git rm components/groups/CreateGroupGuidancePanel.tsx
 ```
 
-- [ ] **Step 3: Typecheck the whole app**
+- [ ] **Step 3: Remove the now-orphaned `groups.createForm.guidance` i18n keys**
 
-Run: `npx tsc --noEmit`
-Expected: no errors. (Watch for unused-import errors in the rewritten screen — there should be none, but remove any the compiler flags.)
+The `guidance` object (`title`, `subtitle`, `tip1`, `tip2`, `tip3`) was used ONLY by the deleted panel; its tips now live as the step `helper` strings added in Task 1. Delete the entire `guidance` object from `groups.createForm` in BOTH `i18n/locales/he.json` and `i18n/locales/en.json`. Keep the sibling `createForm` keys (`namePlaceholder`, `sectionIdentity`, `sectionSettings`, `coverNamePlaceholder`, `membersHint`) — they're still used by `CreateGroupFormFields`.
 
-- [ ] **Step 4: Run the full test suite**
+Verify nothing references the keys and both files still parse:
+```bash
+grep -rn "createForm.guidance" --include='*.ts' --include='*.tsx' . | grep -v node_modules
+node -e "JSON.parse(require('fs').readFileSync('i18n/locales/he.json','utf8'));JSON.parse(require('fs').readFileSync('i18n/locales/en.json','utf8'));console.log('JSON OK')"
+```
+Expected: the grep prints nothing; the node command prints `JSON OK`.
 
-Run: `npx jest`
-Expected: all suites pass, including the pre-existing `__tests__/screens/groups/CreateGroupScreen.test.tsx` (untouched) and `__tests__/lib/onboardingStorage.test.ts`.
+- [ ] **Step 4: Typecheck**
 
-- [ ] **Step 5: Commit**
+Run (from `cost-share-app/apps/mobile`): `npx tsc --noEmit`
+Expected: no errors. Confirm the `CreateGroupFormFields` import cleanup from Task 2 left nothing unused.
+
+- [ ] **Step 5: Run the full mobile test suite (matches the CI green bar)**
+
+From `cost-share-app/apps/mobile`: `npx jest`
+— or the exact CI command from the monorepo root `cost-share-app/`: `npm test --workspace=@cost-share/mobile -- --ci`
+Expected: all suites pass — the new card/screen tests, the guarded `__tests__/screens/groups/CreateGroupScreen.test.tsx` and `EditGroupScreen.test.tsx` (covering the Task 2 refactor), and `__tests__/lib/onboardingStorage.test.ts`. (Note: CI's separate `lint` job is a no-op — the repo has no ESLint config — so `tsc` + `jest` are the real gates.)
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: remove unused CreateGroupGuidancePanel"
+git commit -m "chore: remove unused guidance panel and its dead i18n keys"
 ```
 
 ---
@@ -1110,9 +1271,10 @@ git commit -m "chore: remove unused CreateGroupGuidancePanel"
 - Image step reveals live cover hero → Task 4 (`CreateGroupCoverPreview` inside step 4).
 - Header renamed "הקופה הראשונה" → Task 1.
 - LayoutAnimation + core Animated (test-safe) → Task 3.
-- Guidance panel removed → Task 5. `GroupMembersField` extracted → Task 2.
-- Visual style matches `GroupFormSection`/`primary` tokens → Task 3 card styling.
-- Tests (card unit + screen) → Tasks 2–4.
+- Guidance panel removed + dead `guidance` i18n keys deleted → Task 5. `GroupMembersField` extracted AND reused in `CreateGroupFormFields` → Task 2.
+- Visual style matches `GroupFormSection`/`primary` tokens; expanded-border + body fade polish → Task 3 card styling.
+- Accessibility label on each step header → Task 3.
+- Tests (card unit + screen incl. empty-name gate, image-upload, members) → Tasks 2–4. Verification matches CI → Task 5.
 
 **Placeholder scan:** none — every code/step is complete.
 
@@ -1120,4 +1282,6 @@ git commit -m "chore: remove unused CreateGroupGuidancePanel"
 
 ## Follow-up (out of scope here)
 
-- Dedupe: refactor `CreateGroupFormFields` to use the new `GroupMembersField` (its `CreateGroupScreen.test.tsx` will guard the refactor).
+- Scroll-to-opened-step: when a lower step expands, scroll it into view (needs a `ScrollView` ref exposed through `CreateGroupFormShell`).
+- When `CreateGroupCoverPreview` is embedded inside the image step, drop its outer margin/shadow to avoid a double-shadow look.
+- Dedupe `pickImage` (duplicated between `OnboardingCreateGroupScreen` and `CreateGroupFormFields`) into a shared hook.
