@@ -107,7 +107,32 @@
             "balanceDefaultLabel": "היתרה שלך"
         },
         "create": {
-            "header": "קופה חדשה",
+            "header": "הקופה הראשונה",
+            "steps": {
+                "intro": "בואו נפתח את הקופה הראשונה — שלב אחרי שלב.",
+                "optional": "אופציונלי",
+                "name": {
+                    "title": "שם הקופה",
+                    "helper": "תנו שם שכולם מזהים (למשל «טיול לים» או «דירה 2025»)."
+                },
+                "category": {
+                    "title": "קטגוריה",
+                    "helper": "סוג הקופה קובע את הצבעים — אפשר לשנות אחר כך."
+                },
+                "currency": {
+                    "title": "מטבע"
+                },
+                "image": {
+                    "title": "תמונת כריכה",
+                    "summaryDefault": "ברירת מחדל",
+                    "summarySet": "תמונה נבחרה"
+                },
+                "members": {
+                    "title": "הזמנת חברים",
+                    "helper": "שולחים בוואטסאפ, לינק או מאנשי קשר — וכל החבר'ה בקופה.",
+                    "summarySuffix": "חברים"
+                }
+            },
             "namePlaceholder": "שם הקופה",
             "nameInputPlaceholder": "טיול לים · ארוחת שישי · דירה משותפת...",
             "backgroundLabel": "תמונת רקע",
