@@ -148,7 +148,14 @@
             "namePlaceholder": "Beach trip · Dinner · Shared flat...",
             "sectionIdentity": "Group details",
             "sectionSettings": "Settings",
-            "membersHint": "You're already in the group. Add friends now or invite later via WhatsApp."
+            "membersHint": "You're already in the group. Add friends now or invite later via WhatsApp.",
+            "guidance": {
+                "title": "Let's create your first group",
+                "subtitle": "Same form you'll use every time — with a few quick tips:",
+                "tip1": "Pick a name everyone recognizes (e.g. \"Beach trip\" or \"Flat 2025\").",
+                "tip2": "Group type sets the cover colors — you can change it later.",
+                "tip3": "Cover photo and members are optional — you can add them anytime."
+            }
         },
         "description": "Description",
         "enterDescription": "Enter description (optional)",

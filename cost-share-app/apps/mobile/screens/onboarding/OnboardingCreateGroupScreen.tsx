@@ -1,6 +1,5 @@
 /**
- * First-group onboarding — interactive accordion steps
- * (name, category, currency, cover image, members).
+ * First-group onboarding — same form as CreateGroupScreen + guidance panel.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -18,9 +17,6 @@ import { markPostLoginOnboardingComplete } from '../../lib/onboardingStorage';
 import { CreateGroupFloatingButton } from '../../components/groups/CreateGroupFloatingButton';
 import { Text } from '../../components/AppText';
 import { AppIcon } from '../../components/AppIcon';
-import { Input } from '../../components/Input';
-import { GroupTypeSelector } from '../../components/GroupTypeSelector';
-import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { AddMembersSheet } from '../../components/AddMembersSheet';
 import { CreateGroupFormShell } from '../../components/groups/CreateGroupFormShell';
 import { CreateGroupFormFields } from '../../components/groups/CreateGroupFormFields';
@@ -54,11 +50,6 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
     const [localImageUri, setLocalImageUri] = useState<string | null>(null);
     const [members, setMembers] = useState<User[]>([]);
     const [addMembersOpen, setAddMembersOpen] = useState(false);
-    const [openStep, setOpenStep] = useState<StepKey | null>('name');
-
-    const toggleStep = useCallback((key: StepKey) => {
-        setOpenStep((prev) => (prev === key ? null : key));
-    }, []);
 
     const finish = useCallback(async () => {
         if (!previewMode) {
@@ -98,7 +89,6 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
     const handleCreate = useCallback(async () => {
         if (!name.trim()) {
             setNameError(t('groups.nameRequired'));
-            setOpenStep('name');
             return;
         }
         setNameError('');
@@ -115,10 +105,7 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                 return;
             }
             if (localImageUri) {
-                const uploadedUrl = await uploadGroupImage(
-                    group.id,
-                    localImageUri,
-                );
+                const uploadedUrl = await uploadGroupImage(group.id, localImageUri);
                 if (uploadedUrl) {
                     await updateGroup(group.id, { imageUrl: uploadedUrl });
                 }
@@ -146,7 +133,6 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
         ...(currentUser ? [currentUser.id] : []),
         ...members.map((m) => m.id),
     ];
-    const otherMembersCount = members.length;
 
     return (
         <>
@@ -167,7 +153,9 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                         testID="onboarding-create-back"
                         accessibilityRole="button"
                     >
-                        <View className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center">
+                        <View
+                            className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center"
+                        >
                             <AppIcon
                                 name={isRtl ? 'chevron-forward' : 'chevron-back'}
                                 size={20}
@@ -207,69 +195,26 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                     />
                 }
             >
-                <Text
-                    className={rtlTextClassName(isRtl, 'text-sm leading-relaxed mb-4')}
-                    style={{ color: colors.text.secondary }}
-                >
-                    {t('onboarding.create.steps.intro')}
-                </Text>
-
-                <OnboardingStepCard
-                    index={1}
-                    title={t('onboarding.create.steps.name.title')}
-                    helper={t('onboarding.create.steps.name.helper')}
-                    summary={name.trim() || undefined}
-                    complete={name.trim().length > 0}
-                    expanded={openStep === 'name'}
-                    onToggle={() => toggleStep('name')}
-                    testID="onboarding-step-name"
-                >
-                    <Input
-                        placeholder={t('groups.createForm.namePlaceholder')}
-                        value={name}
-                        onChangeText={(text) => {
-                            setName(text);
-                            if (nameError) setNameError('');
-                        }}
-                        error={nameError}
-                        containerClassName="mb-0"
-                        testID="onboarding-step-name-input"
-                    />
-                </OnboardingStepCard>
-
-                <OnboardingStepCard
-                    index={2}
-                    title={t('onboarding.create.steps.category.title')}
-                    helper={t('onboarding.create.steps.category.helper')}
-                    summary={t(`groups.types.${groupType}`)}
-                    complete={!!groupType}
-                    expanded={openStep === 'category'}
-                    onToggle={() => toggleStep('category')}
-                    testID="onboarding-step-category"
-                >
-                    <GroupTypeSelector value={groupType} onChange={setGroupType} />
-                </OnboardingStepCard>
-
-                <OnboardingStepCard
-                    index={3}
-                    title={t('onboarding.create.steps.currency.title')}
-                    summary={currency}
-                    complete={!!currency}
-                    expanded={openStep === 'currency'}
-                    onToggle={() => toggleStep('currency')}
-                    testID="onboarding-step-currency"
-                >
-                    <CurrencyPicker value={currency} onChange={setCurrency} />
-                </OnboardingStepCard>
-
-                <OnboardingStepCard
-                    index={4}
-                    title={t('onboarding.create.steps.image.title')}
-                    optionalLabel={t('onboarding.create.steps.optional')}
-                    summary={
-                        localImageUri
-                            ? t('onboarding.create.steps.image.summarySet')
-                            : t('onboarding.create.steps.image.summaryDefault')
+                <CreateGroupFormFields
+                    isEdit={false}
+                    name={name}
+                    nameError={nameError}
+                    onNameChange={(text) => {
+                        setName(text);
+                        if (nameError) setNameError('');
+                    }}
+                    groupType={groupType}
+                    onGroupTypeChange={setGroupType}
+                    currency={currency}
+                    onCurrencyChange={setCurrency}
+                    localImageUri={localImageUri}
+                    onImageChange={setLocalImageUri}
+                    displayMembers={displayMembers}
+                    currentUserId={currentUser?.id ?? null}
+                    currentUser={currentUser}
+                    onAddMembers={() => setAddMembersOpen(true)}
+                    onRemoveMember={(m) =>
+                        setMembers((prev) => prev.filter((x) => x.id !== m.id))
                     }
                     membersHintKey="onboarding.create.membersHint"
                     nameAccessory={
@@ -292,10 +237,7 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                 onConfirmSelection={(picked) => {
                     setMembers((prev) => {
                         const ids = new Set(prev.map((m) => m.id));
-                        return [
-                            ...prev,
-                            ...picked.filter((u) => !ids.has(u.id)),
-                        ];
+                        return [...prev, ...picked.filter((u) => !ids.has(u.id))];
                     });
                     setAddMembersOpen(false);
                 }}
