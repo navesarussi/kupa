@@ -14,7 +14,6 @@ import { signOutNativeGoogle } from '../lib/googleSignInNative';
 import { APP_WEB_ORIGIN } from '@cost-share/shared';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store';
-import { updateUser } from './users.service';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -280,7 +279,7 @@ export async function signInWithApple(): Promise<{ error: AuthError | null }> {
     const userId = data.user?.id;
     if (fullName && userId) {
       try {
-        await updateUser(userId, { name: fullName });
+        await supabase.from('profiles').update({ name: fullName }).eq('id', userId);
       } catch {
         // best-effort; never block sign-in on a name update
       }

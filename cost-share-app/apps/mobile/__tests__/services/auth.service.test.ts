@@ -8,7 +8,9 @@ const mockOpenOAuthSession = jest.fn();
 let mockPlatformOs: 'ios' | 'android' | 'web' = 'ios';
 const mockMakeRedirectUri = jest.fn();
 const mockAppleSignInAsync = jest.fn();
-const mockUpdateUser = jest.fn().mockResolvedValue(null);
+const mockProfilesEq = jest.fn((..._args: unknown[]) => Promise.resolve({ data: null, error: null }));
+const mockProfilesUpdate = jest.fn((..._args: unknown[]) => ({ eq: mockProfilesEq }));
+const mockProfilesFrom = jest.fn((..._args: unknown[]) => ({ update: mockProfilesUpdate }));
 
 jest.mock('expo-constants', () => ({
     __esModule: true,
@@ -24,6 +26,7 @@ jest.mock('../../lib/supabase', () => ({
             signInWithOAuth: (...args: unknown[]) => mockSignInWithOAuth(...args),
             signOut: (...args: unknown[]) => mockSignOut(...args),
         },
+        from: (...args: unknown[]) => mockProfilesFrom(...args),
     },
 }));
 
@@ -78,10 +81,6 @@ jest.mock('expo-crypto', () => ({
     CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
     digestStringAsync: jest.fn(async (_algo: string, value: string) => `hashed:${value}`),
     randomUUID: jest.fn(() => 'uuid-1234'),
-}));
-
-jest.mock('../../services/users.service', () => ({
-    updateUser: (...args: unknown[]) => mockUpdateUser(...args),
 }));
 
 import { Platform } from 'react-native';
@@ -347,15 +346,17 @@ describe('auth.service', () => {
 
             await signInWithApple();
 
-            expect(mockUpdateUser).toHaveBeenCalledWith('user-1', { name: 'Dana Cohen' });
+            expect(mockProfilesFrom).toHaveBeenCalledWith('profiles');
+            expect(mockProfilesUpdate).toHaveBeenCalledWith({ name: 'Dana Cohen' });
+            expect(mockProfilesEq).toHaveBeenCalledWith('id', 'user-1');
         });
 
-        it('does not call updateUser when Apple returns no name', async () => {
+        it('does not update the profile when Apple returns no name', async () => {
             mockAppleSignInAsync.mockResolvedValue({ identityToken: 'apple-id-token', fullName: null });
 
             await signInWithApple();
 
-            expect(mockUpdateUser).not.toHaveBeenCalled();
+            expect(mockProfilesUpdate).not.toHaveBeenCalled();
         });
 
         it('returns no error (silent) when the user cancels', async () => {
