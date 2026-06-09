@@ -23,7 +23,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
@@ -63,13 +63,23 @@ import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
 import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
 import { useGroupMembersQuery } from '../../hooks/queries/useGroupMembersQuery';
+import { useGroupsQuery } from '../../hooks/queries/useGroupsQuery';
+import {
+    cancelPendingAddExpense,
+    chainEditFollowUp,
+    getPendingExpenseFromCache,
+    resolvePendingEditAction,
+    useAddExpenseMutation,
+} from '../../hooks/mutations/useAddExpenseMutation';
+import { isPendingExpenseId } from '../../lib/pendingExpense';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     createExpense,
     getExpenseWithSplits,
     updateExpense,
 } from '../../services/expenses.service';
 import { uploadExpenseReceipt } from '../../services/storage.service';
-import Toast from 'react-native-toast-message';
+import { handleError } from '../../lib/handleError';
 import { resolveGroupMemberUsers } from '../../lib/groupMemberUsers';
 import { getAvatarUrl, getDisplayName } from '../../lib/userDisplay';
 import {
@@ -144,6 +154,7 @@ export function AddExpenseScreen() {
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
+    const insets = useSafeAreaInsets();
     const routeParams = route.params ?? {};
     const expenseId: string | undefined = routeParams.expenseId;
     const isEditMode = Boolean(expenseId);
@@ -152,9 +163,12 @@ export function AddExpenseScreen() {
     const groupId = resolvedGroupId ?? '';
     const { isLoading, startLoading, stopLoading } = useLoading();
     const currentUser = useAppStore(state => state.currentUser);
-    const storeGroup = useAppStore(s =>
-        groupId ? s.groups.find(g => g.id === groupId) : undefined,
-    );
+    const groupsQuery = useGroupsQuery();
+    const storeGroup = groupId
+        ? groupsQuery.data?.find(g => g.id === groupId)
+        : undefined;
+    const queryClient = useQueryClient();
+    const addExpense = useAddExpenseMutation(groupId);
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -187,14 +201,20 @@ export function AddExpenseScreen() {
         [membersData],
     );
     const memberUsers = useMemo(
-        () =>
-            resolveGroupMemberUsers(
+        () => {
+            const resolved = resolveGroupMemberUsers(
                 activeMembers,
                 allUsers,
                 storeGroup?.members ?? [],
                 currency,
-            ),
-        [activeMembers, allUsers, storeGroup?.members, currency],
+            );
+            return resolved.filter(u => {
+                if (u.isActive !== false) return true;
+                if (isEditMode && selectedMemberIds.includes(u.id)) return true;
+                return false;
+            });
+        },
+        [activeMembers, allUsers, storeGroup?.members, currency, isEditMode, selectedMemberIds],
     );
 
     useLayoutEffect(() => {
@@ -209,10 +229,11 @@ export function AddExpenseScreen() {
 
     // Create mode: select all active members by default.
     useEffect(() => {
-        if (isEditMode || membersInitialized || activeMembers.length === 0) return;
-        setSelectedMemberIds(activeMembers.map(m => m.userId));
+        if (isEditMode || membersInitialized || activeMembers.length === 0 || allUsers.length === 0) return;
+        const activeUserIds = memberUsers.map(u => u.id);
+        setSelectedMemberIds(activeUserIds);
         setMembersInitialized(true);
-    }, [isEditMode, membersInitialized, activeMembers]);
+    }, [isEditMode, membersInitialized, activeMembers, allUsers, memberUsers]);
 
     // Create mode: default payer to current user.
     useEffect(() => {
@@ -225,6 +246,52 @@ export function AddExpenseScreen() {
         if (!isEditMode || !expenseId) return;
         const load = async () => {
             setExpenseLoading(true);
+            // Pending row — hydrate from the optimistic cache, no network.
+            if (isPendingExpenseId(expenseId)) {
+                const activeGroupId = routeGroupId ?? groupId;
+                if (activeGroupId) {
+                    const cached = getPendingExpenseFromCache(
+                        queryClient,
+                        activeGroupId,
+                        expenseId,
+                    );
+                    if (cached) {
+                        setResolvedGroupId(activeGroupId);
+                        setDescription(cached.description);
+                        setAmount(String(cached.amount));
+                        setCurrency(cached.currency);
+                        setPaidBy(cached.paidBy);
+                        const initialDate =
+                            cached.expenseDate instanceof Date
+                                ? cached.expenseDate
+                                : new Date(cached.expenseDate);
+                        setDate(initialDate);
+                        if (cached.splits.length > 0) {
+                            const initialMemberIds = cached.splits.map((s) => s.userId);
+                            setSelectedMemberIds(initialMemberIds);
+                            setMembersInitialized(true);
+                            const initialSplitMode = cached.splitMode
+                                ? storedSplitModeToUi(cached.splitMode)
+                                : ('equal' as UiSplitMode);
+                            setSplitMode(initialSplitMode);
+                        }
+                        editSnapshotRef.current = snapshotKey({
+                            description: cached.description,
+                            amount: String(cached.amount),
+                            currency: cached.currency,
+                            paidBy: cached.paidBy,
+                            dateMs: initialDate.getTime(),
+                            splitMode: cached.splitMode
+                                ? storedSplitModeToUi(cached.splitMode)
+                                : ('equal' as UiSplitMode),
+                            selectedMemberIds: cached.splits.map((s) => s.userId),
+                            unequalValues: {},
+                        });
+                    }
+                }
+                setExpenseLoading(false);
+                return;
+            }
             const data = await getExpenseWithSplits(expenseId);
             if (data) {
                 const activeGroupId = routeGroupId ?? data.expense.groupId;
@@ -443,10 +510,10 @@ export function AddExpenseScreen() {
             const uploaded = await uploadExpenseReceipt(groupId, localReceiptUri);
             if (!uploaded) {
                 stopLoading();
-                Toast.show({
-                    type: 'error',
-                    text1: t('common.error'),
-                    text2: t('expenses.receiptUploadError'),
+                handleError(new Error('uploadExpenseReceipt returned null'), {
+                    toast: { titleKey: 'common.error', messageKey: 'expenses.receiptUploadError' },
+                    tags: { service: 'storage', op: 'uploadExpenseReceipt' },
+                    extra: { groupId, isEditMode },
                 });
                 return;
             }
@@ -458,22 +525,63 @@ export function AddExpenseScreen() {
                 ? { receiptUrl: '' }
                 : {};
         const storedSplitMode = uiToStoredSplitMode(splitMode);
-        const result = isEditMode
-            ? expenseId
-                ? await updateExpense(expenseId, {
-                      description: description.trim(),
-                      amount: parsedAmount,
-                      currency,
-                      category,
-                      paidBy: payerId,
-                      expenseDate: date,
-                      splits,
-                      splitMode: storedSplitMode,
-                      ...receiptUpdate,
-                  })
-                : null
-            : await createExpense({
-                  groupId,
+
+        if (!isEditMode) {
+            // Offline-capable add via the mutation hook. Optimistic insert
+            // happens synchronously inside onMutate; queued while offline.
+            addExpense.mutate({
+                description: description.trim(),
+                amount: parsedAmount,
+                currency,
+                category,
+                paidBy: payerId,
+                expenseDate: date,
+                splits,
+                splitMode: storedSplitMode,
+                ...(uploadedReceiptUrl ? { receiptUrl: uploadedReceiptUrl } : {}),
+            });
+            stopLoading();
+            navigation.goBack();
+            return;
+        }
+
+        if (expenseId && isPendingExpenseId(expenseId)) {
+            // Editing a row whose create hasn't synced yet — branch on state.
+            const payload = {
+                description: description.trim(),
+                amount: parsedAmount,
+                currency,
+                category,
+                paidBy: payerId,
+                expenseDate: date,
+                splits,
+                splitMode: storedSplitMode,
+                ...receiptUpdate,
+            };
+            const action = resolvePendingEditAction(queryClient, expenseId);
+            if (action === 'chain-follow-up') {
+                chainEditFollowUp(queryClient, groupId, expenseId, payload);
+            } else {
+                cancelPendingAddExpense(queryClient, groupId, expenseId);
+                addExpense.mutate({
+                    description: payload.description,
+                    amount: payload.amount,
+                    currency: payload.currency,
+                    category: payload.category,
+                    paidBy: payload.paidBy,
+                    expenseDate: payload.expenseDate,
+                    splits: payload.splits,
+                    splitMode: payload.splitMode,
+                    ...(uploadedReceiptUrl ? { receiptUrl: uploadedReceiptUrl } : {}),
+                });
+            }
+            stopLoading();
+            navigation.goBack();
+            return;
+        }
+
+        const result = expenseId
+            ? await updateExpense(expenseId, {
                   description: description.trim(),
                   amount: parsedAmount,
                   currency,
@@ -482,8 +590,9 @@ export function AddExpenseScreen() {
                   expenseDate: date,
                   splits,
                   splitMode: storedSplitMode,
-                  ...(uploadedReceiptUrl ? { receiptUrl: uploadedReceiptUrl } : {}),
-              });
+                  ...receiptUpdate,
+              })
+            : null;
         stopLoading();
         if (result) {
             navigation.goBack();
@@ -508,6 +617,8 @@ export function AddExpenseScreen() {
         startLoading,
         stopLoading,
         t,
+        addExpense,
+        queryClient,
     ]);
 
     const runShake = useCallback((anim: Animated.Value) => {
@@ -614,7 +725,10 @@ export function AddExpenseScreen() {
             {/* Hero */}
             <ScrollView
                 style={styles.hero}
-                contentContainerStyle={styles.heroContent}
+                contentContainerStyle={[
+                    styles.heroContent,
+                    { paddingBottom: 140 + insets.bottom },
+                ]}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 showsVerticalScrollIndicator={false}
@@ -714,7 +828,7 @@ export function AddExpenseScreen() {
 
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
                 <LinearGradient
                     pointerEvents="none"
                     colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.95)']}

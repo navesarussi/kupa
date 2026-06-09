@@ -1,12 +1,12 @@
 /**
- * CreateGroupFormShell — shared layout (header, scroll, gradient footer).
- * Visual language aligned with AddExpenseScreen v2.
+ * CreateGroupFormShell — shared layout (header, scroll, sticky footer CTA).
+ * The footer is rendered in-flow (not absolutely positioned) so it can never
+ * overlap form content. ScrollView is strictly above it.
  */
 
 import React from 'react';
 import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '../AppText';
 import { colors } from '../../theme';
 
@@ -17,8 +17,13 @@ type Props = {
     guidance?: React.ReactNode;
     children: React.ReactNode;
     footer: React.ReactNode;
+    /** Full-screen flows without tab bar — pass safe-area bottom inset. */
+    extraBottomInset?: number;
     testID?: string;
 };
+
+const FOOTER_GAP_ABOVE = 2;
+const FOOTER_PADDING_TOP = 12;
 
 export function CreateGroupFormShell({
     title,
@@ -27,10 +32,11 @@ export function CreateGroupFormShell({
     guidance,
     children,
     footer,
+    extraBottomInset = 0,
     testID,
 }: Props) {
     return (
-        <SafeAreaView edges={['top', 'bottom']} style={styles.root} testID={testID}>
+        <SafeAreaView edges={['top']} style={styles.root} testID={testID}>
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -58,13 +64,12 @@ export function CreateGroupFormShell({
                     {children}
                 </ScrollView>
 
-                <View style={styles.footer}>
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(248,250,252,0)', 'rgba(248,250,252,0.97)']}
-                        locations={[0, 0.45]}
-                        style={StyleSheet.absoluteFill}
-                    />
+                <View
+                    style={[
+                        styles.footerBar,
+                        { paddingBottom: extraBottomInset + FOOTER_GAP_ABOVE },
+                    ]}
+                >
                     {footer}
                 </View>
             </KeyboardAvoidingView>
@@ -132,16 +137,13 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 16,
         paddingTop: 4,
-        paddingBottom: 120,
+        paddingBottom: 16,
     },
-    footer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
+    footerBar: {
+        paddingTop: FOOTER_PADDING_TOP,
         paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 8,
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
     },
     sectionShadow: {
         shadowColor: '#0F172A',

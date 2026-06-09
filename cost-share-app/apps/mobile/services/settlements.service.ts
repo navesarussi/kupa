@@ -11,8 +11,8 @@ import {
 import { settlementFromRow } from '@cost-share/shared';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
-import Toast from 'react-native-toast-message';
-import i18n from '../i18n';
+import { showSuccessToast, showErrorToast } from '../lib/appToast';
+import { handleError } from '../lib/handleError';
 
 export async function fetchSettlements(groupId?: string): Promise<Settlement[]> {
     try {
@@ -28,11 +28,10 @@ export async function fetchSettlements(groupId?: string): Promise<Settlement[]> 
         if (error) throw error;
         return (data ?? []).map(settlementFromRow);
     } catch (error) {
-        console.error('Failed to fetch settlements:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to load settlements',
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'settleUp.loadError', messageKey: 'common.networkError' },
+            tags: { service: 'settlements', op: 'fetch' },
+            extra: { groupId },
         });
         return [];
     }
@@ -54,11 +53,7 @@ export async function createSettlement(dto: CreateSettlementDto): Promise<Settle
     if (!createdBy) return null;
 
     if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to record payment',
-            text2: i18n.t('expenses.invalidAmount'),
-        });
+        showErrorToast('settleUp.recordError', 'expenses.invalidAmount');
         return null;
     }
 
@@ -81,18 +76,13 @@ export async function createSettlement(dto: CreateSettlementDto): Promise<Settle
             .single();
         if (error) throw error;
 
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('settleUp.toastRecorded'),
-        });
+        showSuccessToast('settleUp.toastRecorded');
         return settlementFromRow(data);
     } catch (error) {
-        console.error('Failed to create settlement:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to record payment',
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'settleUp.recordError', messageKey: 'common.networkError' },
+            tags: { service: 'settlements', op: 'create' },
+            extra: { groupId: dto.groupId, amount: dto.amount, currency: dto.currency },
         });
         return null;
     }
@@ -103,11 +93,7 @@ export async function updateSettlement(
     dto: UpdateSettlementDto,
 ): Promise<Settlement | null> {
     if (dto.amount !== undefined && (!Number.isFinite(dto.amount) || dto.amount <= 0)) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to update payment',
-            text2: i18n.t('expenses.invalidAmount'),
-        });
+        showErrorToast('settleUp.updateError', 'expenses.invalidAmount');
         return null;
     }
 
@@ -125,18 +111,13 @@ export async function updateSettlement(
             .select()
             .single();
         if (error) throw error;
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('settleUp.toastUpdated'),
-        });
+        showSuccessToast('settleUp.toastUpdated');
         return settlementFromRow(data);
     } catch (error) {
-        console.error('Failed to update settlement:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to update payment',
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'settleUp.updateError', messageKey: 'common.networkError' },
+            tags: { service: 'settlements', op: 'update' },
+            extra: { settlementId: id, patchKeys: Object.keys(dto) },
         });
         return null;
     }
@@ -149,18 +130,13 @@ export async function deleteSettlement(id: string): Promise<boolean> {
             .update({ deleted_at: new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('settleUp.toastDeleted'),
-        });
+        showSuccessToast('settleUp.toastDeleted');
         return true;
     } catch (error) {
-        console.error('Failed to delete settlement:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to delete payment',
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'settleUp.deleteError', messageKey: 'common.networkError' },
+            tags: { service: 'settlements', op: 'delete' },
+            extra: { settlementId: id },
         });
         return false;
     }

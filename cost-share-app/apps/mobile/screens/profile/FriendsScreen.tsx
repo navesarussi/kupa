@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
-import Toast from 'react-native-toast-message';
+import { showSuccessMessage } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { Text } from '../../components/AppText';
 import { MemberAvatar } from '../../components/MemberAvatar';
 import { AppIcon } from '../../components/AppIcon';
@@ -57,9 +58,13 @@ export function FriendsScreen() {
         async (req: FriendRequest) => {
             try {
                 await acceptM.mutateAsync(req.id);
-                Toast.show({ type: 'success', text1: t('friends.toasts.accepted') });
-            } catch {
-                Toast.show({ type: 'error', text1: t('friends.toasts.error') });
+                showSuccessMessage('friends.toasts.accepted');
+            } catch (err) {
+                handleError(err, {
+                    toast: { titleKey: 'friends.toasts.error' },
+                    tags: { service: 'friends', op: 'accept' },
+                    extra: { requestId: req.id },
+                });
             }
         },
         [acceptM, t],
@@ -69,9 +74,13 @@ export function FriendsScreen() {
         async (req: FriendRequest) => {
             try {
                 await rejectM.mutateAsync(req.id);
-                Toast.show({ type: 'success', text1: t('friends.toasts.rejected') });
-            } catch {
-                Toast.show({ type: 'error', text1: t('friends.toasts.error') });
+                showSuccessMessage('friends.toasts.rejected');
+            } catch (err) {
+                handleError(err, {
+                    toast: { titleKey: 'friends.toasts.error' },
+                    tags: { service: 'friends', op: 'reject' },
+                    extra: { requestId: req.id },
+                });
             }
         },
         [rejectM, t],
@@ -83,9 +92,13 @@ export function FriendsScreen() {
         setConfirmRemove(null);
         try {
             await removeM.mutateAsync(friend.id);
-            Toast.show({ type: 'success', text1: t('friends.toasts.removed') });
-        } catch {
-            Toast.show({ type: 'error', text1: t('friends.toasts.error') });
+            showSuccessMessage('friends.toasts.removed');
+        } catch (err) {
+            handleError(err, {
+                toast: { titleKey: 'friends.toasts.error' },
+                tags: { service: 'friends', op: 'remove' },
+                extra: { friendId: friend.id },
+            });
         }
     }, [confirmRemove, removeM, t]);
 

@@ -71,35 +71,25 @@ jest.mock('../../../services/users.service', () => ({
 import { AddExpenseScreen } from '../../../screens/expenses/AddExpenseScreen';
 import { createExpense } from '../../../services/expenses.service';
 import { getGroupMembers } from '../../../services/groups.service';
+import { fetchGroupUsers } from '../../../services/users.service';
 import { useAppStore } from '../../../store';
+import { queryClient } from '../../../lib/queryClient';
+import { queryKeys } from '../../../hooks/queries/keys';
 
 const mockCreateExpense = createExpense as jest.MockedFunction<typeof createExpense>;
 const mockGetGroupMembers = getGroupMembers as jest.MockedFunction<typeof getGroupMembers>;
+const mockFetchGroupUsers = fetchGroupUsers as jest.MockedFunction<typeof fetchGroupUsers>;
 
 beforeEach(() => {
     mockNavigate.mockClear();
     mockGoBack.mockClear();
     mockCreateExpense.mockReset();
+    mockFetchGroupUsers.mockReset();
+    mockFetchGroupUsers.mockResolvedValue([
+        { id: 'u1', name: 'Alice', email: 'a@x.com', inviteToken: 'alice123456', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date(), isActive: true, isAdmin: false },
+        { id: 'u2', name: 'Bob', email: 'b@x.com', inviteToken: 'bob12345678', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date(), isActive: true, isAdmin: false },
+    ]);
     useAppStore.setState({
-        groups: [
-            {
-                id: 'g1',
-                name: 'Test Group',
-                defaultCurrency: 'USD',
-                groupType: 'general',
-                inviteToken: 'testgroup1',
-                createdBy: 'u1',
-                isActive: true,
-                isArchivedByMe: false,
-                isAutoArchived: false,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                members: [
-                    { userId: 'u1', displayName: 'Alice', isActive: true },
-                    { userId: 'u2', displayName: 'Bob', isActive: true },
-                ],
-            },
-        ],
         currentUser: {
             id: 'u1',
             email: 'a@x.com',
@@ -113,6 +103,28 @@ beforeEach(() => {
             updatedAt: new Date(),
         },
     });
+    // Clear all cached queries so mockResolvedValueOnce overrides aren't shadowed
+    // by data populated during a prior test in this file.
+    queryClient.clear();
+    queryClient.setQueryData(queryKeys.groups, [
+        {
+            id: 'g1',
+            name: 'Test Group',
+            defaultCurrency: 'USD',
+            groupType: 'general',
+            inviteToken: 'testgroup1',
+            createdBy: 'u1',
+            isActive: true,
+            isArchivedByMe: false,
+            isAutoArchived: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            members: [
+                { userId: 'u1', displayName: 'Alice', isActive: true },
+                { userId: 'u2', displayName: 'Bob', isActive: true },
+            ],
+        },
+    ]);
 });
 
 describe('AddExpenseScreen — v2', () => {
@@ -316,5 +328,33 @@ describe('AddExpenseScreen — v2', () => {
             dto.expenseDate.getMonth() === 5 &&
             dto.expenseDate.getDate() === 15,
         ).toBe(false);
+    });
+
+    it('does not include soft-deleted users in the split selections when creating a new expense', async () => {
+        mockFetchGroupUsers.mockResolvedValueOnce([
+            { id: 'u1', name: 'Alice', email: 'a@x.com', inviteToken: 'alice123456', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date(), isActive: true, isAdmin: false },
+            { id: 'u2', name: 'Bob', email: 'b@x.com', inviteToken: 'bob12345678', defaultCurrency: 'USD', language: 'en', createdAt: new Date(), updatedAt: new Date(), isActive: false, isAdmin: false }, // inactive
+        ]);
+        mockGetGroupMembers.mockResolvedValueOnce([
+            { id: 'm1', groupId: 'g1', userId: 'u1', isActive: true, joinedAt: new Date() },
+            { id: 'm2', groupId: 'g1', userId: 'u2', isActive: true, joinedAt: new Date() },
+        ]);
+
+        mockCreateExpense.mockResolvedValueOnce({ id: 'e1' } as any);
+        const { findByTestId } = renderWithQuery(<AddExpenseScreen />);
+
+        fireEvent.changeText(await findByTestId('description-input'), 'Coffee');
+        fireEvent.changeText(await findByTestId('amount-display'), '10');
+
+        fireEvent.press(await findByTestId('add-expense-submit'));
+
+        await waitFor(() => expect(mockCreateExpense).toHaveBeenCalled());
+        expect(mockCreateExpense).toHaveBeenCalledWith(
+            expect.objectContaining({
+                splits: [
+                    { userId: 'u1' } // Bob (u2) is not selected because he is soft-deleted
+                ],
+            }),
+        );
     });
 });

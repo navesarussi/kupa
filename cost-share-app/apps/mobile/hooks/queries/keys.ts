@@ -6,6 +6,9 @@ export const queryKeys = {
     activityUnreadCount: ['activity', 'unread-count'] as const,
     groupUsers: (groupId: string) => ['groupUsers', groupId] as const,
     groupMembers: (groupId: string) => ['groupMembers', groupId] as const,
+    groupExpenses: (groupId: string) => ['groupExpenses', groupId] as const,
+    groupMessages: (groupId: string) => ['groupMessages', groupId] as const,
+    balanceSummary: ['balanceSummary'] as const,
     friends: ['friends'] as const,
     friendRequestsIncoming: ['friend-requests', 'incoming'] as const,
     friendRequestsOutgoing: ['friend-requests', 'outgoing'] as const,
@@ -19,4 +22,17 @@ export const queryKeys = {
         ['group-simplified-debts-by-currency', groupId] as const,
     legalDocument: (slug: 'terms' | 'privacy', locale: 'en' | 'he') =>
         ['legal-document', slug, locale] as const,
+    adminPlatformMetrics: ['admin', 'platform-metrics'] as const,
+    adminSentryIssues: (params: {
+        environment: 'dev' | 'prod';
+        status: 'unresolved' | 'all';
+        timeRange: '24h' | '7d' | '30d';
+    }) =>
+        ['adminSentryIssues', params.environment, params.status, params.timeRange] as const,
+    adminSentryIssueDetail: (issueId: string) =>
+        ['adminSentryIssueDetail', issueId] as const,
+    adminSentryIssueEvents: (issueId: string) =>
+        ['adminSentryIssueEvents', issueId] as const,
+    exchangeRates: (base: string, symbolsKey: string) =>
+        ['exchangeRates', base, symbolsKey] as const,
 };

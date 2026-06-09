@@ -1,9 +1,14 @@
+import './lib/sentry';
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, type AppStateStatus, LogBox, View, ActivityIndicator, Platform } from 'react-native';
+import { AppState, type AppStateStatus, LogBox, View, Platform } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
+import * as Sentry from '@sentry/react-native';
+import { applySentryUser, applySentryLanguage } from './lib/sentryIdentity';
 import Toast from 'react-native-toast-message';
+import { toastConfig } from './lib/toastConfig';
 import { handleAuthRedirectUrl, isAuthCallbackUrl } from './services/auth.service';
 import { AuthenticatedAppGate } from './components/AuthenticatedAppGate';
 import { LoginScreen } from './screens/auth/LoginScreen';
@@ -16,18 +21,23 @@ import {
   isInvalidRefreshTokenError,
   setupSupabaseAuthAutoRefresh,
 } from './lib/authSessionLifecycle';
+import { configureNativeGoogleSignIn } from './lib/googleSignInNative';
 import { supabase } from './lib/supabase';
 import { assertProfileActiveWithTimeout } from './lib/auth';
 import { signalDeactivatedAccount } from './lib/signalDeactivatedAccount';
-import { hydrateCurrentUserProfile } from './services/users.service';
+import { acceptSessionIfAllowed as acceptSessionIfAllowedImpl } from './lib/acceptSessionIfAllowed';
 import { queryClient } from './lib/queryClient';
+import { restoreClient } from './lib/persistQueryClient';
+import { wireNetworkStatusToOnlineManager } from './lib/networkStatus';
+import { sweepIfOnline } from './lib/zombieSweep';
+import { initAvatarCache } from './lib/avatarCache';
+import { AppGateSkeleton } from './components/skeletons/AppGateSkeleton';
 import { useAppStore } from './store';
 import { useAppRealtime } from './hooks/useAppRealtime';
 import { colors } from './theme';
 import { RtlLayoutProvider } from './hooks/useRtlLayout';
 import { WebAlertHost } from './components/WebAlertHost';
 import type { Session } from '@supabase/supabase-js';
-import './i18n';
 import './global.css';
 
 // Benign when a persisted session was revoked server-side (global sign-out, token rotation, etc.).
@@ -55,44 +65,31 @@ function WebFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
+function App() {
   const [isReady, setIsReady] = useState(false);
   const [preOnboardingDone, setPreOnboardingDone] = useState<boolean | null>(null);
-  const { session, setSession } = useAppStore();
-  const currentUserId = useAppStore((s) => s.currentUser?.id ?? null);
+  const session = useAppStore((s) => s.session);
+  const setSession = useAppStore((s) => s.setSession);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const currentUserId = currentUser?.id ?? null;
+  const language = useAppStore((s) => s.language);
   useAppRealtime(currentUserId);
   const setPendingDeactivationNotice = useAppStore((s) => s.setPendingDeactivationNotice);
   const incomingUrl = Linking.useURL();
+
+  useEffect(() => {
+    applySentryUser(currentUser ?? null);
+  }, [currentUser]);
+
+  useEffect(() => {
+    applySentryLanguage(language);
+  }, [language]);
 
   const rejectDeactivatedSession = useCallback(async () => {
     void signalDeactivatedAccount(setPendingDeactivationNotice);
     await clearStaleAuthSession();
     setSession(null);
   }, [setPendingDeactivationNotice, setSession]);
-
-  const acceptSessionIfAllowed = useCallback(async (nextSession: Session | null) => {
-    if (!nextSession) {
-      setSession(null);
-      return;
-    }
-
-    // Only reject on a definitive 'deactivated' from the server. 'unknown' (offline / timeout)
-    // must NOT trigger the deletion notice — the local session was valid; let the user in and
-    // re-verify on the next foreground via guardSession.
-    const status = await assertProfileActiveWithTimeout();
-    if (status === 'deactivated') {
-      await rejectDeactivatedSession();
-      return;
-    }
-
-    const hydration = await hydrateCurrentUserProfile(nextSession.user.id);
-    if (hydration === 'deactivated') {
-      await rejectDeactivatedSession();
-      return;
-    }
-
-    setSession(nextSession);
-  }, [rejectDeactivatedSession, setSession]);
 
   const processOAuthCallbackUrl = useCallback(async (url: string) => {
     const { error } = await handleAuthRedirectUrl(url);
@@ -130,12 +127,31 @@ export default function App() {
     }
   }, [rejectDeactivatedSession]);
 
+  // Boot-only: do not list auth callbacks in deps — they must not re-run init and stack listeners.
   useEffect(() => {
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
 
     const init = async () => {
+      const store = useAppStore.getState();
+
+      const acceptSession = (nextSession: Session | null, mode: 'fresh' | 'hydration') =>
+        acceptSessionIfAllowedImpl(nextSession, mode, {
+          setSession: store.setSession,
+          setPendingDeactivationNotice: store.setPendingDeactivationNotice,
+        });
+
+      const processOAuth = async (url: string) => {
+        const { error } = await handleAuthRedirectUrl(url);
+        if (error?.code === 'account_deleted') {
+          void signalDeactivatedAccount(store.setPendingDeactivationNotice);
+          await clearStaleAuthSession();
+          store.setSession(null);
+        }
+      };
+
       try {
+        configureNativeGoogleSignIn();
         await initializeLanguage();
         const preDone = await hasCompletedPreLoginOnboarding();
         if (mounted) setPreOnboardingDone(preDone);
@@ -143,7 +159,7 @@ export default function App() {
         if (Platform.OS === 'web' && typeof globalThis.location !== 'undefined') {
           const callbackUrl = globalThis.location.href;
           if (isAuthCallbackUrl(callbackUrl)) {
-            await processOAuthCallbackUrl(callbackUrl);
+            await processOAuth(callbackUrl);
             globalThis.history.replaceState({}, '', '/');
           }
         }
@@ -151,10 +167,12 @@ export default function App() {
         const hydratedSession = await hydrateAuthSession();
         if (!mounted) return;
 
+        await Promise.all([restoreClient(), initAvatarCache()]);
+
         if (hydratedSession) {
-          await acceptSessionIfAllowed(hydratedSession);
+          await acceptSession(hydratedSession, 'hydration');
         } else {
-          setSession(null);
+          store.setSession(null);
         }
 
         setupSupabaseAuthAutoRefresh();
@@ -162,25 +180,31 @@ export default function App() {
         // Register after hydrateAuthSession so we are the only boot-time listener and
         // do not clear the store on a premature null before AsyncStorage is read.
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-          if (!nextSession) {
-            setSession(null);
+          if (event === 'INITIAL_SESSION') return;
+
+          if (event === 'SIGNED_OUT') {
+            useAppStore.getState().setSession(null);
             return;
           }
 
+          if (!nextSession) return;
+
           if (event === 'SIGNED_IN') {
             setTimeout(() => {
-              void acceptSessionIfAllowed(nextSession);
+              void acceptSession(nextSession, 'fresh');
             }, 0);
             return;
           }
 
-          setSession(nextSession);
+          if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            useAppStore.getState().setSession(nextSession);
+          }
         });
         authSubscription = subscription;
       } catch (e) {
         if (isInvalidRefreshTokenError(e)) {
           await clearStaleAuthSession();
-          if (mounted) setSession(null);
+          if (mounted) useAppStore.getState().setSession(null);
         } else {
           console.error('Init error:', e);
         }
@@ -196,12 +220,18 @@ export default function App() {
       mounted = false;
       authSubscription?.unsubscribe();
     };
-  }, [acceptSessionIfAllowed, processOAuthCallbackUrl, setSession]);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = wireNetworkStatusToOnlineManager();
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') {
         void guardSession();
+        sweepIfOnline(queryClient);
       }
     });
     return () => sub.remove();
@@ -212,9 +242,7 @@ export default function App() {
       <SafeAreaProvider>
         <RtlLayoutProvider>
           <WebFrame>
-            <View className="flex-1 justify-center items-center bg-white">
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
+            <AppGateSkeleton />
           </WebFrame>
         </RtlLayoutProvider>
       </SafeAreaProvider>
@@ -229,16 +257,14 @@ export default function App() {
         <RtlLayoutProvider>
           <WebFrame>
             {preOnboardingDone === null ? (
-              <View className="flex-1 justify-center items-center bg-white">
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
+              <AppGateSkeleton />
             ) : showPreOnboarding ? (
               <OnboardingPreAuthFlow onFinished={() => setPreOnboardingDone(true)} />
             ) : (
               <LoginScreen />
             )}
           </WebFrame>
-          <Toast />
+          <Toast config={toastConfig} topOffset={56} />
         </RtlLayoutProvider>
       </SafeAreaProvider>
     );
@@ -251,9 +277,11 @@ export default function App() {
           <WebFrame>
             <AuthenticatedAppGate />
           </WebFrame>
-          <Toast />
+          <Toast config={toastConfig} topOffset={56} />
         </RtlLayoutProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
 }
+
+export default Sentry.wrap(App);

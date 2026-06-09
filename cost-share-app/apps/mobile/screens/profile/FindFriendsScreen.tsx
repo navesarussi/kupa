@@ -13,7 +13,8 @@ import {
     RefreshControl,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import Toast from 'react-native-toast-message';
+import { showSuccessMessage } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { Text } from '../../components/AppText';
 import { MemberAvatar } from '../../components/MemberAvatar';
 import { AppIcon } from '../../components/AppIcon';
@@ -50,9 +51,13 @@ export function FindFriendsScreen() {
         async (userId: string) => {
             try {
                 await sendM.mutateAsync(userId);
-                Toast.show({ type: 'success', text1: t('friends.toasts.requestSent') });
-            } catch {
-                Toast.show({ type: 'error', text1: t('friends.toasts.requestSentError') });
+                showSuccessMessage('friends.toasts.requestSent');
+            } catch (err) {
+                handleError(err, {
+                    toast: { titleKey: 'friends.toasts.requestSentError' },
+                    tags: { service: 'friends', op: 'sendRequest' },
+                    extra: { targetUserId: userId },
+                });
             }
         },
         [sendM, t],
@@ -62,9 +67,13 @@ export function FindFriendsScreen() {
         async (requestId: string) => {
             try {
                 await acceptM.mutateAsync(requestId);
-                Toast.show({ type: 'success', text1: t('friends.toasts.accepted') });
-            } catch {
-                Toast.show({ type: 'error', text1: t('friends.toasts.error') });
+                showSuccessMessage('friends.toasts.accepted');
+            } catch (err) {
+                handleError(err, {
+                    toast: { titleKey: 'friends.toasts.error' },
+                    tags: { service: 'friends', op: 'accept' },
+                    extra: { requestId },
+                });
             }
         },
         [acceptM, t],
@@ -74,9 +83,13 @@ export function FindFriendsScreen() {
         async (requestId: string) => {
             try {
                 await rejectM.mutateAsync(requestId);
-                Toast.show({ type: 'success', text1: t('friends.toasts.rejected') });
-            } catch {
-                Toast.show({ type: 'error', text1: t('friends.toasts.error') });
+                showSuccessMessage('friends.toasts.rejected');
+            } catch (err) {
+                handleError(err, {
+                    toast: { titleKey: 'friends.toasts.error' },
+                    tags: { service: 'friends', op: 'reject' },
+                    extra: { requestId },
+                });
             }
         },
         [rejectM, t],

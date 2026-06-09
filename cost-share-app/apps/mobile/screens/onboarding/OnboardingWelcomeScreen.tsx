@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '../../components/AppText';
 import { OnboardingHeroImage } from '../../components/onboarding/OnboardingHeroImage';
 import { OnboardingFloatingCard } from '../../components/onboarding/OnboardingFloatingCard';
+import { OnboardingLanguageToggle } from '../../components/onboarding/OnboardingLanguageToggle';
 import { onboardingColors } from '../../theme/onboardingColors';
 import { rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
 
@@ -34,6 +35,10 @@ export function OnboardingWelcomeScreen({ onStart, onExistingAccount }: Props) {
         <View style={styles.root}>
             <StatusBar barStyle="light-content" />
 
+            <View style={[styles.langRow, { top: insets.top + 8 }]}>
+                <OnboardingLanguageToggle variant="onDark" testID="onboarding-welcome-language-button" />
+            </View>
+
             <View style={[styles.heroWrap, { height: heroHeight }]}>
                 <OnboardingHeroImage variant="mountains" height={heroHeight} />
                 <LinearGradient
@@ -51,7 +56,7 @@ export function OnboardingWelcomeScreen({ onStart, onExistingAccount }: Props) {
                 subtitle={t('onboarding.welcome.card1Subtitle')}
                 style={{ top: insets.top + 56, end: 24 }}
                 rotateDeg={-3}
-                delayMs={140}
+                delayMs={60}
             />
             <OnboardingFloatingCard
                 icon="swap-horizontal-outline"
@@ -63,7 +68,7 @@ export function OnboardingWelcomeScreen({ onStart, onExistingAccount }: Props) {
                 subtitleBold
                 style={{ top: insets.top + 156, start: 28 }}
                 rotateDeg={4}
-                delayMs={260}
+                delayMs={120}
             />
             <OnboardingFloatingCard
                 icon="people-outline"
@@ -73,14 +78,14 @@ export function OnboardingWelcomeScreen({ onStart, onExistingAccount }: Props) {
                 subtitle={t('onboarding.welcome.card3Subtitle')}
                 style={{ top: insets.top + 276, end: 20 }}
                 rotateDeg={-2}
-                delayMs={380}
+                delayMs={180}
             />
 
             <Animated.View
-                entering={onboardingMotion.fadeUp(440)}
+                entering={onboardingMotion.fadeUp(220)}
                 style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 24) + 20 }]}
             >
-                <Animated.View entering={onboardingMotion.fadeDown(520)}>
+                <Animated.View entering={onboardingMotion.fadeDown(280)}>
                     <Text style={styles.wordmark}>{t('onboarding.welcome.brand')}</Text>
                     <Text
                         className={rtlTextClassName(isRtl, 'text-[17px] font-medium leading-snug mt-3.5')}
@@ -126,6 +131,11 @@ const styles = StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: onboardingColors.navy,
+    },
+    langRow: {
+        position: 'absolute',
+        end: 20,
+        zIndex: 4,
     },
     heroWrap: {
         position: 'absolute',

@@ -1,5 +1,61 @@
 import '@testing-library/jest-native/extend-expect';
 
+jest.mock('expo-crypto', () => {
+    let mockCounter = 0;
+    return {
+        randomUUID: () => {
+            mockCounter += 1;
+            return `test-uuid-${mockCounter}-${Math.random().toString(36).slice(2, 10)}`;
+        },
+    };
+});
+
+jest.mock('expo-file-system', () => {
+    class Directory {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        create() {
+            return;
+        }
+        delete() {
+            return;
+        }
+    }
+    class File {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        static async downloadFileAsync(
+            _url: string,
+            dest: { uri: string },
+        ): Promise<File> {
+            return new File(dest.uri);
+        }
+        delete() {
+            return;
+        }
+    }
+    return {
+        Directory,
+        File,
+        Paths: {
+            document: new Directory('/test/docs/'),
+            cache: new Directory('/test/cache/'),
+        },
+    };
+});
+
 jest.mock('./lib/supabase', () => ({
     supabase: {
         from: jest.fn(() => ({
@@ -16,6 +72,9 @@ jest.mock('./lib/supabase', () => ({
             getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
             getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
             signOut: jest.fn().mockResolvedValue({ error: null }),
+        },
+        functions: {
+            invoke: jest.fn().mockResolvedValue({ data: null, error: null }),
         },
     },
 }));
@@ -81,6 +140,41 @@ jest.mock('react-native-safe-area-context', () => {
         useSafeAreaFrame: () => ({ x: 0, y: 0, width: 320, height: 640 }),
     };
 });
+
+// Mock Sentry: ships as ESM (`export ... from '@sentry/core'`) which Jest can't parse,
+// and we don't want test runs hitting the SDK or its native modules anyway.
+jest.mock('@sentry/react-native', () => ({
+    __esModule: true,
+    init: jest.fn(),
+    wrap: <T>(component: T) => component,
+    setUser: jest.fn(),
+    setTag: jest.fn(),
+    setTags: jest.fn(),
+    setContext: jest.fn(),
+    setExtra: jest.fn(),
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+    addBreadcrumb: jest.fn(),
+    reactNavigationIntegration: () => ({
+        registerNavigationContainer: jest.fn(),
+    }),
+}));
+
+// Mock native Google Sign-In: it touches TurboModule at import time.
+jest.mock('@react-native-google-signin/google-signin', () => ({
+    GoogleSignin: {
+        configure: jest.fn(),
+        hasPlayServices: jest.fn().mockResolvedValue(true),
+        signIn: jest.fn().mockResolvedValue({ type: 'cancelled' }),
+        signOut: jest.fn().mockResolvedValue(undefined),
+    },
+    isErrorWithCode: () => false,
+    statusCodes: {
+        SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+        IN_PROGRESS: 'IN_PROGRESS',
+        PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    },
+}));
 
 // Silence the React Native logging during tests.
 jest.spyOn(console, 'warn').mockImplementation(() => { });

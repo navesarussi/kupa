@@ -17,8 +17,10 @@ import { Button } from '../../components/Button';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
 import { ProfileImagePicker } from '../../components/ProfileImagePicker';
 import { InviteLinkBlock } from '../../components/InviteLinkBlock';
-import { DEFAULT_CURRENCY } from '@cost-share/shared';
-import Toast from 'react-native-toast-message';
+import { useAppLanguage } from '../../hooks/useRtlLayout';
+import { defaultCurrencyForAppLanguage } from '../../lib/appDefaultCurrency';
+import { showSuccessToast } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { getAvatarUrl, getDisplayName } from '../../lib/userDisplay';
 
 export function EditProfileScreen() {
@@ -26,11 +28,15 @@ export function EditProfileScreen() {
     const navigation = useNavigation<any>();
     const { isLoading, startLoading, stopLoading } = useLoading();
     const currentUser = useAppStore((state) => state.currentUser);
+    const appLanguage = useAppLanguage();
 
     // TODO(account-deletion): self-edit form initial value uses raw name on purpose so empty names stay empty (not the unknown-user fallback). Keep raw read.
     const [name, setName] = useState(currentUser?.name || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
-    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || DEFAULT_CURRENCY);
+    const [currency, setCurrency] = useState(
+        () =>
+            currentUser?.defaultCurrency ?? defaultCurrencyForAppLanguage(appLanguage),
+    );
     const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
     const [avatarRemoved, setAvatarRemoved] = useState(false);
     const [nameError, setNameError] = useState('');
@@ -60,10 +66,10 @@ export function EditProfileScreen() {
             const uploadedUrl = await uploadProfileImage(currentUser.id, localAvatarUri);
             if (!uploadedUrl) {
                 stopLoading();
-                Toast.show({
-                    type: 'error',
-                    text1: t('common.error'),
-                    text2: t('profile.imageUploadError'),
+                handleError(new Error('uploadProfileImage returned null'), {
+                    toast: { titleKey: 'common.error', messageKey: 'profile.imageUploadError' },
+                    tags: { service: 'storage', op: 'uploadProfileImage' },
+                    extra: { userId: currentUser.id },
                 });
                 return;
             }
@@ -79,17 +85,13 @@ export function EditProfileScreen() {
         stopLoading();
 
         if (result) {
-            Toast.show({
-                type: 'success',
-                text1: t('common.success'),
-                text2: t('profile.profileUpdated'),
-            });
+            showSuccessToast('profile.profileUpdated');
             navigation.goBack();
         } else {
-            Toast.show({
-                type: 'error',
-                text1: t('common.error'),
-                text2: t('profile.updateError'),
+            handleError(new Error('updateUser returned null'), {
+                toast: { titleKey: 'common.error', messageKey: 'profile.updateError' },
+                tags: { service: 'users', op: 'updateUser' },
+                extra: { userId: currentUser.id, flow: 'editProfile' },
             });
         }
     };

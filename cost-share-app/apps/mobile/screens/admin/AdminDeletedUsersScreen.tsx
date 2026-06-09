@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import Toast from 'react-native-toast-message';
+import { showSuccessMessage } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { Text } from '../../components/AppText';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { listDeletedAccounts, restoreDeletedAccount, type DeletedAccount } from '../../services/admin.service';
+import { toDate } from '../../lib/dateUtils';
 
 export function AdminDeletedUsersScreen() {
     const { t } = useTranslation();
@@ -36,10 +38,14 @@ export function AdminDeletedUsersScreen() {
         setPending(null);
         const result = await restoreDeletedAccount(target.userId);
         if (result.ok) {
-            Toast.show({ type: 'success', text1: t('admin.deletedUsers.restoreSuccess') });
+            showSuccessMessage('admin.deletedUsers.restoreSuccess');
             await load();
         } else {
-            Toast.show({ type: 'error', text1: t(result.error ?? 'admin.deletedUsers.restoreError') });
+            handleError(new Error(`restoreDeletedAccount failed: ${result.error ?? 'unknown'}`), {
+                toast: { titleKey: result.error ?? 'admin.deletedUsers.restoreError' },
+                tags: { service: 'admin', op: 'restoreDeletedAccount' },
+                extra: { userId: target.userId, errorKey: result.error },
+            });
         }
     }, [pending, t, load]);
 
@@ -64,7 +70,7 @@ export function AdminDeletedUsersScreen() {
                             <Text className="text-base text-gray-900">{item.email}</Text>
                             <Text className="text-xs text-gray-500 mt-0.5">
                                 {t('admin.deletedUsers.deletedAtRelative', {
-                                    when: item.deletedAt.toLocaleDateString(),
+                                    when: toDate(item.deletedAt).toLocaleDateString(),
                                 })}
                             </Text>
                         </View>

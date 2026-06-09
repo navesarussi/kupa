@@ -46,12 +46,15 @@ describe('initializeLanguage', () => {
         i18nMgr.forceRTL.mockReset();
         i18nMgr.isRTL = false;
         useAppStore.setState({ language: 'en' });
-        await i18n.changeLanguage('en');
+        if (i18n.isInitialized && i18n.language !== 'en') {
+            await i18n.changeLanguage('en');
+        }
     });
 
     describe('saved-value path', () => {
-        it('uses saved he without reading device locale or reloading', async () => {
+        it('uses saved he without reading device locale when native is already RTL', async () => {
             await AsyncStorage.setItem('@app_language', 'he');
+            i18nMgr.isRTL = true;
 
             await initializeLanguage();
 
@@ -61,7 +64,33 @@ describe('initializeLanguage', () => {
             expect(reloadAsyncMock).not.toHaveBeenCalled();
         });
 
-        it('uses saved en without reading device locale or reloading', async () => {
+        it('uses saved he, forces RTL, and reloads when native is still LTR', async () => {
+            await AsyncStorage.setItem('@app_language', 'he');
+
+            await initializeLanguage();
+
+            expect(i18n.language).toBe('he');
+            expect(useAppStore.getState().language).toBe('he');
+            expect(getLocalesMock).not.toHaveBeenCalled();
+            expect(i18nMgr.forceRTL).toHaveBeenCalledWith(true);
+            expect(reloadAsyncMock).toHaveBeenCalledTimes(1);
+            expect(await AsyncStorage.getItem('@rtl_native_applied')).toBe('he');
+        });
+
+        it('does not reload again when native RTL stays wrong after a prior reload for he', async () => {
+            await AsyncStorage.multiSet([
+                ['@app_language', 'he'],
+                ['@rtl_native_applied', 'he'],
+            ]);
+
+            await initializeLanguage();
+
+            expect(i18n.language).toBe('he');
+            expect(i18nMgr.forceRTL).not.toHaveBeenCalled();
+            expect(reloadAsyncMock).not.toHaveBeenCalled();
+        });
+
+        it('uses saved en without reading device locale when native is already LTR', async () => {
             await AsyncStorage.setItem('@app_language', 'en');
 
             await initializeLanguage();
@@ -70,6 +99,19 @@ describe('initializeLanguage', () => {
             expect(useAppStore.getState().language).toBe('en');
             expect(getLocalesMock).not.toHaveBeenCalled();
             expect(reloadAsyncMock).not.toHaveBeenCalled();
+        });
+
+        it('uses saved en, forces LTR, and reloads when native still has RTL', async () => {
+            await AsyncStorage.setItem('@app_language', 'en');
+            i18nMgr.isRTL = true;
+
+            await initializeLanguage();
+
+            expect(i18n.language).toBe('en');
+            expect(useAppStore.getState().language).toBe('en');
+            expect(getLocalesMock).not.toHaveBeenCalled();
+            expect(i18nMgr.forceRTL).toHaveBeenCalledWith(false);
+            expect(reloadAsyncMock).toHaveBeenCalledTimes(1);
         });
     });
 

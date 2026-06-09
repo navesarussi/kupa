@@ -4,9 +4,8 @@ import {
     StyleSheet,
     TouchableOpacity,
     StatusBar,
+    Dimensions,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { onboardingMotion } from '../../theme/onboardingMotion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Text } from '../../components/AppText';
@@ -16,20 +15,26 @@ import {
     OnboardingMockupHighlight,
 } from '../../components/onboarding/OnboardingAppMockup';
 import { OnboardingPagerDots } from '../../components/onboarding/OnboardingPagerDots';
+import { OnboardingLanguageToggle } from '../../components/onboarding/OnboardingLanguageToggle';
 import { onboardingColors } from '../../theme/onboardingColors';
 import type { OnboardingHeroVariant } from '../../theme/onboardingColors';
 import { rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
+
+const TOP_BAR_HEIGHT = 40;
+const BOTTOM_CARD_HEIGHT = 220;
+const MOCKUP_NATURAL_HEIGHT = 520;
+const MOCKUP_NATURAL_WIDTH = 320;
 
 type Props = {
     stepIndex: number;
     eyebrowKey: string;
     titleKey: string;
-    bodyKey: string;
     mockupHighlight: OnboardingMockupHighlight;
     mockupHero: OnboardingHeroVariant;
     balanceLabelKey?: string;
     balanceAmountKey?: string;
     onSkip: () => void;
+    onBack: () => void;
     onNext: () => void;
 };
 
@@ -37,24 +42,35 @@ export function OnboardingFeatureScreen({
     stepIndex,
     eyebrowKey,
     titleKey,
-    bodyKey,
     mockupHighlight,
     mockupHero,
     balanceLabelKey,
     balanceAmountKey,
     onSkip,
+    onBack,
     onNext,
 }: Props) {
     const { t } = useTranslation();
     const isRtl = useRtlLayout();
     const insets = useSafeAreaInsets();
+    const { width: screenW, height: screenH } = Dimensions.get('window');
+
+    const availableHeight =
+        screenH - insets.top - TOP_BAR_HEIGHT - BOTTOM_CARD_HEIGHT;
+    const mockupScale = Math.min(
+        availableHeight / MOCKUP_NATURAL_HEIGHT,
+        screenW / MOCKUP_NATURAL_WIDTH,
+    );
 
     return (
         <View style={styles.root}>
             <StatusBar barStyle="dark-content" />
 
             <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
-                <View style={styles.topBarSpacer} />
+                <OnboardingLanguageToggle
+                    variant="onLight"
+                    testID="onboarding-feature-language-button"
+                />
                 <TouchableOpacity
                     onPress={onSkip}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -71,23 +87,17 @@ export function OnboardingFeatureScreen({
             </View>
 
             <View style={styles.mockupArea}>
-                <Animated.View
-                    entering={onboardingMotion.fadeDown(80)}
-                    style={styles.mockupScale}
-                >
+                <View style={{ transform: [{ scale: mockupScale }] }}>
                     <OnboardingAppMockup
                         highlight={mockupHighlight}
                         hero={mockupHero}
                         balanceLabelKey={balanceLabelKey}
                         balanceAmountKey={balanceAmountKey}
                     />
-                </Animated.View>
+                </View>
             </View>
 
-            <Animated.View
-                entering={onboardingMotion.fadeDown(160)}
-                style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
-            >
+            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
                 <Text
                     className={rtlTextClassName(isRtl, 'text-xs font-bold tracking-wider mb-2.5')}
                     style={{ color: onboardingColors.blue }}
@@ -100,14 +110,22 @@ export function OnboardingFeatureScreen({
                 >
                     {t(titleKey)}
                 </Text>
-                <Text
-                    className={rtlTextClassName(isRtl, 'text-[15px] leading-relaxed mb-5')}
-                    style={{ color: onboardingColors.muted }}
-                >
-                    {t(bodyKey)}
-                </Text>
 
                 <View style={styles.footer}>
+                    <TouchableOpacity
+                        onPress={onBack}
+                        activeOpacity={0.7}
+                        style={styles.backBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('onboarding.back')}
+                        testID="onboarding-feature-back"
+                    >
+                        <AppIcon
+                            name={isRtl ? 'chevron-forward' : 'chevron-back'}
+                            size={22}
+                            color={onboardingColors.muted}
+                        />
+                    </TouchableOpacity>
                     <OnboardingPagerDots count={4} activeIndex={stepIndex} />
                     <TouchableOpacity
                         onPress={onNext}
@@ -124,7 +142,7 @@ export function OnboardingFeatureScreen({
                         />
                     </TouchableOpacity>
                 </View>
-            </Animated.View>
+            </View>
         </View>
     );
 }
@@ -140,17 +158,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 22,
     },
-    topBarSpacer: {
-        width: 48,
-    },
     mockupArea: {
         flex: 1,
         overflow: 'hidden',
         alignItems: 'center',
-        paddingTop: 22,
-    },
-    mockupScale: {
-        transform: [{ scale: 0.62 }, { translateY: -30 }],
+        justifyContent: 'center',
     },
     sheet: {
         backgroundColor: onboardingColors.white,
@@ -168,6 +180,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    backBtn: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: onboardingColors.hairline,
+        backgroundColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     nextBtn: {
         width: 56,

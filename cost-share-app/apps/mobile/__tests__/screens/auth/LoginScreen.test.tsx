@@ -5,8 +5,8 @@ jest.mock('../../../services/auth.service', () => ({
     signInWithGoogle: jest.fn(),
 }));
 
-jest.mock('../../../i18n', () => ({
-    changeLanguage: jest.fn().mockResolvedValue(undefined),
+jest.mock('../../../hooks/useChangeAppLanguage', () => ({
+    useChangeAppLanguage: jest.fn(() => jest.fn().mockResolvedValue(undefined)),
 }));
 
 jest.mock('../../../lib/openMailto', () => ({
@@ -19,18 +19,25 @@ jest.mock('../../../lib/deactivationNoticeStorage', () => ({
     clearDeactivationNoticePending: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../lib/appToast', () => ({
+    showAppToast: jest.fn(),
+    showErrorToast: jest.fn(),
+}));
+
 import { LoginScreen } from '../../../screens/auth/LoginScreen';
 import { signInWithGoogle } from '../../../services/auth.service';
-import { changeLanguage } from '../../../i18n';
+import { useChangeAppLanguage } from '../../../hooks/useChangeAppLanguage';
 import { useAppStore } from '../../../store';
 import {
     clearDeactivationNoticePending,
     consumeDeactivationNoticePending,
 } from '../../../lib/deactivationNoticeStorage';
-import Toast from 'react-native-toast-message';
+import { showAppToast, showErrorToast } from '../../../lib/appToast';
 
 const mockSignIn = signInWithGoogle as jest.MockedFunction<typeof signInWithGoogle>;
-const mockChangeLanguage = changeLanguage as jest.MockedFunction<typeof changeLanguage>;
+const mockUseChangeAppLanguage = useChangeAppLanguage as jest.MockedFunction<
+    typeof useChangeAppLanguage
+>;
 const mockConsumeNotice = consumeDeactivationNoticePending as jest.MockedFunction<
     typeof consumeDeactivationNoticePending
 >;
@@ -40,13 +47,16 @@ describe('LoginScreen', () => {
         jest.clearAllMocks();
         useAppStore.setState({ language: 'en', pendingDeactivationNotice: false });
         mockConsumeNotice.mockResolvedValue(false);
+        mockUseChangeAppLanguage.mockImplementation(() =>
+            jest.fn().mockResolvedValue(undefined),
+        );
     });
 
     it('renders the app logo, name, tagline and feature chips', () => {
         const { getByText, getByTestId } = render(<LoginScreen />);
         expect(getByTestId('login-screen')).toBeTruthy();
         expect(getByTestId('app-logo')).toBeTruthy();
-        expect(getByText('Kupa')).toBeTruthy();
+        expect(getByText('CoPay')).toBeTruthy();
         expect(getByText('auth.tagline')).toBeTruthy();
         expect(getByText('auth.description')).toBeTruthy();
         expect(getByTestId('login-feature-chips')).toBeTruthy();
@@ -61,10 +71,13 @@ describe('LoginScreen', () => {
     });
 
     it('changes language when Hebrew is selected from picker', () => {
+        const changeAppLanguage = jest.fn().mockResolvedValue(undefined);
+        mockUseChangeAppLanguage.mockReturnValue(changeAppLanguage);
+
         const { getByTestId, getByText } = render(<LoginScreen />);
         fireEvent.press(getByTestId('login-language-button'));
         fireEvent.press(getByText('profile.hebrew'));
-        expect(mockChangeLanguage).toHaveBeenCalledWith('he');
+        expect(changeAppLanguage).toHaveBeenCalledWith('he');
     });
 
     it('renders the Google sign-in button', () => {
@@ -85,8 +98,10 @@ describe('LoginScreen', () => {
         const { getByTestId } = render(<LoginScreen />);
         fireEvent.press(getByTestId('login-google-button'));
         await waitFor(() =>
-            expect(Toast.show).toHaveBeenCalledWith(
-                expect.objectContaining({ type: 'error' }),
+            expect(showErrorToast).toHaveBeenCalledWith(
+                'auth.signInError',
+                undefined,
+                'boom',
             ),
         );
     });
@@ -100,7 +115,8 @@ describe('LoginScreen', () => {
         fireEvent.press(getByTestId('login-google-button'));
 
         expect(await findByText('deleteAccount.deactivatedTitle')).toBeTruthy();
-        expect(Toast.show).not.toHaveBeenCalled();
+        expect(showAppToast).not.toHaveBeenCalled();
+        expect(showErrorToast).not.toHaveBeenCalled();
     });
 
     it('shows deleted-account dialog when pendingDeactivationNotice flips on', async () => {

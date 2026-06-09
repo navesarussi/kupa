@@ -36,21 +36,74 @@ const resources = {
     he: { translation: he },
 };
 
-// Storage key for language preference
 const LANGUAGE_KEY = '@app_language';
+/** Last language we already ran forceRTL + reload for (prevents Android dev reload loops). */
+const RTL_NATIVE_APPLIED_KEY = '@rtl_native_applied';
 
-// Initialize i18n
-void i18n
-    .use(initReactI18next)
-    .init({
-        resources,
-        lng: 'en', // default language
-        fallbackLng: 'en',
-        interpolation: {
-            escapeValue: false,
-        },
-        compatibilityJSON: 'v4',
-    });
+const i18nInitOptions = {
+    resources,
+    fallbackLng: 'en' as const,
+    interpolation: {
+        escapeValue: false,
+    },
+    compatibilityJSON: 'v4' as const,
+};
+
+let initPromise: Promise<void> | null = null;
+
+async function ensureI18nReady(language: SupportedLanguage): Promise<void> {
+    if (!i18n.isInitialized) {
+        if (!initPromise) {
+            initPromise = i18n.use(initReactI18next).init({
+                ...i18nInitOptions,
+                lng: language,
+            }).then(() => undefined);
+        }
+        await initPromise;
+        return;
+    }
+
+    if (i18n.language !== language) {
+        await i18n.changeLanguage(language);
+    }
+}
+
+async function syncNativeRtl(language: SupportedLanguage): Promise<void> {
+    const desiredRTL = language === 'he';
+    if (I18nManager.isRTL === desiredRTL) {
+        await AsyncStorage.setItem(RTL_NATIVE_APPLIED_KEY, language);
+        return;
+    }
+
+    const applied = await AsyncStorage.getItem(RTL_NATIVE_APPLIED_KEY);
+    if (applied === language) {
+        // forceRTL + reload already ran for this language but native isRTL can stay
+        // wrong on Android dev builds — RtlLayoutProvider still mirrors from store.
+        if (__DEV__) {
+            console.warn(
+                '[i18n] Native I18nManager.isRTL still mismatched after reload; using logical RTL.',
+            );
+        }
+        return;
+    }
+
+    I18nManager.forceRTL(desiredRTL);
+    await AsyncStorage.setItem(RTL_NATIVE_APPLIED_KEY, language);
+    await Updates.reloadAsync();
+    // Execution stops here — the app reloads.
+}
+
+async function resolveStartupLanguage(): Promise<SupportedLanguage> {
+    const savedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
+
+    if (savedLanguage === 'en' || savedLanguage === 'he') {
+        return savedLanguage;
+    }
+
+    const deviceLanguage = resolveDeviceLanguage();
+    await AsyncStorage.setItem(LANGUAGE_KEY, deviceLanguage);
+    return deviceLanguage;
+}
 
 /**
  * Initialize language from AsyncStorage on app start
@@ -58,38 +111,15 @@ void i18n
  */
 export const initializeLanguage = async (): Promise<void> => {
     try {
-        const savedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
-
-        if (savedLanguage === 'en' || savedLanguage === 'he') {
-            await i18n.changeLanguage(savedLanguage);
-            const isRTL = savedLanguage === 'he';
-
-            // Apply RTL setting if needed
-            if (I18nManager.isRTL !== isRTL) {
-                I18nManager.forceRTL(isRTL);
-            }
-
-            useAppStore.getState().setLanguage(savedLanguage);
-
-            console.log(`Language loaded from storage: ${savedLanguage}`);
-            return;
-        }
-
-        // First launch — seed from device locale.
-        const deviceLanguage = resolveDeviceLanguage();
-        await i18n.changeLanguage(deviceLanguage);
-        useAppStore.getState().setLanguage(deviceLanguage);
-        await AsyncStorage.setItem(LANGUAGE_KEY, deviceLanguage);
-        console.log(`Language seeded from device locale: ${deviceLanguage}`);
-
-        const desiredRTL = deviceLanguage === 'he';
-        if (I18nManager.isRTL !== desiredRTL) {
-            I18nManager.forceRTL(desiredRTL);
-            await Updates.reloadAsync();
-            // Execution stops here — the app reloads.
-        }
+        const language = await resolveStartupLanguage();
+        await ensureI18nReady(language);
+        useAppStore.getState().setLanguage(language);
+        await syncNativeRtl(language);
+        if (__DEV__) console.log(`Language initialized: ${language}`);
     } catch (error) {
         console.error('Failed to initialize language:', error);
+        await ensureI18nReady('en');
+        useAppStore.getState().setLanguage('en');
     }
 };
 
@@ -99,15 +129,12 @@ export const initializeLanguage = async (): Promise<void> => {
  */
 export const changeLanguage = async (language: 'en' | 'he'): Promise<void> => {
     try {
+        await ensureI18nReady(language);
         await i18n.changeLanguage(language);
-
-        const isRTL = language === 'he';
-        if (I18nManager.isRTL !== isRTL) {
-            I18nManager.forceRTL(isRTL);
-        }
-
         await AsyncStorage.setItem(LANGUAGE_KEY, language);
-        console.log(`Language saved to storage: ${language}`);
+        useAppStore.getState().setLanguage(language);
+        if (__DEV__) console.log(`Language saved to storage: ${language}`);
+        await syncNativeRtl(language);
     } catch (error) {
         console.error('Failed to change language:', error);
         throw error;

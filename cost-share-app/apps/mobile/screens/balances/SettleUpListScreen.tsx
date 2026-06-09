@@ -29,6 +29,7 @@ import {
 } from '../../hooks/queries/useSettlementQueries';
 import { useGroupSimplifiedDebtsByCurrencyQuery } from '../../hooks/queries/useGroupBalancesQueries';
 import { useGroupUsersQuery } from '../../hooks/queries/useGroupUsersQuery';
+import { useGroupsQuery } from '../../hooks/queries/useGroupsQuery';
 import { useGroupSettlementsRealtime } from '../../hooks/useGroupSettlementsRealtime';
 import { useAppStore } from '../../store';
 import { colors } from '../../theme';
@@ -61,9 +62,10 @@ export function SettleUpListScreen() {
     const navigation = useNavigation<any>();
     const { groupId } = route.params;
     const currentUserId = useAppStore(s => s.currentUser?.id ?? '');
-    const groupName = useAppStore(
-        s => s.groups.find(g => g.id === groupId)?.name,
-    );
+    const groupsQuery = useGroupsQuery();
+    const group = groupsQuery.data?.find(g => g.id === groupId);
+    const groupName = group?.name;
+    const groupDefaultCurrency = group?.defaultCurrency ?? 'USD';
 
     useLayoutEffect(() => {
         if (groupName) {
@@ -116,6 +118,7 @@ export function SettleUpListScreen() {
     const [pendingDeleteSettlement, setPendingDeleteSettlement] =
         useState<Settlement | null>(null);
     const [othersExpanded, setOthersExpanded] = useState(false);
+    const [recordingPayment, setRecordingPayment] = useState(false);
 
     const memberMap = useMemo<Record<string, GroupMemberLite>>(() => {
         const map: Record<string, GroupMemberLite> = {};
@@ -306,6 +309,20 @@ export function SettleUpListScreen() {
                                 )}
                             </View>
                         ) : null}
+                        {memberLites.filter(m => m.isActive).length >= 2 ? (
+                            <TouchableOpacity
+                                onPress={() => setRecordingPayment(true)}
+                                activeOpacity={0.7}
+                                accessibilityRole="button"
+                                className="mt-3 flex-row items-center justify-center px-3 py-3 rounded-2xl bg-white border border-dashed border-primary-dark"
+                                testID="settle-record-payment-cta"
+                            >
+                                <AppIcon name="add-circle-outline" size={18} color={colors.primaryDark} />
+                                <Text className="ml-2 text-[14px] font-semibold text-primary-dark">
+                                    {t('settleUp.recordPaymentCta')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                         {sortedSettlements.length > 0 ? (
                             <View className="mt-8 mb-4">
                                 <View className="flex-row items-center mb-3 px-1">
@@ -415,8 +432,63 @@ export function SettleUpListScreen() {
                     groupName={groupName}
                 />
             )}
+
+            {recordingPayment && currentUserId && (
+                <SettleUpSheet
+                    visible={recordingPayment}
+                    members={memberLites}
+                    pairwiseDebts={debts}
+                    currentUserId={currentUserId}
+                    initial={pickRecordPaymentInitial({
+                        memberLites,
+                        currentUserId,
+                        defaultCurrency: groupDefaultCurrency,
+                    })}
+                    mode="create"
+                    allowParticipantEdit
+                    submitting={createMutation.isPending}
+                    onSubmit={async values => {
+                        await handleSubmit(values);
+                        setRecordingPayment(false);
+                    }}
+                    onClose={() => setRecordingPayment(false)}
+                    groupName={groupName}
+                />
+            )}
         </SafeAreaView>
     );
+}
+
+interface RecordPaymentInitialArgs {
+    memberLites: GroupMemberLite[];
+    currentUserId: string;
+    defaultCurrency: string;
+}
+
+/**
+ * Starting point for the "record a payment" sheet: the current user is the
+ * default payer; the first other active member is the default receiver; the
+ * currency defaults to the group's default. Deleted (inactive) accounts are
+ * skipped — the user can swap any of these via the in-sheet pickers.
+ */
+function pickRecordPaymentInitial({
+    memberLites,
+    currentUserId,
+    defaultCurrency,
+}: RecordPaymentInitialArgs) {
+    const activeMembers = memberLites.filter(m => m.isActive);
+    const selfIsActive = activeMembers.some(m => m.userId === currentUserId);
+    const fromUserId = selfIsActive
+        ? currentUserId
+        : activeMembers[0]?.userId ?? '';
+    const toUserId =
+        activeMembers.find(m => m.userId !== fromUserId)?.userId ?? '';
+    return {
+        fromUserId,
+        toUserId,
+        currency: defaultCurrency,
+        amount: 0,
+    };
 }
 
 interface SettlementHistoryRowProps {

@@ -10,8 +10,7 @@
  *   └────────────────────────────────────────┘
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { platformAlert } from '../lib/platformAlert';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import type { GroupMemberLite, PairwiseDebt, PaymentMethod } from '@cost-share/shared';
@@ -26,10 +25,10 @@ import {
     CurrencyPickerPopup,
     type CurrencyPickerOption,
 } from './expenseV2/CurrencyPickerPopup';
+import { MemberPickerPopup } from './expenseV2/MemberPickerPopup';
+import { CurrencyPicker } from './CurrencyPicker';
 import { rtlRowStyle, useRtlLayout } from '../hooks/useRtlLayout';
 import { getAvatarUrlForMember } from '../lib/userDisplay';
-import { openPaymentApp, type IsraeliPaymentApp } from '../lib/israeliPaymentLinks';
-import { PaymentAppLogo } from './settleUp/PaymentAppLogo';
 
 export interface SettleUpFormValues {
     fromUserId: string;
@@ -55,6 +54,13 @@ interface SettleUpSheetProps {
     };
     groupName?: string;
     mode: 'create' | 'edit';
+    /**
+     * When true, the user can change the payer and receiver by tapping the
+     * hero avatars, and the currency picker shows every currency present in
+     * the group's debts (not only those between the current from/to pair).
+     * Used by the "Record a payment" CTA on the settle-up list screen.
+     */
+    allowParticipantEdit?: boolean;
     submitting?: boolean;
     onSubmit: (values: SettleUpFormValues) => Promise<void> | void;
     onClose: () => void;
@@ -67,8 +73,6 @@ const METHOD_TILES: ReadonlyArray<{ key: MethodKey; icon: AppIconName }> = [
     { key: 'credit_card', icon: 'card-outline' },
     { key: 'paypal', icon: 'logo-paypal' },
 ];
-
-const PAYMENT_APPS: ReadonlyArray<IsraeliPaymentApp> = ['bit', 'paybox'];
 
 const DEFAULT_METHOD: MethodKey = 'credit_card';
 
@@ -94,6 +98,7 @@ export function SettleUpSheet({
     initial,
     groupName,
     mode,
+    allowParticipantEdit = false,
     submitting = false,
     onSubmit,
     onClose,
@@ -101,8 +106,8 @@ export function SettleUpSheet({
     const { t, i18n } = useTranslation();
     const isRtl = useRtlLayout();
 
-    const fromUserId = initial.fromUserId;
-    const toUserId = initial.toUserId;
+    const [fromUserId, setFromUserId] = useState(initial.fromUserId);
+    const [toUserId, setToUserId] = useState(initial.toUserId);
     const [currency, setCurrency] = useState(initial.currency);
     const [amountText, setAmountText] = useState(formatAmountText(initial.amount));
     const [paymentMethod, setPaymentMethod] = useState<MethodKey>(
@@ -113,15 +118,21 @@ export function SettleUpSheet({
     );
     const [datePickerOpen, setDatePickerOpen] = useState(false);
     const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+    const [fromPickerOpen, setFromPickerOpen] = useState(false);
+    const [toPickerOpen, setToPickerOpen] = useState(false);
 
     useEffect(() => {
         if (!visible) return;
+        setFromUserId(initial.fromUserId);
+        setToUserId(initial.toUserId);
         setCurrency(initial.currency);
         setAmountText(formatAmountText(initial.amount));
         setPaymentMethod(normalizeMethodKey(initial.paymentMethod));
         setSettlementDate(initial.settlementDate ?? new Date());
     }, [
         visible,
+        initial.fromUserId,
+        initial.toUserId,
         initial.currency,
         initial.amount,
         initial.paymentMethod,
@@ -129,22 +140,58 @@ export function SettleUpSheet({
     ]);
 
     const owedCurrencyOptions = useMemo<CurrencyPickerOption[]>(() => {
-        const filtered = pairwiseDebts
+        const pairMatches = pairwiseDebts
             .filter(
                 d =>
-                    d.fromUserId === initial.fromUserId &&
-                    d.toUserId === initial.toUserId &&
+                    d.fromUserId === fromUserId &&
+                    d.toUserId === toUserId &&
                     d.amount > 0,
             )
             .map(d => ({ currency: d.currency, amount: d.amount }));
-        if (filtered.some(o => o.currency === initial.currency)) return filtered;
+
+        if (allowParticipantEdit) {
+            // Record-arbitrary-payment: offer every currency present in the
+            // group's debts, plus whatever is currently selected.
+            const seen = new Set<string>();
+            const merged: CurrencyPickerOption[] = [];
+            for (const opt of pairMatches) {
+                if (seen.has(opt.currency)) continue;
+                seen.add(opt.currency);
+                merged.push(opt);
+            }
+            for (const d of pairwiseDebts) {
+                if (seen.has(d.currency)) continue;
+                seen.add(d.currency);
+                merged.push({ currency: d.currency, amount: 0 });
+            }
+            if (!seen.has(currency)) {
+                merged.unshift({ currency, amount: 0 });
+            }
+            return merged;
+        }
+
+        if (pairMatches.some(o => o.currency === initial.currency)) {
+            return pairMatches;
+        }
         return [
             { currency: initial.currency, amount: initial.amount },
-            ...filtered,
+            ...pairMatches,
         ];
-    }, [pairwiseDebts, initial.fromUserId, initial.toUserId, initial.currency, initial.amount]);
+    }, [
+        pairwiseDebts,
+        fromUserId,
+        toUserId,
+        initial.currency,
+        initial.amount,
+        allowParticipantEdit,
+        currency,
+    ]);
 
-    const canPickCurrency = mode === 'create' && owedCurrencyOptions.length > 1;
+    // In record-arbitrary-payment mode the user can pick any currency from the
+    // full ISO catalog, so the chip is always interactive.
+    const canPickCurrency =
+        allowParticipantEdit ||
+        (mode === 'create' && owedCurrencyOptions.length > 1);
 
     const parsedAmount = useMemo(() => {
         const n = parseFloat(amountText.replace(',', '.'));
@@ -157,11 +204,26 @@ export function SettleUpSheet({
         return map;
     }, [members]);
 
+    // Deleted (soft-deleted) accounts must not be selectable as payer/receiver
+    // when recording an arbitrary payment.
+    const activeMembers = useMemo(
+        () => members.filter(m => m.isActive),
+        [members],
+    );
+
     const fromMember = memberById.get(fromUserId);
     const toMember = memberById.get(toUserId);
 
+    const sameParticipant =
+        Boolean(fromUserId) && fromUserId === toUserId;
+
     const recordDisabled =
-        submitting || !Number.isFinite(parsedAmount) || parsedAmount <= 0;
+        submitting ||
+        !Number.isFinite(parsedAmount) ||
+        parsedAmount <= 0 ||
+        !fromUserId ||
+        !toUserId ||
+        sameParticipant;
 
     const handleCurrencySelected = useCallback(
         (option: CurrencyPickerOption) => {
@@ -219,9 +281,20 @@ export function SettleUpSheet({
                         onAmountChange={setAmountText}
                         canPickCurrency={canPickCurrency}
                         onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)}
+                        canPickParticipants={allowParticipantEdit}
+                        onOpenFromPicker={() => setFromPickerOpen(true)}
+                        onOpenToPicker={() => setToPickerOpen(true)}
                         groupName={groupName}
                         isRtl={isRtl}
                     />
+
+                    {sameParticipant ? (
+                        <View className="mx-4 mt-2">
+                            <Text className="text-[12px] text-red-500">
+                                {t('settleUp.sameParticipantError')}
+                            </Text>
+                        </View>
+                    ) : null}
 
                     <PaymentMethodSection
                         selected={paymentMethod}
@@ -250,13 +323,54 @@ export function SettleUpSheet({
                     }}
                 />
 
-                <CurrencyPickerPopup
-                    visible={currencyPickerOpen}
-                    options={owedCurrencyOptions}
-                    selectedCurrency={currency}
-                    onCancel={() => setCurrencyPickerOpen(false)}
-                    onConfirm={handleCurrencySelected}
-                />
+                {allowParticipantEdit ? (
+                    <CurrencyPicker
+                        value={currency}
+                        onChange={next => {
+                            setCurrency(next);
+                            setCurrencyPickerOpen(false);
+                        }}
+                        visible={currencyPickerOpen}
+                        onClose={() => setCurrencyPickerOpen(false)}
+                    />
+                ) : (
+                    <CurrencyPickerPopup
+                        visible={currencyPickerOpen}
+                        options={owedCurrencyOptions}
+                        selectedCurrency={currency}
+                        onCancel={() => setCurrencyPickerOpen(false)}
+                        onConfirm={handleCurrencySelected}
+                    />
+                )}
+
+                {allowParticipantEdit ? (
+                    <>
+                        <MemberPickerPopup
+                            visible={fromPickerOpen}
+                            title={t('settleUp.memberPickerFromTitle')}
+                            members={activeMembers}
+                            selectedUserId={fromUserId}
+                            disabledUserId={toUserId}
+                            onCancel={() => setFromPickerOpen(false)}
+                            onConfirm={member => {
+                                setFromUserId(member.userId);
+                                setFromPickerOpen(false);
+                            }}
+                        />
+                        <MemberPickerPopup
+                            visible={toPickerOpen}
+                            title={t('settleUp.memberPickerToTitle')}
+                            members={activeMembers}
+                            selectedUserId={toUserId}
+                            disabledUserId={fromUserId}
+                            onCancel={() => setToPickerOpen(false)}
+                            onConfirm={member => {
+                                setToUserId(member.userId);
+                                setToPickerOpen(false);
+                            }}
+                        />
+                    </>
+                ) : null}
 
             </View>
         </BottomSheetShell>
@@ -273,6 +387,9 @@ interface SettleUpHeroProps {
     onAmountChange: (v: string) => void;
     canPickCurrency: boolean;
     onOpenCurrencyPicker: () => void;
+    canPickParticipants: boolean;
+    onOpenFromPicker: () => void;
+    onOpenToPicker: () => void;
     groupName?: string;
     isRtl: boolean;
 }
@@ -285,6 +402,9 @@ function SettleUpHero({
     onAmountChange,
     canPickCurrency,
     onOpenCurrencyPicker,
+    canPickParticipants,
+    onOpenFromPicker,
+    onOpenToPicker,
     groupName,
     isRtl,
 }: SettleUpHeroProps) {
@@ -324,7 +444,12 @@ function SettleUpHero({
                 </View>
 
                 <View className="flex-1 flex-row items-center justify-between px-3">
-                    <FlowAvatar member={fromMember} label={t('settleUp.from')} />
+                    <FlowAvatar
+                        member={fromMember}
+                        label={t('settleUp.from')}
+                        onPress={canPickParticipants ? onOpenFromPicker : undefined}
+                        testID="settle-from-avatar"
+                    />
 
                     <View className="flex-1 items-center">
                         <View
@@ -372,16 +497,37 @@ function SettleUpHero({
                         </View>
                     </View>
 
-                    <FlowAvatar member={toMember} label={t('settleUp.to')} />
+                    <FlowAvatar
+                        member={toMember}
+                        label={t('settleUp.to')}
+                        onPress={canPickParticipants ? onOpenToPicker : undefined}
+                        testID="settle-to-avatar"
+                    />
                 </View>
             </LinearGradient>
         </View>
     );
 }
 
-function FlowAvatar({ member, label }: { member: GroupMemberLite | undefined; label: string }) {
+interface FlowAvatarProps {
+    member: GroupMemberLite | undefined;
+    label: string;
+    onPress?: () => void;
+    testID?: string;
+}
+
+function FlowAvatar({ member, label, onPress, testID }: FlowAvatarProps) {
+    const Wrapper: React.ComponentType<any> = onPress ? Pressable : View;
+    const wrapperProps = onPress
+        ? {
+              onPress,
+              accessibilityRole: 'button' as const,
+              accessibilityLabel: label,
+              testID,
+          }
+        : { testID };
     return (
-        <View style={{ width: 96 }} className="items-center">
+        <Wrapper {...wrapperProps} style={{ width: 96 }} className="items-center">
             <View
                 style={{
                     borderWidth: 2,
@@ -416,7 +562,7 @@ function FlowAvatar({ member, label }: { member: GroupMemberLite | undefined; la
             >
                 {label}
             </Text>
-        </View>
+        </Wrapper>
     );
 }
 
@@ -473,28 +619,9 @@ interface PaymentMethodSectionProps {
 
 function PaymentMethodSection({ selected, onSelect, isRtl }: PaymentMethodSectionProps) {
     const { t } = useTranslation();
-    const showAppLaunchers = Platform.OS === 'ios' || Platform.OS === 'android';
 
     return (
         <View className="px-4 pt-5 self-stretch">
-            {showAppLaunchers ? (
-                <>
-                    <SectionLabel
-                        isRtl={isRtl}
-                        title={t('settleUp.paymentApps')}
-                        subtitle={t('settleUp.paymentAppsSubtitle')}
-                    />
-                    <PaymentAppTiles t={t} isRtl={isRtl} />
-                    <View
-                        className="my-4 self-stretch"
-                        style={{
-                            height: 1,
-                            backgroundColor: '#E5E7EB',
-                        }}
-                    />
-                </>
-            ) : null}
-
             <SectionLabel isRtl={isRtl} title={t('settleUp.methodType')} />
             <MethodTiles selected={selected} onSelect={onSelect} t={t} isRtl={isRtl} />
         </View>
@@ -568,78 +695,6 @@ function MethodTiles({ selected, onSelect, t, isRtl }: MethodTilesProps) {
                             >
                                 {label}
                             </Text>
-                        </Pressable>
-                    );
-                })}
-            </View>
-        </ScrollView>
-    );
-}
-
-function PaymentAppTiles({
-    t,
-    isRtl,
-}: {
-    t: (key: string, opts?: Record<string, unknown>) => string;
-    isRtl: boolean;
-}) {
-    const handleOpenApp = useCallback(
-        async (app: IsraeliPaymentApp) => {
-            try {
-                await openPaymentApp(app);
-            } catch {
-                platformAlert(t('settleUp.paymentAppErrorTitle'), t('settleUp.paymentAppOpenFailed'));
-            }
-        },
-        [t],
-    );
-
-    return (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled>
-            <View style={[rtlRowStyle(isRtl), { gap: 12 }]}>
-                {PAYMENT_APPS.map((key) => {
-                    const appLabel = t(`settleUp.paymentAppLabels.${key}`);
-                    const isPaybox = key === 'paybox';
-                    return (
-                        <Pressable
-                            key={key}
-                            onPress={() => void handleOpenApp(key)}
-                            testID={`payment-app-tile-${key}`}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('settleUp.openPaymentApp', { app: appLabel })}
-                            style={{ alignItems: 'center', width: 72 }}
-                        >
-                            <View
-                                style={{
-                                    width: 72,
-                                    height: 72,
-                                    borderRadius: 16,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderWidth: isPaybox ? 0 : 1,
-                                    borderColor: '#E5E7EB',
-                                    backgroundColor: isPaybox ? '#5BC8F5' : '#FFFFFF',
-                                    overflow: 'hidden',
-                                    shadowColor: '#000',
-                                    shadowOpacity: 0.06,
-                                    shadowRadius: 8,
-                                    shadowOffset: { width: 0, height: 2 },
-                                }}
-                            >
-                                {isPaybox ? (
-                                    <PaymentAppLogo app={key} size={72} />
-                                ) : (
-                                    <PaymentAppLogo app={key} size={56} />
-                                )}
-                            </View>
-                            {!isPaybox ? (
-                                <Text
-                                    className="text-[10px] font-semibold text-gray-600 mt-1"
-                                    numberOfLines={1}
-                                >
-                                    {appLabel}
-                                </Text>
-                            ) : null}
                         </Pressable>
                     );
                 })}

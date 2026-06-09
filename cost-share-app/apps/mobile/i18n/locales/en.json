@@ -34,7 +34,7 @@
         "profile": "Profile"
     },
     "auth": {
-        "appName": "kupa",
+        "appName": "CoPay",
         "signInWithGoogle": "Continue with Google",
         "subtitle": "Split expenses with friends",
         "tagline": "Your shared kitty with friends",
@@ -45,112 +45,94 @@
             "balances": "Balances"
         },
         "signInError": "Sign in failed. Please try again.",
-        "signingIn": "Signing in..."
+        "signingIn": "Signing in...",
+        "googleSignInSheetTitle": "Sign in with Google",
+        "googleSignInSheetHint": "Tap below — account selection opens on top of this sheet."
     },
     "onboarding": {
         "skip": "Skip",
         "next": "Next",
+        "back": "Back",
         "welcome": {
-            "brand": "Pashut",
-            "tagline": "The kitty with your crew.\nNo spreadsheets, no WhatsApp math.",
+            "brand": "CoPay",
+            "tagline": "Split expenses with your crew.\nNo spreadsheets, no group-chat math.",
             "start": "Let's go",
             "existingAccount": "I already have an account",
-            "card1Title": "Gas for the trip",
-            "card1Subtitle": "3 of 5 in the split · ₪180",
-            "card2Title": "Avraham owes you",
-            "card2Subtitle": "+ ₪770",
+            "card1Title": "Road trip gas",
+            "card1Subtitle": "3 of 5 in the split · $65",
+            "card2Title": "Mike owes you",
+            "card2Subtitle": "+ $210",
             "card3Title": "Invite friends",
-            "card3Subtitle": "WhatsApp · link · contacts"
+            "card3Subtitle": "iMessage · link · contacts"
         },
         "feature1": {
             "eyebrow": "Split with who matters",
-            "title": "Pick who pays — not the whole group",
-            "body": "On every expense, choose who's in the split: gas for three, dinner without the friend who bailed. Anyone not selected doesn't pay and isn't charged for it."
+            "title": "Pick who pays — not the whole group"
         },
         "feature2": {
             "eyebrow": "Invite your crew",
-            "title": "Send a link — they're in",
-            "body": "Contacts, WhatsApp, or a group link. No need to explain the app — they tap and join the group."
+            "title": "Send a link — they're in"
         },
         "feature3": {
             "eyebrow": "No guesswork",
             "title": "See who owes whom — no mental math",
-            "body": "Balances update on their own. No more \"wait, let me calculate and get back to you\" — everyone in the group sees the same numbers.",
             "balanceLabel": "In your favor",
-            "balanceAmount": "+ ₪138"
+            "balanceAmount": "+ $38"
         },
         "feature4": {
             "eyebrow": "Settle up",
-            "title": "One payment — done",
-            "body": "Instead of a chain of transfers, we find the minimum: who pays whom, and how much. One tap — and you're square."
+            "title": "One payment — done"
         },
         "mockup": {
-            "groupName": "Beach trip",
-            "expense1Title": "Shabbat groceries",
-            "expense1Sub": "Noah paid · ₪320 · whole group",
+            "groupName": "Beach weekend",
+            "expense1Title": "Grocery run",
+            "expense1Sub": "Jake paid · $88 · whole group",
             "partialSplitCallout": "Choose who's in the split — not everyone",
             "partialSplitBadge": "{{count}} of {{total}} in split",
             "expense2Title": "Gas",
-            "expense2Sub": "You paid · ₪180",
+            "expense2Sub": "You paid · $65",
             "expense3Title": "Airbnb",
-            "expense3Sub": "Dana paid · ₪900 · split with 4",
-            "invite1Title": "Dana",
+            "expense3Sub": "Sarah paid · $248 · split with 4",
+            "invite1Title": "Sarah",
             "invite1Sub": "In the group",
-            "invite2Title": "Noah",
+            "invite2Title": "Jake",
             "invite2Sub": "Invited · pending",
             "invite3Title": "New invite",
-            "invite3Sub": "WhatsApp · link · contacts",
-            "debt1Title": "Avraham",
-            "debt1Sub": "Owes you · ₪770",
-            "debt2Title": "Noah",
-            "debt2Sub": "You owe · ₪120",
+            "invite3Sub": "iMessage · link · contacts",
+            "debt1Title": "Mike",
+            "debt1Sub": "Owes you · $210",
+            "debt2Title": "Jake",
+            "debt2Sub": "You owe · $42",
             "balanceDefaultLabel": "Your balance"
         },
         "create": {
-            "header": "Your first kupa",
-            "steps": {
-                "intro": "Let's open your first kupa — step by step.",
+            "header": "Your first group",
+            "hero": {
+                "eyebrow": "Last step",
+                "title": "Create your first group and start splitting expenses with friends",
+                "subtitle": "Name, type, and currency. Friends can join after you open it.",
+                "checkName": "Group name",
+                "checkDefaults": "Type & currency (defaults)",
+                "checkMembers": "Invite members",
                 "optional": "Optional",
-                "name": {
-                    "title": "Kupa name",
-                    "helper": "Pick a name everyone recognizes (e.g. \"Beach trip\" or \"Apt 2025\")."
-                },
-                "category": {
-                    "title": "Category",
-                    "helper": "The type sets the colors — you can change it later."
-                },
-                "currency": {
-                    "title": "Currency"
-                },
-                "image": {
-                    "title": "Cover image",
-                    "summaryDefault": "Default",
-                    "summarySet": "Image selected"
-                },
-                "members": {
-                    "title": "Invite members",
-                    "helper": "Send via WhatsApp, a link, or contacts — everyone's in the kupa.",
-                    "summarySuffix": "members"
-                }
+                "win1": "Splits calculate for you",
+                "win2": "Type & currency — editable",
+                "win3": "Invite via link or text"
             },
-            "namePlaceholder": "Group name",
-            "nameInputPlaceholder": "Beach trip · Dinner · Shared flat...",
-            "backgroundLabel": "Cover image",
-            "heroSea": "Sea",
-            "heroMountains": "Mountains",
-            "heroForest": "Forest",
-            "heroFlowers": "Flowers",
-            "heroWaves": "Waves",
-            "uploadHint": "Upload photo",
-            "membersLabel": "Group members",
-            "adminHint": "Group admin",
-            "addMembers": "Add members",
-            "inviteHint": "WhatsApp, link, or contacts — get everyone into the group",
+            "suggestions": {
+                "label": "Name ideas",
+                "trip": "Beach weekend",
+                "flat": "Roommates",
+                "games": "Game night",
+                "friday": "Friendsgiving"
+            },
+            "membersHint": "Invite now — or after the group is open.",
             "submit": "Create group",
+            "submitReady": "Open it",
             "skipTitle": "Skip creating a group?",
-            "skipMessage": "You can create a group later from the Groups tab.",
-            "skipConfirm": "Skip for now",
-            "findFriendsAfterCreate": "Right after you create the group — find friends and send invites"
+            "skipMessage": "No group means no expenses. You can open one anytime from Groups.",
+            "skipConfirm": "Skip",
+            "findFriendsAfterCreate": "After opening the group — link, text, or contacts."
         }
     },
     "groups": {
@@ -188,6 +170,9 @@
         "createError": "Failed to create group",
         "inactiveMemberSkipped": "Deleted users can't be added to a group",
         "updateError": "Failed to update group",
+        "deleteError": "Failed to delete group",
+        "memberAddError": "Failed to add member",
+        "memberRemoveError": "Failed to remove member",
         "deleteGroup": "Delete Group",
         "deleteForEveryone": "Delete group for everyone",
         "deleteGroupConfirm": "Are you sure you want to delete this group? This action cannot be undone.",
@@ -322,13 +307,13 @@
             "menuTitle": "Share group",
             "inviteOption": "Invite a friend to join",
             "inviteDescription": "Send a link to add someone to this group",
-            "exportOption": "Export to file",
-            "exportDescription": "Save group activity and balances as a file",
-            "exportTitle": "Share group report (PDF)",
-            "exportTitleHtml": "Share group report",
+            "exportOption": "Export to Excel / CSV",
+            "exportDescription": "Save group activity and balances as a CSV file (opens in Excel / Google Sheets)",
+            "exportTitle": "Share group report",
             "exportError": "Couldn't generate the file",
             "exporting": "Preparing export…",
             "exportedAt": "Exported",
+            "groupName": "Group",
             "members": "Members",
             "defaultCurrency": "Default currency",
             "sectionBalances": "Simplified balances (who owes whom)",
@@ -346,7 +331,7 @@
             "typeExpense": "Expense",
             "typeMessage": "Message",
             "typeSettlement": "Settlement",
-            "footer": "Generated by Kupa"
+            "footer": "Generated by CoPay"
         },
         "expense": {
             "youLent": "You lent {{amount}}",
@@ -456,6 +441,7 @@
         "loadError": "Failed to load expenses",
         "createError": "Failed to create expense",
         "updateError": "Failed to update expense",
+        "deleteError": "Failed to delete expense",
         "receipt": "Receipt",
         "addReceipt": "Add a receipt photo",
         "replaceReceipt": "Replace",
@@ -594,7 +580,16 @@
         "portal": {
             "title": "Admin Portal",
             "sectionLabel": "Tools",
-            "deletedUsersRow": "Deleted users"
+            "deletedUsersRow": "Deleted users",
+            "resetOnboardingRow": "Reset onboarding",
+            "previewCreateGroupRow": "Preview first-group screen"
+        },
+        "onboarding": {
+            "resetTitle": "Reset onboarding?",
+            "resetMessage": "Flags will be cleared and the first-group screen opens. Pre-login onboarding requires signing out and restarting the app.",
+            "resetConfirm": "Reset",
+            "resetSuccess": "Onboarding reset",
+            "previewTitle": "Preview"
         },
         "deletedUsers": {
             "title": "Deleted users",
@@ -607,7 +602,51 @@
             "restoreError": "Restore failed. Please try again."
         },
         "errors": {
-            "notAuthorized": "You don't have permission for this action"
+            "notAuthorized": "You don't have permission for this action",
+            "portalRow": "Errors",
+            "screenTitle": "Errors",
+            "detailTitle": "Issue",
+            "eventTitle": "Event",
+            "filters": {
+                "environment": "Environment",
+                "envDev": "Dev",
+                "envProd": "Prod",
+                "status": "Status",
+                "statusUnresolved": "Unresolved",
+                "statusAll": "All",
+                "timeRange": "Time",
+                "range24h": "24h",
+                "range7d": "7d",
+                "range30d": "30d"
+            },
+            "loading": "Loading errors…",
+            "empty": "No errors in this window",
+            "failed": "Failed to load. Pull to retry.",
+            "occurrences": "{{count}} occurrences",
+            "occurrences_one": "{{count}} occurrence",
+            "affectedUsers": "{{count}} users affected",
+            "affectedUsers_one": "{{count}} user affected",
+            "lastSeen": "Last seen {{when}}",
+            "firstSeen": "First seen {{when}}",
+            "level": "Level",
+            "status_label": "Status",
+            "eventTimestamp": "Timestamp",
+            "device": "Device",
+            "os": "OS",
+            "screen": "Screen",
+            "stackTrace": "Stack trace",
+            "tags": "Tags",
+            "user": "User",
+            "noEvents": "No events captured for this issue",
+            "noStack": "No stack trace available"
+        },
+        "metrics": {
+            "sectionLabel": "Overview",
+            "registeredUsers": "Registered users",
+            "activeGroups": "Active groups",
+            "archivedGroups": "Archived groups",
+            "archiveFootnote": "Archived = inactive 2+ months with zero balances (app-wide). Per-user manual archive is not included.",
+            "loadError": "Could not load metrics. Pull to refresh or try again later."
         }
     },
     "profile": {
@@ -726,6 +765,10 @@
         "toastRecorded": "Payment recorded",
         "toastUpdated": "Payment updated",
         "toastDeleted": "Payment deleted",
+        "loadError": "Failed to load payments",
+        "recordError": "Failed to record payment",
+        "updateError": "Failed to update payment",
+        "deleteError": "Failed to delete payment",
         "notInvolved": "You're not in this debt",
         "othersToggle": "Settlements that don't involve you ({{count}})",
         "detailHeaderLabel": "Settlement",
@@ -758,7 +801,11 @@
         "paymentAppErrorTitle": "Can't open payment",
         "paymentAppOpenFailed": "Couldn't open the payment app. Make sure it is installed.",
         "currencyPickerTitle": "Choose currency",
-        "amountOwed": "{{amount}} owed"
+        "amountOwed": "{{amount}} owed",
+        "recordPaymentCta": "Record a payment",
+        "memberPickerFromTitle": "Choose payer",
+        "memberPickerToTitle": "Choose receiver",
+        "sameParticipantError": "Payer and receiver can't be the same"
     },
     "feed": {
         "settlement": "{{from}} paid {{to}} {{amount}}",
@@ -778,21 +825,21 @@
     },
     "invite": {
         "friend": {
-            "title": "Invite a friend to Kupa",
+            "title": "Invite a friend to CoPay",
             "subtitle": "Send a link via WhatsApp and more",
             "cta": "Share link",
-            "shareMessage": "Hey! Let's split expenses together on Kupa. If you sign up through this link we'll automatically become friends: {{url}}",
+            "shareMessage": "Hey! Let's split expenses together on CoPay. If you sign up through this link we'll automatically become friends: {{url}}",
             "rotate": "Rotate link",
             "rotateConfirmTitle": "Rotate invite link?",
             "rotateConfirmBody": "The previous link will stop working. Anyone holding the old link won't be able to become your friend until you send them the new one.",
             "rotated": "Invite link updated",
             "findEmpty": "Didn't find who you're looking for?",
             "findEmptyCta": "Invite a new friend by link",
-            "findInviteName": "Invite {{name}} to Kupa"
+            "findInviteName": "Invite {{name}} to CoPay"
         },
         "group": {
             "title": "Share group link",
-            "shareMessage": "I added you to the '{{groupName}}' group on Kupa. Join via this link: {{url}}",
+            "shareMessage": "I added you to the '{{groupName}}' group on CoPay. Join via this link: {{url}}",
             "rotate": "Rotate link",
             "rotateConfirmTitle": "Rotate group invite link?",
             "rotateConfirmBody": "Anyone holding the current link won't be able to join until you send them the new one. Members already in the group are unaffected.",
@@ -812,7 +859,7 @@
         }
     },
     "dashboard": {
-        "appTitle": "Kupa",
+        "appTitle": "CoPay",
         "youOwe": "You owe",
         "youAreOwed": "You're owed",
         "balanceOverview": "Balance overview",
@@ -833,7 +880,6 @@
         "closedGroups": "Settled groups",
         "activeGroups": "Unsettled groups",
         "friends": "Friends",
-        "friendsCount": "{{count}} friends",
         "loadError": "Failed to load dashboard",
         "settled": "Settled up",
         "owesYou": "owes you",

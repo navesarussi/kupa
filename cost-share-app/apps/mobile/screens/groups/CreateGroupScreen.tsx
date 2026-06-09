@@ -4,11 +4,12 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { TouchableOpacity, Modal, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { platformAlert } from '../../lib/platformAlert';
-import Toast from 'react-native-toast-message';
+import { handleError } from '../../lib/handleError';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { GroupType, DEFAULT_CURRENCY, User } from '@cost-share/shared';
+import { GroupType, User } from '@cost-share/shared';
 import { useLoading } from '../../hooks/useLoading';
 import { useAppStore } from '../../store';
 import {
@@ -21,27 +22,33 @@ import { fetchGroupPairwiseDebts } from '../../services/settlements.service';
 import { fetchGroupUsers } from '../../services/users.service';
 import { uploadGroupImage } from '../../services/storage.service';
 import { getCurrentUserId } from '../../lib/auth';
-import { Button } from '../../components/Button';
+import { CreateGroupFloatingButton } from '../../components/groups/CreateGroupFloatingButton';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { AddMembersSheet } from '../../components/AddMembersSheet';
 import { Text } from '../../components/AppText';
 import { colors } from '../../theme';
 import { CreateGroupFormShell } from '../../components/groups/CreateGroupFormShell';
 import { CreateGroupFormFields } from '../../components/groups/CreateGroupFormFields';
+import { useAppLanguage } from '../../hooks/useRtlLayout';
+import { initialCreateGroupCurrency } from '../../lib/appDefaultCurrency';
 
 export function CreateGroupScreen() {
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
+    const insets = useSafeAreaInsets();
     const groupId: string | undefined = route.params?.groupId;
     const initialMembers: User[] | undefined = route.params?.initialMembers;
     const isEdit = Boolean(groupId);
     const { isLoading, startLoading, stopLoading } = useLoading();
     const currentUser = useAppStore((state) => state.currentUser);
+    const appLanguage = useAppLanguage();
 
     const [name, setName] = useState('');
     const [groupType, setGroupType] = useState<GroupType>('general');
-    const [currency, setCurrency] = useState(currentUser?.defaultCurrency || DEFAULT_CURRENCY);
+    const [currency, setCurrency] = useState(() =>
+        initialCreateGroupCurrency(appLanguage, currentUser),
+    );
     const [nameError, setNameError] = useState('');
     const [imageUrl, setImageUrl] = useState<string | undefined>();
     const [localImageUri, setLocalImageUri] = useState<string | null>(null);
@@ -153,16 +160,19 @@ export function CreateGroupScreen() {
             if (localImageUri) {
                 const uploadedUrl = await uploadGroupImage(result.id, localImageUri);
                 if (!uploadedUrl) {
-                    Toast.show({
-                        type: 'error',
-                        text1: t('common.error'),
-                        text2: t('groups.imageUploadError'),
+                    handleError(new Error('uploadGroupImage returned null'), {
+                        toast: { titleKey: 'common.error', messageKey: 'groups.imageUploadError' },
+                        tags: { service: 'storage', op: 'uploadGroupImage' },
+                        extra: { groupId: result.id, flow: 'create' },
                     });
                 } else {
                     await updateGroup(result.id, { imageUrl: uploadedUrl });
                 }
             }
-            navigation.replace('GroupDetail', { groupId: result.id });
+            navigation.navigate('Main', {
+                screen: 'Groups',
+                params: { screen: 'GroupDetail', params: { groupId: result.id } },
+            });
         } finally {
             stopLoading();
         }
@@ -177,10 +187,10 @@ export function CreateGroupScreen() {
             if (localImageUri) {
                 const uploadedUrl = await uploadGroupImage(groupId, localImageUri);
                 if (!uploadedUrl) {
-                    Toast.show({
-                        type: 'error',
-                        text1: t('common.error'),
-                        text2: t('groups.imageUploadError'),
+                    handleError(new Error('uploadGroupImage returned null'), {
+                        toast: { titleKey: 'common.error', messageKey: 'groups.imageUploadError' },
+                        tags: { service: 'storage', op: 'uploadGroupImage' },
+                        extra: { groupId, flow: 'update' },
                     });
                     return;
                 }
@@ -238,6 +248,7 @@ export function CreateGroupScreen() {
             <CreateGroupFormShell
                 testID="create-group-screen"
                 title={screenTitle}
+                extraBottomInset={insets.bottom}
                 headerStart={
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
@@ -249,8 +260,26 @@ export function CreateGroupScreen() {
                         </Text>
                     </TouchableOpacity>
                 }
+                headerEnd={
+                    <TouchableOpacity
+                        onPress={handleSubmit}
+                        disabled={isLoading}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        testID="create-group-save-header"
+                    >
+                        <Text
+                            style={{
+                                fontSize: 15,
+                                fontWeight: '600',
+                                color: isLoading ? colors.gray400 : colors.primary,
+                            }}
+                        >
+                            {t('common.save')}
+                        </Text>
+                    </TouchableOpacity>
+                }
                 footer={
-                    <Button
+                    <CreateGroupFloatingButton
                         title={submitLabel}
                         onPress={handleSubmit}
                         loading={isLoading}

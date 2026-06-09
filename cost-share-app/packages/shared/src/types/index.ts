@@ -25,7 +25,7 @@ export interface User {
     email?: string;
     avatarUrl?: string;
     phone?: string;
-    inviteToken: string;  // 10-char URL-safe slug; the value used to build https://kupa.pro/i/<token>
+    inviteToken: string;  // 10-char URL-safe slug; used with APP_WEB_ORIGIN + /i/<token>
     defaultCurrency: string;  // 'USD', 'ILS', 'EUR', etc.
     language: Language;
     isActive: boolean;  // Soft-delete flag — false means the user has deleted their account
@@ -46,7 +46,7 @@ export interface Group {
     imageUrl?: string;
     groupType: GroupType;
     defaultCurrency: string;
-    inviteToken: string;  // 10-char URL-safe slug; the value used to build https://kupa.pro/g/<token>
+    inviteToken: string;  // 10-char URL-safe slug; used with APP_WEB_ORIGIN + /g/<token>
     createdBy: string;  // Profile ID
     isActive: boolean;  // Soft delete flag
     createdAt: Date;
@@ -621,6 +621,22 @@ export interface UserDashboard {
     balanceSummary: BalanceSummary;
     stats: DashboardStats;
     friends: FriendBalance[];
+}
+
+/** Platform-wide admin metrics — supabase.rpc('admin_get_platform_metrics'). */
+export interface AdminPlatformMetrics {
+    version: number;
+    generatedAt: string; // ISO timestamp from DB
+    users: {
+        registered: number;
+        deleted: number;
+    };
+    groups: {
+        active: number;
+        archived: number;
+        deleted: number;
+        manualArchiveMemberships: number;
+    };
 }
 
 // ============================================

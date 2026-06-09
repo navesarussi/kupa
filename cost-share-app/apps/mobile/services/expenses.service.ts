@@ -16,11 +16,17 @@ import {
     calculateEqualSplit,
     validateExpenseSplits,
 } from '@cost-share/shared';
+import { handleError } from '../lib/handleError';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
-import { markGroupExpensesHydrated } from '../lib/groupFeedCache';
-import { useAppStore } from '../store';
-import Toast from 'react-native-toast-message';
+import { queryClient } from '../lib/queryClient';
+import { queryKeys } from '../hooks/queries/keys';
+import {
+    expenseSplitValidationMessage,
+    showErrorToast,
+    showSuccessMessage,
+    showSuccessToast,
+} from '../lib/appToast';
 import i18n from '../i18n';
 
 function resolveSplitAmounts(
@@ -57,21 +63,12 @@ export async function fetchExpenses(groupId?: string): Promise<ExpenseWithSplits
             return { ...expense, splits };
         });
 
-        const store = useAppStore.getState();
-        if (groupId) {
-            const otherGroups = store.expenses.filter(e => e.groupId !== groupId);
-            store.setExpenses([...otherGroups, ...expenses]);
-            markGroupExpensesHydrated(groupId);
-        } else {
-            store.setExpenses(expenses);
-        }
         return expenses;
     } catch (error) {
-        console.error('Failed to fetch expenses:', error);
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.loadError'),
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'history.loadError', messageKey: 'common.networkError' },
+            tags: { service: 'expenses', op: 'fetch' },
+            extra: { groupId },
         });
         return [];
     }
@@ -106,75 +103,62 @@ export async function getExpenseWithSplitsById(
     return { ...expense, splits };
 }
 
-export async function createExpense(dto: CreateExpenseDto): Promise<Expense | null> {
+/**
+ * Creates an expense. Throws on failure so React Query's mutation lifecycle can
+ * route the error to onError (and the optimistic row gets pendingFailed: true).
+ * The hook layer surfaces toasts; we no longer toast from inside the service.
+ */
+export async function createExpense(dto: CreateExpenseDto): Promise<ExpenseWithSplits> {
     const createdBy = await getCurrentUserId();
-    if (!createdBy) return null;
+    if (!createdBy) throw new Error('createExpense: no authenticated user');
 
     const splits = resolveSplitAmounts(dto.amount, dto.splits);
 
     const validation = validateExpenseSplits(dto.amount, splits);
     if (!validation.valid) {
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.createError'),
-            text2: validation.message ?? i18n.t('common.networkError'),
-        });
-        return null;
+        const message =
+            expenseSplitValidationMessage(validation) || i18n.t('common.networkError');
+        throw new Error(message);
     }
 
     const expenseDate = (dto.expenseDate ?? new Date()).toISOString().slice(0, 10);
 
-    try {
-        const { data: expenseRow, error: expenseErr } = await supabase
-            .from('expenses')
-            .insert({
-                group_id: dto.groupId,
-                description: dto.description,
-                amount: dto.amount,
-                currency: dto.currency,
-                category: dto.category,
-                expense_date: expenseDate,
-                receipt_url: dto.receiptUrl,
-                paid_by: dto.paidBy,
-                created_by: createdBy,
-                split_mode: dto.splitMode ?? 'equal',
-            })
-            .select()
-            .single();
-        if (expenseErr) throw expenseErr;
+    const { data: expenseRow, error: expenseErr } = await supabase
+        .from('expenses')
+        .insert({
+            group_id: dto.groupId,
+            description: dto.description,
+            amount: dto.amount,
+            currency: dto.currency,
+            category: dto.category,
+            expense_date: expenseDate,
+            receipt_url: dto.receiptUrl,
+            paid_by: dto.paidBy,
+            created_by: createdBy,
+            split_mode: dto.splitMode ?? 'equal',
+        })
+        .select()
+        .single();
+    if (expenseErr) throw expenseErr;
+    if (!expenseRow) throw new Error('createExpense: insert returned no row');
 
-        const splitRows = splits.map(s => ({
-            expense_id: expenseRow.id,
-            user_id: s.userId,
-            amount: s.amount,
-        }));
-        const { error: splitsErr } = await supabase.from('expense_splits').insert(splitRows);
-        if (splitsErr) throw splitsErr;
+    const splitRows = splits.map(s => ({
+        expense_id: expenseRow.id,
+        user_id: s.userId,
+        amount: s.amount,
+    }));
+    const { error: splitsErr } = await supabase.from('expense_splits').insert(splitRows);
+    if (splitsErr) throw splitsErr;
 
-        const expense = expenseFromRow(expenseRow);
-        const splitsForStore: ExpenseSplit[] = splits.map(s => ({
-            id: '',
-            expenseId: expense.id,
-            userId: s.userId,
-            amount: s.amount,
-            createdAt: expense.createdAt,
-        }));
-        useAppStore.getState().addExpense({ ...expense, splits: splitsForStore });
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: i18n.t('expenses.addExpense'),
-        });
-        return expense;
-    } catch (error) {
-        console.error('Failed to create expense:', error);
-        Toast.show({
-            type: 'error',
-            text1: i18n.t('history.createError'),
-            text2: i18n.t('common.networkError'),
-        });
-        return null;
-    }
+    const expense = expenseFromRow(expenseRow);
+    const splitsForCache: ExpenseSplit[] = splits.map(s => ({
+        id: '',
+        expenseId: expense.id,
+        userId: s.userId,
+        amount: s.amount,
+        createdAt: expense.createdAt,
+    }));
+    return { ...expense, splits: splitsForCache };
 }
 
 export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<Expense | null> {
@@ -189,11 +173,11 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             resolvedSplits = resolveSplitAmounts(amount, dto.splits);
             const validation = validateExpenseSplits(amount, resolvedSplits);
             if (!validation.valid) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Failed to update expense',
-                    text2: validation.message,
-                });
+                showErrorToast(
+                    'expenses.updateError',
+                    undefined,
+                    expenseSplitValidationMessage(validation),
+                );
                 return null;
             }
 
@@ -240,7 +224,12 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
             baseExpense = expenseFromRow(data);
         }
 
-        const storeSplits = resolvedSplits
+        const groupId = baseExpense.groupId;
+        const cachedExpenses =
+            queryClient.getQueryData<ExpenseWithSplits[]>(queryKeys.groupExpenses(groupId)) ?? [];
+        const cachedSplits =
+            cachedExpenses.find(e => e.id === id)?.splits ?? [];
+        const cacheSplits: ExpenseSplit[] = resolvedSplits
             ? resolvedSplits.map(s => ({
                   id: '',
                   expenseId: id,
@@ -248,21 +237,22 @@ export async function updateExpense(id: string, dto: UpdateExpenseDto): Promise<
                   amount: s.amount,
                   createdAt: baseExpense.createdAt,
               }))
-            : useAppStore.getState().expenses.find(e => e.id === id)?.splits ?? [];
+            : cachedSplits;
 
-        useAppStore.getState().updateExpense({ ...baseExpense, splits: storeSplits });
-        Toast.show({
-            type: 'success',
-            text1: i18n.t('common.success'),
-            text2: 'Expense updated',
+        const merged: ExpenseWithSplits = { ...baseExpense, splits: cacheSplits };
+        queryClient.setQueryData<ExpenseWithSplits[]>(queryKeys.groupExpenses(groupId), (prev) => {
+            const list = prev ?? [];
+            return list.some(e => e.id === id)
+                ? list.map(e => (e.id === id ? merged : e))
+                : [merged, ...list];
         });
+        showSuccessToast('expenses.expenseUpdated');
         return baseExpense;
     } catch (error) {
-        console.error('Failed to update expense:', error);
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to update expense',
-            text2: i18n.t('common.networkError'),
+        handleError(error, {
+            toast: { titleKey: 'expenses.updateError', messageKey: 'common.networkError' },
+            tags: { service: 'expenses', op: 'update' },
+            extra: { expenseId: id, patchKeys: Object.keys(dto) },
         });
         return null;
     }
@@ -273,20 +263,25 @@ export async function deleteExpense(id: string): Promise<boolean> {
         .from('expenses')
         .update({ is_deleted: true })
         .eq('id', id)
-        .select('id')
+        .select('id, group_id')
         .maybeSingle();
 
     if (error || !data) {
-        Toast.show({
-            type: 'error',
-            text1: 'Failed to delete expense',
-            text2: i18n.t('common.networkError'),
+        handleError(error ?? new Error('Delete failed: no rows updated'), {
+            toast: { titleKey: 'expenses.deleteError', messageKey: 'common.networkError' },
+            tags: { service: 'expenses', op: 'delete' },
+            extra: { expenseId: id },
         });
         return false;
     }
 
-    useAppStore.getState().removeExpense(id);
-    Toast.show({ type: 'success', text1: 'Expense deleted' });
+    const groupId = data.group_id as string | undefined;
+    if (groupId) {
+        queryClient.setQueryData<ExpenseWithSplits[]>(queryKeys.groupExpenses(groupId), (prev) =>
+            (prev ?? []).filter(e => e.id !== id),
+        );
+    }
+    showSuccessMessage('expenses.expenseDeleted');
     return true;
 }
 
