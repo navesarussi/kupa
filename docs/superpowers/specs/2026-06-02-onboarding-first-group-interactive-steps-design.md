@@ -5,6 +5,8 @@
 **Supersedes:** the "Create first group (simplified)" screen from
 [2026-06-01-onboarding-flow-design.md](2026-06-01-onboarding-flow-design.md) (post-login phase). That flow is unchanged; only the create-group screen's layout is reworked.
 
+**Revision (2026-06-09):** The hero that shipped grew past the "slim one-line intro" below — it gained a 3-row checklist (name / defaults / members) plus three "quick-win" tiles, which **duplicated** the accordion steps and buried the task. Reworked so steps live in **one** place: the hero (`OnboardingCreateGroupHero`) is now a compact progress header — eyebrow + dynamic headline/subline + a single progress bar (copy + bar flip on `ready` once the name is filled) — and the accordion is the sole step list. The one required step still to do (name) is highlighted via a new `active` prop on `OnboardingStepCard` (blue ring + filled blue badge); completed and optional steps are quieted (green check / muted badge). i18n: removed `onboarding.create.hero.{title,subtitle,checkName,checkDefaults,checkMembers,optional,win1,win2,win3}`; added `hero.{titleTodo,subtitleTodo,titleReady,subtitleReady}`.
+
 ## Problem
 
 Today `OnboardingCreateGroupScreen` shows two disconnected blocks:

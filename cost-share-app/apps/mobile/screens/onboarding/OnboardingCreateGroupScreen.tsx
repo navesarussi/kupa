@@ -29,7 +29,6 @@ import { GroupMembersField } from '../../components/groups/GroupMembersField';
 import { OnboardingStepCard } from '../../components/groups/OnboardingStepCard';
 import { OnboardingCreateGroupHero } from '../../components/onboarding/OnboardingCreateGroupHero';
 import { OnboardingNameSuggestions } from '../../components/onboarding/OnboardingNameSuggestions';
-import { OnboardingLanguageToggle } from '../../components/onboarding/OnboardingLanguageToggle';
 import { colors } from '../../theme';
 import { useAppLanguage, useRtlLayout } from '../../hooks/useRtlLayout';
 import { initialCreateGroupCurrency } from '../../lib/appDefaultCurrency';
@@ -151,6 +150,10 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
     const displayMembers = currentUser ? [currentUser, ...members] : members;
     const hasName = name.trim().length > 0;
     const hasExtraMembers = members.length > 0;
+    const hasImage = !!localImageUri;
+    // Name is the only required field (category + currency have defaults), so it
+    // is the single step we highlight until it's filled.
+    const activeStep: StepKey | null = hasName ? null : 'name';
     const memberIdsForSheet = [
         ...(currentUser ? [currentUser.id] : []),
         ...members.map((m) => m.id),
@@ -165,6 +168,7 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                 guidance={
                     <OnboardingCreateGroupHero
                         hasName={hasName}
+                        hasImage={hasImage}
                         hasExtraMembers={hasExtraMembers}
                     />
                 }
@@ -185,21 +189,15 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                     </TouchableOpacity>
                 }
                 headerEnd={
-                    <View className="flex-row items-center gap-2">
-                        <OnboardingLanguageToggle
-                            variant="form"
-                            testID="onboarding-create-language-button"
-                        />
-                        <TouchableOpacity
-                            onPress={handleExit}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            testID="onboarding-create-skip"
-                        >
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.gray500 }}>
-                                {t(previewMode ? 'common.close' : 'onboarding.skip')}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        onPress={handleExit}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        testID="onboarding-create-skip"
+                    >
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.gray500 }}>
+                            {t(previewMode ? 'common.close' : 'onboarding.skip')}
+                        </Text>
+                    </TouchableOpacity>
                 }
                 footer={
                     <CreateGroupFloatingButton
@@ -217,6 +215,7 @@ export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Pro
                     helper={t('onboarding.create.steps.name.helper')}
                     summary={name.trim() || undefined}
                     complete={hasName}
+                    active={activeStep === 'name'}
                     expanded={openStep === 'name'}
                     onToggle={() => toggleStep('name')}
                     testID="onboarding-step-name"

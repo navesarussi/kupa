@@ -18,6 +18,7 @@ import {
 import { Text } from '../AppText';
 import { AppIcon } from '../AppIcon';
 import { colors } from '../../theme';
+import { onboardingColors } from '../../theme/onboardingColors';
 import { rtlTextClassName, useRtlLayout } from '../../hooks/useRtlLayout';
 
 if (
@@ -35,6 +36,8 @@ type Props = {
     optionalLabel?: string;
     complete: boolean;
     expanded: boolean;
+    /** The one step the user still needs to do — gets the accent treatment. */
+    active?: boolean;
     onToggle: () => void;
     children: React.ReactNode;
     testID?: string;
@@ -48,6 +51,7 @@ export function OnboardingStepCard({
     optionalLabel,
     complete,
     expanded,
+    active = false,
     onToggle,
     children,
     testID,
@@ -69,6 +73,14 @@ export function OnboardingStepCard({
         outputRange: ['0deg', '180deg'],
     });
 
+    const elevated = expanded || active;
+    const badgeBg = complete
+        ? colors.success.DEFAULT
+        : active
+          ? onboardingColors.blue
+          : '#EEF2F7';
+    const badgeNumberColor = active ? colors.white : '#64748B';
+
     const handlePress = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         onToggle();
@@ -77,14 +89,20 @@ export function OnboardingStepCard({
     return (
         <View
             testID={testID}
-            className="mb-3 rounded-2xl bg-white border border-slate-200/80 px-4 py-3.5"
+            className="mb-3 rounded-2xl px-4 py-3.5"
             style={{
-                borderColor: expanded ? 'rgba(96,165,250,0.55)' : undefined,
+                backgroundColor: active ? '#F6FAFF' : '#FFFFFF',
+                borderWidth: active ? 1.5 : 1,
+                borderColor: active
+                    ? onboardingColors.blue
+                    : expanded
+                      ? 'rgba(96,165,250,0.55)'
+                      : '#E2E8F0',
                 shadowColor: '#0F172A',
-                shadowOffset: { width: 0, height: expanded ? 8 : 4 },
-                shadowOpacity: expanded ? 0.08 : 0.04,
-                shadowRadius: expanded ? 16 : 12,
-                elevation: expanded ? 4 : 2,
+                shadowOffset: { width: 0, height: elevated ? 8 : 4 },
+                shadowOpacity: elevated ? 0.08 : 0.04,
+                shadowRadius: elevated ? 16 : 12,
+                elevation: elevated ? 4 : 2,
             }}
         >
             <TouchableOpacity
@@ -100,11 +118,7 @@ export function OnboardingStepCard({
             >
                 <View
                     className="w-7 h-7 rounded-full items-center justify-center"
-                    style={{
-                        backgroundColor: complete
-                            ? colors.success.DEFAULT
-                            : colors.primary,
-                    }}
+                    style={{ backgroundColor: badgeBg }}
                     testID={testID ? `${testID}-badge` : undefined}
                 >
                     {complete ? (
@@ -115,7 +129,14 @@ export function OnboardingStepCard({
                             testID={testID ? `${testID}-check` : undefined}
                         />
                     ) : (
-                        <Text className="text-xs font-bold text-white">
+                        <Text
+                            className="text-xs font-bold"
+                            style={{
+                                color: badgeNumberColor,
+                                textAlign: 'center',
+                                includeFontPadding: false,
+                            }}
+                        >
                             {String(index)}
                         </Text>
                     )}
