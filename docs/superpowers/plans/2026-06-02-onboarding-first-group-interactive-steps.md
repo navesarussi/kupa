@@ -1285,3 +1285,560 @@ git commit -m "chore: remove unused guidance panel and its dead i18n keys"
 - Scroll-to-opened-step: when a lower step expands, scroll it into view (needs a `ScrollView` ref exposed through `CreateGroupFormShell`).
 - When `CreateGroupCoverPreview` is embedded inside the image step, drop its outer margin/shadow to avoid a double-shadow look.
 - Dedupe `pickImage` (duplicated between `OnboardingCreateGroupScreen` and `CreateGroupFormFields`) into a shared hook.
+
+---
+
+## Revision 2026-06-09 — remaining work on current `dev`
+
+**Supersedes Tasks 1–5 above** (they targeted a stale baseline). On current `dev`: `OnboardingStepCard` + `GroupMembersField` already landed (green); the guidance panel + header rename were done by `dev`. Only three tasks remain. Working dir: `cost-share-app/apps/mobile`. `t(key)` returns the key in tests; reanimated renders fine in jest now.
+
+### Task R1: i18n — add `onboarding.create.steps.*`
+
+**Files:** `i18n/locales/he.json`, `i18n/locales/en.json`
+
+- [ ] **Step 1:** add a `steps` object inside `onboarding.create` (alongside the existing `header`, `submit`, `membersHint`, …) in `he.json`:
+```json
+"steps": {
+    "optional": "אופציונלי",
+    "name": { "title": "שם הקופה", "helper": "תנו שם שכולם מזהים (למשל «טיול לים» או «דירה 2025»)." },
+    "category": { "title": "קטגוריה", "helper": "סוג הקופה קובע את הצבעים — אפשר לשנות אחר כך." },
+    "currency": { "title": "מטבע" },
+    "image": { "title": "תמונת כריכה", "summaryDefault": "ברירת מחדל", "summarySet": "תמונה נבחרה" },
+    "members": { "title": "הזמנת חברים", "summarySuffix": "חברים" }
+},
+```
+- [ ] **Step 2:** mirror in `en.json`:
+```json
+"steps": {
+    "optional": "Optional",
+    "name": { "title": "Kupa name", "helper": "Pick a name everyone recognizes (e.g. \"Beach trip\" or \"Apt 2025\")." },
+    "category": { "title": "Category", "helper": "The type sets the colors — you can change it later." },
+    "currency": { "title": "Currency" },
+    "image": { "title": "Cover image", "summaryDefault": "Default", "summarySet": "Image selected" },
+    "members": { "title": "Invite members", "summarySuffix": "members" }
+},
+```
+- [ ] **Step 3:** verify: `node -e "for(const f of ['he','en']){const s=require('./i18n/locales/'+f+'.json').onboarding.create.steps; ['optional','name','category','currency','image','members'].forEach(k=>{if(!s[k])throw new Error(f+' missing '+k)});} console.log('i18n OK')"` → `i18n OK`.
+- [ ] **Step 4:** commit: `git add i18n/locales/he.json i18n/locales/en.json && git commit -m "i18n: add onboarding create-group step copy"`
+
+### Task R2: Swap the onboarding screen body for the stepper
+
+**Files:**
+- Modify (full rewrite): `screens/onboarding/OnboardingCreateGroupScreen.tsx`
+- Test (create): `__tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`
+
+Keep ALL existing scaffolding (hero `guidance`, language toggle, floating button, `previewMode`, locale currency, safe-area, `appToast`, name suggestions). Replace only the `<CreateGroupFormFields>` child with five `OnboardingStepCard`s.
+
+- [ ] **Step 1: Write the failing test** — create `__tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`:
+```tsx
+import React from 'react';
+import { fireEvent, waitFor } from '@testing-library/react-native';
+import { renderWithQuery } from '../../helpers/renderWithQuery';
+
+jest.mock('../../../services/groups.service', () => ({
+    createGroup: jest.fn(),
+    updateGroup: jest.fn(),
+}));
+jest.mock('../../../services/storage.service', () => ({
+    uploadGroupImage: jest.fn(),
+}));
+jest.mock('../../../lib/onboardingStorage', () => ({
+    markPostLoginOnboardingComplete: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('expo-image-picker', () => ({
+    requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
+    launchImageLibraryAsync: jest
+        .fn()
+        .mockResolvedValue({ canceled: false, assets: [{ uri: 'file://cover.jpg' }] }),
+}));
+jest.mock('../../../components/AddMembersSheet', () => {
+    const React = require('react');
+    const { Pressable, Text } = require('react-native');
+    function AddMembersSheet({ onConfirmSelection }: any) {
+        return (
+            <Pressable
+                testID="mock-confirm-members"
+                onPress={() => onConfirmSelection([{ id: 'u2', name: 'Bob' }])}
+            >
+                <Text>confirm</Text>
+            </Pressable>
+        );
+    }
+    return { AddMembersSheet };
+});
+
+import { OnboardingCreateGroupScreen } from '../../../screens/onboarding/OnboardingCreateGroupScreen';
+import { createGroup, updateGroup } from '../../../services/groups.service';
+import { uploadGroupImage } from '../../../services/storage.service';
+import { markPostLoginOnboardingComplete } from '../../../lib/onboardingStorage';
+import { useAppStore } from '../../../store';
+
+const mockCreateGroup = createGroup as jest.MockedFunction<typeof createGroup>;
+const mockUpdateGroup = updateGroup as jest.MockedFunction<typeof updateGroup>;
+const mockUploadGroupImage = uploadGroupImage as jest.MockedFunction<typeof uploadGroupImage>;
+
+beforeEach(() => {
+    mockCreateGroup.mockReset();
+    mockUpdateGroup.mockReset();
+    mockUploadGroupImage.mockReset();
+    (markPostLoginOnboardingComplete as jest.Mock).mockClear();
+    useAppStore.setState({
+        currentUser: {
+            id: 'u1', email: 'a@x.com', name: 'Alice', inviteToken: 'alice123456',
+            defaultCurrency: 'ILS', language: 'he', isActive: true, isAdmin: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        },
+    });
+});
+
+describe('OnboardingCreateGroupScreen — interactive steps (current dev)', () => {
+    it('renders the header and all five step cards (hero preserved)', () => {
+        const { getByText, getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        expect(getByText('onboarding.create.header')).toBeTruthy();
+        ['name', 'category', 'currency', 'image', 'members'].forEach((k) =>
+            expect(getByTestId(`onboarding-step-${k}`)).toBeTruthy(),
+        );
+    });
+
+    it('opens the name step by default and gates submit on the name', () => {
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        const submit = getByTestId('onboarding-create-submit');
+        expect(submit.props.accessibilityState?.disabled).toBe(true);
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        expect(submit.props.accessibilityState?.disabled).toBe(false);
+    });
+
+    it('expands a collapsed step on header tap and collapses the open one', () => {
+        const { getByTestId, queryByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        expect(queryByTestId('onboarding-step-currency-body')).toBeNull();
+        fireEvent.press(getByTestId('onboarding-step-currency-header'));
+        expect(getByTestId('onboarding-step-currency-body')).toBeTruthy();
+        expect(queryByTestId('onboarding-step-name-body')).toBeNull();
+    });
+
+    it('creates the group with name, type and currency on submit', async () => {
+        mockCreateGroup.mockResolvedValueOnce({ id: 'g1' } as any);
+        const onDone = jest.fn();
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={onDone} />,
+        );
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        await waitFor(() =>
+            expect(mockCreateGroup).toHaveBeenCalledWith({
+                name: 'טיול לים', groupType: 'trip', defaultCurrency: 'ILS', memberIds: [],
+            }),
+        );
+        await waitFor(() => expect(markPostLoginOnboardingComplete).toHaveBeenCalled());
+        await waitFor(() => expect(onDone).toHaveBeenCalled());
+    });
+
+    it('does not create when the name is empty', () => {
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        expect(mockCreateGroup).not.toHaveBeenCalled();
+    });
+
+    it('uploads the picked cover image and updates the group', async () => {
+        mockCreateGroup.mockResolvedValueOnce({ id: 'g1' } as any);
+        mockUploadGroupImage.mockResolvedValueOnce('https://cdn/cover.jpg');
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        fireEvent.press(getByTestId('onboarding-step-image-header'));
+        fireEvent.press(getByTestId('onboarding-step-cover'));
+        await waitFor(() => expect(getByTestId('onboarding-step-cover-remove')).toBeTruthy());
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        await waitFor(() =>
+            expect(mockUploadGroupImage).toHaveBeenCalledWith('g1', 'file://cover.jpg'),
+        );
+        await waitFor(() =>
+            expect(mockUpdateGroup).toHaveBeenCalledWith('g1', { imageUrl: 'https://cdn/cover.jpg' }),
+        );
+    });
+
+    it('includes added members in the createGroup memberIds', async () => {
+        mockCreateGroup.mockResolvedValueOnce({ id: 'g1' } as any);
+        const { getByTestId } = renderWithQuery(
+            <OnboardingCreateGroupScreen onDone={jest.fn()} />,
+        );
+        fireEvent.changeText(getByTestId('onboarding-step-name-input'), 'טיול לים');
+        fireEvent.press(getByTestId('mock-confirm-members'));
+        fireEvent.press(getByTestId('onboarding-create-submit'));
+        await waitFor(() =>
+            expect(mockCreateGroup).toHaveBeenCalledWith(
+                expect.objectContaining({ memberIds: ['u2'] }),
+            ),
+        );
+    });
+});
+```
+
+- [ ] **Step 2: Run it — expect FAIL** (`onboarding-step-*` testIDs absent): `npx jest __tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`
+
+- [ ] **Step 3: Replace the ENTIRE contents** of `screens/onboarding/OnboardingCreateGroupScreen.tsx` with:
+```tsx
+/**
+ * First-group onboarding — interactive accordion steps under the live hero
+ * (name, category, currency, cover image, members).
+ */
+
+import React, { useCallback, useState } from 'react';
+import { View, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { platformAlert } from '../../lib/platformAlert';
+import { useTranslation } from 'react-i18next';
+import { GroupType, User } from '@cost-share/shared';
+import { showAppToast, showInfoToast } from '../../lib/appToast';
+import { useLoading } from '../../hooks/useLoading';
+import { useAppStore } from '../../store';
+import { createGroup, updateGroup } from '../../services/groups.service';
+import { uploadGroupImage } from '../../services/storage.service';
+import { markPostLoginOnboardingComplete } from '../../lib/onboardingStorage';
+import { CreateGroupFloatingButton } from '../../components/groups/CreateGroupFloatingButton';
+import { Text } from '../../components/AppText';
+import { AppIcon } from '../../components/AppIcon';
+import { Input } from '../../components/Input';
+import { GroupTypeSelector } from '../../components/GroupTypeSelector';
+import { CurrencyPicker } from '../../components/CurrencyPicker';
+import { AddMembersSheet } from '../../components/AddMembersSheet';
+import { CreateGroupFormShell } from '../../components/groups/CreateGroupFormShell';
+import { CreateGroupCoverPreview } from '../../components/groups/CreateGroupCoverPreview';
+import { GroupMembersField } from '../../components/groups/GroupMembersField';
+import { OnboardingStepCard } from '../../components/groups/OnboardingStepCard';
+import { OnboardingCreateGroupHero } from '../../components/onboarding/OnboardingCreateGroupHero';
+import { OnboardingNameSuggestions } from '../../components/onboarding/OnboardingNameSuggestions';
+import { OnboardingLanguageToggle } from '../../components/onboarding/OnboardingLanguageToggle';
+import { colors } from '../../theme';
+import { useAppLanguage, useRtlLayout } from '../../hooks/useRtlLayout';
+import { initialCreateGroupCurrency } from '../../lib/appDefaultCurrency';
+
+type Props = {
+    onDone: () => void;
+    /** Admin preview — do not persist onboarding completion. */
+    previewMode?: boolean;
+};
+
+type StepKey = 'name' | 'category' | 'currency' | 'image' | 'members';
+
+export function OnboardingCreateGroupScreen({ onDone, previewMode = false }: Props) {
+    const { t } = useTranslation();
+    const { bottom: safeBottom } = useSafeAreaInsets();
+    const isRtl = useRtlLayout();
+    const appLanguage = useAppLanguage();
+    const currentUser = useAppStore((s) => s.currentUser);
+    const { isLoading, startLoading, stopLoading } = useLoading();
+
+    const [name, setName] = useState('');
+    const [nameError, setNameError] = useState('');
+    const [groupType, setGroupType] = useState<GroupType>('trip');
+    const [currency, setCurrency] = useState(() =>
+        initialCreateGroupCurrency(appLanguage, currentUser),
+    );
+    const [localImageUri, setLocalImageUri] = useState<string | null>(null);
+    const [members, setMembers] = useState<User[]>([]);
+    const [addMembersOpen, setAddMembersOpen] = useState(false);
+    const [openStep, setOpenStep] = useState<StepKey | null>('name');
+
+    const toggleStep = useCallback((key: StepKey) => {
+        setOpenStep((prev) => (prev === key ? null : key));
+    }, []);
+
+    const finish = useCallback(async () => {
+        if (!previewMode) {
+            await markPostLoginOnboardingComplete();
+        }
+        onDone();
+    }, [onDone, previewMode]);
+
+    const handleSkip = useCallback(() => {
+        platformAlert(
+            t('onboarding.create.skipTitle'),
+            t('onboarding.create.skipMessage'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('onboarding.create.skipConfirm'),
+                    style: 'destructive',
+                    onPress: () => void finish(),
+                },
+            ],
+        );
+    }, [finish, t]);
+
+    const handleExit = useCallback(() => {
+        if (previewMode) {
+            onDone();
+            return;
+        }
+        handleSkip();
+    }, [previewMode, onDone, handleSkip]);
+
+    const handleFindFriends = useCallback(() => {
+        setAddMembersOpen(false);
+        showInfoToast('onboarding.create.findFriendsAfterCreate');
+    }, []);
+
+    const pickImage = useCallback(async () => {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            platformAlert(t('groups.imagePermissionTitle'), t('groups.imagePermissionMessage'));
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [16, 9],
+            quality: 0.85,
+        });
+        if (!result.canceled && result.assets[0]?.uri) {
+            setLocalImageUri(result.assets[0].uri);
+        }
+    }, [t]);
+
+    const handleCreate = useCallback(async () => {
+        if (!name.trim()) {
+            setNameError(t('groups.nameRequired'));
+            setOpenStep('name');
+            return;
+        }
+        setNameError('');
+        startLoading();
+        try {
+            const group = await createGroup({
+                name: name.trim(),
+                groupType,
+                defaultCurrency: currency,
+                memberIds: members.map((m) => m.id),
+            });
+            if (!group) {
+                showAppToast({ type: 'error', titleKey: 'common.error' });
+                return;
+            }
+            if (localImageUri) {
+                const uploadedUrl = await uploadGroupImage(group.id, localImageUri);
+                if (uploadedUrl) {
+                    await updateGroup(group.id, { imageUrl: uploadedUrl });
+                }
+            }
+            await finish();
+        } finally {
+            stopLoading();
+        }
+    }, [currency, finish, groupType, localImageUri, members, name, startLoading, stopLoading, t]);
+
+    const displayMembers = currentUser ? [currentUser, ...members] : members;
+    const hasName = name.trim().length > 0;
+    const hasExtraMembers = members.length > 0;
+    const memberIdsForSheet = [
+        ...(currentUser ? [currentUser.id] : []),
+        ...members.map((m) => m.id),
+    ];
+
+    return (
+        <>
+            <CreateGroupFormShell
+                testID="onboarding-create-group-screen"
+                extraBottomInset={safeBottom}
+                title={t('onboarding.create.header')}
+                guidance={
+                    <OnboardingCreateGroupHero
+                        hasName={hasName}
+                        hasExtraMembers={hasExtraMembers}
+                    />
+                }
+                headerStart={
+                    <TouchableOpacity
+                        onPress={handleExit}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        testID="onboarding-create-back"
+                        accessibilityRole="button"
+                    >
+                        <View className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center">
+                            <AppIcon
+                                name={isRtl ? 'chevron-forward' : 'chevron-back'}
+                                size={20}
+                                color={colors.gray700}
+                            />
+                        </View>
+                    </TouchableOpacity>
+                }
+                headerEnd={
+                    <View className="flex-row items-center gap-2">
+                        <OnboardingLanguageToggle
+                            variant="form"
+                            testID="onboarding-create-language-button"
+                        />
+                        <TouchableOpacity
+                            onPress={handleExit}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            testID="onboarding-create-skip"
+                        >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.gray500 }}>
+                                {t(previewMode ? 'common.close' : 'onboarding.skip')}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                }
+                footer={
+                    <CreateGroupFloatingButton
+                        title={t(hasName ? 'onboarding.create.submitReady' : 'onboarding.create.submit')}
+                        onPress={() => void handleCreate()}
+                        loading={isLoading}
+                        disabled={isLoading || !name.trim()}
+                        testID="onboarding-create-submit"
+                    />
+                }
+            >
+                <OnboardingStepCard
+                    index={1}
+                    title={t('onboarding.create.steps.name.title')}
+                    helper={t('onboarding.create.steps.name.helper')}
+                    summary={name.trim() || undefined}
+                    complete={hasName}
+                    expanded={openStep === 'name'}
+                    onToggle={() => toggleStep('name')}
+                    testID="onboarding-step-name"
+                >
+                    <OnboardingNameSuggestions
+                        visible={!hasName}
+                        onSelect={(suggested) => {
+                            setName(suggested);
+                            if (nameError) setNameError('');
+                        }}
+                    />
+                    <Input
+                        placeholder={t('groups.createForm.namePlaceholder')}
+                        value={name}
+                        onChangeText={(text) => {
+                            setName(text);
+                            if (nameError) setNameError('');
+                        }}
+                        error={nameError}
+                        containerClassName="mb-0"
+                        testID="onboarding-step-name-input"
+                    />
+                </OnboardingStepCard>
+
+                <OnboardingStepCard
+                    index={2}
+                    title={t('onboarding.create.steps.category.title')}
+                    helper={t('onboarding.create.steps.category.helper')}
+                    summary={t(`groups.types.${groupType}`)}
+                    complete={!!groupType}
+                    expanded={openStep === 'category'}
+                    onToggle={() => toggleStep('category')}
+                    testID="onboarding-step-category"
+                >
+                    <GroupTypeSelector value={groupType} onChange={setGroupType} />
+                </OnboardingStepCard>
+
+                <OnboardingStepCard
+                    index={3}
+                    title={t('onboarding.create.steps.currency.title')}
+                    summary={currency}
+                    complete={!!currency}
+                    expanded={openStep === 'currency'}
+                    onToggle={() => toggleStep('currency')}
+                    testID="onboarding-step-currency"
+                >
+                    <CurrencyPicker value={currency} onChange={setCurrency} />
+                </OnboardingStepCard>
+
+                <OnboardingStepCard
+                    index={4}
+                    title={t('onboarding.create.steps.image.title')}
+                    optionalLabel={t('onboarding.create.steps.optional')}
+                    summary={
+                        localImageUri
+                            ? t('onboarding.create.steps.image.summarySet')
+                            : t('onboarding.create.steps.image.summaryDefault')
+                    }
+                    complete={!!localImageUri}
+                    expanded={openStep === 'image'}
+                    onToggle={() => toggleStep('image')}
+                    testID="onboarding-step-image"
+                >
+                    <CreateGroupCoverPreview
+                        name={name}
+                        groupType={groupType}
+                        localUri={localImageUri}
+                        onPress={() => void pickImage()}
+                        testID="onboarding-step-cover"
+                    />
+                    {localImageUri ? (
+                        <TouchableOpacity
+                            onPress={() => setLocalImageUri(null)}
+                            className="self-start mt-1"
+                            testID="onboarding-step-cover-remove"
+                        >
+                            <Text className="text-sm font-medium text-red-500">
+                                {t('groups.removeImage')}
+                            </Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </OnboardingStepCard>
+
+                <OnboardingStepCard
+                    index={5}
+                    title={t('onboarding.create.steps.members.title')}
+                    helper={t('onboarding.create.membersHint')}
+                    optionalLabel={t('onboarding.create.steps.optional')}
+                    summary={
+                        hasExtraMembers
+                            ? `${members.length} ${t('onboarding.create.steps.members.summarySuffix')}`
+                            : undefined
+                    }
+                    complete={hasExtraMembers}
+                    expanded={openStep === 'members'}
+                    onToggle={() => toggleStep('members')}
+                    testID="onboarding-step-members"
+                >
+                    <GroupMembersField
+                        displayMembers={displayMembers}
+                        currentUserId={currentUser?.id ?? null}
+                        currentUser={currentUser}
+                        onAddMembers={() => setAddMembersOpen(true)}
+                        onRemoveMember={(m) =>
+                            setMembers((prev) => prev.filter((x) => x.id !== m.id))
+                        }
+                    />
+                </OnboardingStepCard>
+            </CreateGroupFormShell>
+
+            <AddMembersSheet
+                visible={addMembersOpen}
+                onClose={() => setAddMembersOpen(false)}
+                currentMemberIds={memberIdsForSheet}
+                onFindFriends={handleFindFriends}
+                onConfirmSelection={(picked) => {
+                    setMembers((prev) => {
+                        const ids = new Set(prev.map((m) => m.id));
+                        return [...prev, ...picked.filter((u) => !ids.has(u.id))];
+                    });
+                    setAddMembersOpen(false);
+                }}
+            />
+        </>
+    );
+}
+```
+
+- [ ] **Step 4: Run the test — expect PASS (7 tests):** `npx jest __tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx`
+- [ ] **Step 5: commit:** `git add screens/onboarding/OnboardingCreateGroupScreen.tsx __tests__/screens/onboarding/OnboardingCreateGroupScreen.test.tsx && git commit -m "feat: interactive accordion steps in first-group onboarding (on current dev)"`
+
+### Task R3: Verify
+
+- [ ] `npx tsc --noEmit` → clean.
+- [ ] `npx jest` → full mobile suite green (incl. the new screen test, `OnboardingStepCard`, `GroupMembersField`, `CreateGroupScreen`, onboarding component tests).
+- [ ] commit anything outstanding (do NOT stage `cost-share-app/package-lock.json`).

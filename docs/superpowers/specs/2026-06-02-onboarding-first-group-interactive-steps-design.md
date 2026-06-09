@@ -105,3 +105,29 @@ Expand/collapse uses React Native `LayoutAnimation` (configured on each toggle);
 - No behavioral or visual change to the standard `CreateGroupScreen` (its `CreateGroupFormFields` gets only a behavior-preserving internal swap to `GroupMembersField`, verified by `CreateGroupScreen.test.tsx`).
 - No new persisted fields; no DB/schema change.
 - No re-show-onboarding-from-settings (still out, per 2026-06-01 spec).
+
+---
+
+## Revision 2026-06-09 — rebased on current `dev`
+
+The design above was written against a **stale** `dev` (the branch was 36 commits behind). After merging current `origin/dev`, the onboarding screen had already been reworked, so the integration is re-scoped (the core idea — interactive accordion steps — is unchanged).
+
+**What `dev` already provides (MUST be preserved):** `OnboardingCreateGroupScreen` wraps `CreateGroupFormShell` with a live `OnboardingCreateGroupHero` (the `guidance` slot), `OnboardingLanguageToggle` (header), a `CreateGroupFloatingButton` footer (with a `submitReady` title once a name is typed), `previewMode` (admin preview — must NOT persist onboarding completion), `initialCreateGroupCurrency` (locale-aware), `useSafeAreaInsets` → `extraBottomInset`, `showAppToast`/`showInfoToast`, and `OnboardingNameSuggestions` (passed as `nameAccessory`). The header is **already** "הקופה הראשונה". `CreateGroupGuidancePanel` was **already removed** by `dev`.
+
+**Approved approach (option 1 — keep hero + stepper below):** keep the entire screen scaffolding; replace ONLY the flat `<CreateGroupFormFields>` body with the 5 `OnboardingStepCard`s. The hero stays on top; the steps become the interactive body.
+
+| Step | Input (current components) |
+|------|----------------------------|
+| ① name | `OnboardingNameSuggestions` (visible while empty) + `Input` |
+| ② category | `GroupTypeSelector` |
+| ③ currency | `CurrencyPicker` |
+| ④ cover image | `CreateGroupCoverPreview` + remove |
+| ⑤ members | `GroupMembersField` |
+
+**Already landed (merged, green on current `dev`):** `OnboardingStepCard` and `GroupMembersField` (+ unit tests).
+
+**No longer in scope (superseded by `dev`):** header rename (done), `CreateGroupGuidancePanel` deletion (done), and the `CreateGroupFormFields`→`GroupMembersField` dedupe (onboarding no longer uses `CreateGroupFormFields`; the standard `CreateGroupScreen` keeps it).
+
+**Animation note (from on-device run):** the app runs the **New Architecture**, where `LayoutAnimation` is a no-op; the chevron rotation + body fade (core `Animated`) still work, so expand/collapse is acceptable (height just isn't animated). Revisit with an `Animated` height only if it feels janky.
+
+**i18n:** add `onboarding.create.steps.*` (optional label, per-step titles/helpers, image + members summaries) to `he.json` + `en.json`. Reuse `onboarding.create.membersHint` for the members helper; no `intro` line (the hero covers it).
