@@ -1,5 +1,61 @@
 import '@testing-library/jest-native/extend-expect';
 
+jest.mock('expo-crypto', () => {
+    let mockCounter = 0;
+    return {
+        randomUUID: () => {
+            mockCounter += 1;
+            return `test-uuid-${mockCounter}-${Math.random().toString(36).slice(2, 10)}`;
+        },
+    };
+});
+
+jest.mock('expo-file-system', () => {
+    class Directory {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        create() {
+            return;
+        }
+        delete() {
+            return;
+        }
+    }
+    class File {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        static async downloadFileAsync(
+            _url: string,
+            dest: { uri: string },
+        ): Promise<File> {
+            return new File(dest.uri);
+        }
+        delete() {
+            return;
+        }
+    }
+    return {
+        Directory,
+        File,
+        Paths: {
+            document: new Directory('/test/docs/'),
+            cache: new Directory('/test/cache/'),
+        },
+    };
+});
+
 jest.mock('./lib/supabase', () => ({
     supabase: {
         from: jest.fn(() => ({
