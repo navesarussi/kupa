@@ -63,7 +63,7 @@ Order is name → category → currency → image → members. Only **name** gat
 
 ### Animation
 
-`react-native-reanimated` (already used across onboarding, see `theme/onboardingMotion.ts`): smooth height/opacity expand-collapse and chevron rotation. Respect existing motion timings.
+Expand/collapse uses React Native `LayoutAnimation` (configured on each toggle); chevron rotation uses RN core `Animated` (0→180° interpolate). Chosen for unit-test safety — the repo has **no** `react-native-reanimated` jest mock, so the step card avoids reanimated at runtime. The rest of onboarding keeps reanimated.
 
 ## Visual style (matches current app)
 
@@ -74,7 +74,8 @@ Order is name → category → currency → image → members. Only **name** gat
 
 ## Architecture
 
-- **New** `components/groups/OnboardingStepCard.tsx` — presentational: header (badge/check, title, optional tag, trailing summary, chevron) + animated collapsible body (`children`). Props: `index`, `title`, `helper?`, `summary?`, `optional?`, `complete`, `expanded`, `onToggle`, `children`, `testID`.
+- **New** `components/groups/OnboardingStepCard.tsx` — presentational: header (badge/check, title, optional tag, trailing summary, chevron) + animated collapsible body (`children`). Props: `index`, `title`, `helper?`, `summary?`, `optionalLabel?`, `complete`, `expanded`, `onToggle`, `children`, `testID`.
+- **New** `components/groups/GroupMembersField.tsx` — the member-avatars + add row, extracted so the onboarding members step stays focused. Used by onboarding now. The standard `CreateGroupFormFields` keeps its own copy this round (zero-risk); deduping it to use `GroupMembersField` is a tracked follow-up.
 - `OnboardingCreateGroupScreen` owns `openStep` state (which step is expanded) and composes the **existing** inputs (`Input`, `GroupTypeSelector`, `CurrencyPicker`, `CreateGroupCoverPreview`, members block) as `children` of each `OnboardingStepCard`. It stops rendering `CreateGroupFormFields` and `CreateGroupGuidancePanel`.
 - Inputs themselves are **not modified**. Submit/skip/create logic (`handleCreate`, gating on `name`, image upload, `AddMembersSheet`) is preserved as-is.
 - `CreateGroupFormShell` is reused for header/scroll/footer.
