@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kupay.mobile",
+      "usesAppleSignIn": true,
       "associatedDomains": [
         "applinks:kupa.pro"
       ],
@@ -29,7 +30,8 @@
           "bit",
           "paybox",
           "PayBox"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -122,6 +124,7 @@
       ],
       "expo-localization",
       "@react-native-google-signin/google-signin",
+      "expo-apple-authentication",
       [
         "@sentry/react-native/expo",
         {
