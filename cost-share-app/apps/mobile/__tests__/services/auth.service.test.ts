@@ -7,6 +7,8 @@ const mockOpenAuthSessionAsync = jest.fn();
 const mockOpenOAuthSession = jest.fn();
 let mockPlatformOs: 'ios' | 'android' | 'web' = 'ios';
 const mockMakeRedirectUri = jest.fn();
+const mockAppleSignInAsync = jest.fn();
+const mockUpdateUser = jest.fn().mockResolvedValue(null);
 
 jest.mock('expo-constants', () => ({
     __esModule: true,
@@ -67,12 +69,28 @@ jest.mock('expo-web-browser', () => ({
     openAuthSessionAsync: (...args: unknown[]) => mockOpenAuthSessionAsync(...args),
 }));
 
+jest.mock('expo-apple-authentication', () => ({
+    signInAsync: (...args: unknown[]) => mockAppleSignInAsync(...args),
+    AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+}));
+
+jest.mock('expo-crypto', () => ({
+    CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+    digestStringAsync: jest.fn(async (_algo: string, value: string) => `hashed:${value}`),
+    randomUUID: jest.fn(() => 'uuid-1234'),
+}));
+
+jest.mock('../../services/users.service', () => ({
+    updateUser: (...args: unknown[]) => mockUpdateUser(...args),
+}));
+
 import { Platform } from 'react-native';
 import { queryClient } from '../../lib/queryClient';
 import {
     getAuthRedirectUri,
     handleAuthRedirectUrl,
     isAuthCallbackUrl,
+    signInWithApple,
     signInWithGoogle,
     signOut,
 } from '../../services/auth.service';
@@ -290,6 +308,81 @@ describe('auth.service', () => {
             expect(result.error?.message).toContain('com.kupay.mobile://auth/callback');
             expect(result.error?.message).toContain('Redirect URLs');
             expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('signInWithApple', () => {
+        beforeEach(() => {
+            setPlatformOs('ios');
+            mockSignInWithIdToken.mockResolvedValue({
+                data: { user: { id: 'user-1' } },
+                error: null,
+            });
+        });
+
+        it('exchanges the Apple identity token with the raw nonce', async () => {
+            mockAppleSignInAsync.mockResolvedValue({
+                identityToken: 'apple-id-token',
+                fullName: null,
+            });
+
+            const result = await signInWithApple();
+
+            expect(mockAppleSignInAsync).toHaveBeenCalledWith(
+                expect.objectContaining({ nonce: 'hashed:uuid-1234' }),
+            );
+            expect(mockSignInWithIdToken).toHaveBeenCalledWith({
+                provider: 'apple',
+                token: 'apple-id-token',
+                nonce: 'uuid-1234',
+            });
+            expect(result.error).toBeNull();
+        });
+
+        it('captures the full name on first sign-in', async () => {
+            mockAppleSignInAsync.mockResolvedValue({
+                identityToken: 'apple-id-token',
+                fullName: { givenName: 'Dana', familyName: 'Cohen' },
+            });
+
+            await signInWithApple();
+
+            expect(mockUpdateUser).toHaveBeenCalledWith('user-1', { name: 'Dana Cohen' });
+        });
+
+        it('does not call updateUser when Apple returns no name', async () => {
+            mockAppleSignInAsync.mockResolvedValue({ identityToken: 'apple-id-token', fullName: null });
+
+            await signInWithApple();
+
+            expect(mockUpdateUser).not.toHaveBeenCalled();
+        });
+
+        it('returns no error (silent) when the user cancels', async () => {
+            mockAppleSignInAsync.mockRejectedValue({ code: 'ERR_REQUEST_CANCELED' });
+
+            const result = await signInWithApple();
+
+            expect(result.error).toBeNull();
+            expect(mockSignInWithIdToken).not.toHaveBeenCalled();
+        });
+
+        it('returns account_deleted when the profile is deactivated', async () => {
+            mockAppleSignInAsync.mockResolvedValue({ identityToken: 'apple-id-token', fullName: null });
+            mockIsAuthSessionAllowed.mockResolvedValueOnce(false);
+
+            const result = await signInWithApple();
+
+            expect(result.error?.code).toBe('account_deleted');
+        });
+
+        it('returns a generic error when there is no identity token', async () => {
+            mockAppleSignInAsync.mockResolvedValue({ identityToken: null, fullName: null });
+
+            const result = await signInWithApple();
+
+            expect(result.error?.code).toBe('generic');
+            expect(mockSignInWithIdToken).not.toHaveBeenCalled();
         });
     });
 
