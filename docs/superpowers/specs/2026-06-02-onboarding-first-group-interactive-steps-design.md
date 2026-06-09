@@ -25,7 +25,7 @@ One step open at a time; tapping a step header expands it and collapses the othe
 ### Layout (top → bottom)
 
 ```
-‹  קופה חדשה                       דלג     ← existing header (back / skip)
+‹  הקופה הראשונה                    דלג     ← header (back / skip); title "הקופה הראשונה"
 בואו נפתח את הקופה הראשונה                  ← slim one-line intro (replaces tips panel)
 
 ① שם הקופה                       [open] ▲
@@ -82,6 +82,7 @@ Order is name → category → currency → image → members. Only **name** gat
 
 ## i18n
 
+- `onboarding.create.header` copy changes from "קופה חדשה" to **"הקופה הראשונה"** (en equivalent, e.g. "Your first kupa"). Scoped to onboarding; the standard `CreateGroupScreen` uses its own title.
 - New keys under `onboarding.create.steps.*` (titles, helpers, "אופציונלי", "{n} חברים" summary) in both `i18n/locales/he.json` and `en.json`. Reuse existing copy where possible (tip1/tip2/tip3, `membersHint`, type labels, currency code).
 - All Hebrew; RTL preserved (REQ-PROF-03).
 
