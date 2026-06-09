@@ -132,7 +132,15 @@
             "skipTitle": "Skip creating a group?",
             "skipMessage": "No group means no expenses. You can open one anytime from Groups.",
             "skipConfirm": "Skip",
-            "findFriendsAfterCreate": "After opening the group — link, text, or contacts."
+            "findFriendsAfterCreate": "After opening the group — link, text, or contacts.",
+            "steps": {
+                "optional": "Optional",
+                "name": { "title": "Kupa name", "helper": "Pick a name everyone recognizes (e.g. \"Beach trip\" or \"Apt 2025\")." },
+                "category": { "title": "Category", "helper": "The type sets the colors — you can change it later." },
+                "currency": { "title": "Currency" },
+                "image": { "title": "Cover image", "summaryDefault": "Default", "summarySet": "Image selected" },
+                "members": { "title": "Invite members", "summarySuffix": "members" }
+            }
         }
     },
     "groups": {
