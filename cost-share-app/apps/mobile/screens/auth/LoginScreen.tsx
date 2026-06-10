@@ -15,12 +15,14 @@ import { AppBrandTitle } from '../../components/AppBrandTitle';
 import { DeletedAccountNoticeDialog } from '../../components/DeletedAccountNoticeDialog';
 import { LoginFeatureChips } from '../../components/auth/LoginFeatureChips';
 import { LoginGoogleButton } from '../../components/auth/LoginGoogleButton';
+import { LoginAppleButton } from '../../components/auth/LoginAppleButton';
 import { colors } from '../../theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLoading } from '../../hooks/useLoading';
-import { signInWithGoogle } from '../../services/auth.service';
+import { signInWithApple, signInWithGoogle } from '../../services/auth.service';
 import { showAppToast } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { LanguageSheet } from '../../components/settings/LanguageSheet';
 import { useChangeAppLanguage } from '../../hooks/useChangeAppLanguage';
 import { centeredTextStyle, useAppLanguage } from '../../hooks/useRtlLayout';
@@ -30,6 +32,7 @@ import {
     consumeDeactivationNoticePending,
 } from '../../lib/deactivationNoticeStorage';
 import { getSupportEmail, openSupportContact } from '../../lib/openMailto';
+import appVersion from '../../version.json';
 
 export function LoginScreen() {
     const { t } = useTranslation();
@@ -84,18 +87,48 @@ export function LoginScreen() {
         try {
             const { error } = await signInWithGoogle();
             if (error) {
+                // account_deleted is expected business state (user previously deleted their account),
+                // shown via a dedicated dialog — not a bug, so no Sentry capture.
                 if (error.code === 'account_deleted') {
                     showDeletedAccountNotice();
                     return;
                 }
-                showAppToast({
-                    type: 'error',
-                    titleKey: 'auth.signInError',
-                    message: error.message,
+                handleError(error, {
+                    toast: { titleKey: 'auth.signInError', message: error.message },
+                    tags: { service: 'auth', op: 'signInWithGoogle' },
+                    extra: { errorCode: error.code },
                 });
             }
-        } catch {
-            showAppToast({ type: 'error', titleKey: 'auth.signInError' });
+        } catch (error) {
+            handleError(error, {
+                toast: { titleKey: 'auth.signInError' },
+                tags: { service: 'auth', op: 'signInWithGoogle' },
+            });
+        } finally {
+            stopLoading();
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        startLoading();
+        try {
+            const { error } = await signInWithApple();
+            if (error) {
+                if (error.code === 'account_deleted') {
+                    showDeletedAccountNotice();
+                    return;
+                }
+                handleError(error, {
+                    toast: { titleKey: 'auth.signInError', message: error.message },
+                    tags: { service: 'auth', op: 'signInWithApple' },
+                    extra: { errorCode: error.code },
+                });
+            }
+        } catch (error) {
+            handleError(error, {
+                toast: { titleKey: 'auth.signInError' },
+                tags: { service: 'auth', op: 'signInWithApple' },
+            });
         } finally {
             stopLoading();
         }
@@ -154,6 +187,12 @@ export function LoginScreen() {
                         loading={isLoading}
                         disabled={isLoading}
                     />
+                    <View className="h-3" />
+                    <LoginAppleButton
+                        title={t('auth.signInWithApple')}
+                        onPress={handleAppleSignIn}
+                        disabled={isLoading}
+                    />
                     {isLoading ? (
                         <Text
                             className="text-sm text-gray-400 mt-3 text-center"
@@ -162,6 +201,9 @@ export function LoginScreen() {
                             {t('auth.signingIn')}
                         </Text>
                     ) : null}
+                    <Text className="text-[11px] text-gray-300 text-center mt-4">
+                        v{appVersion.version}
+                    </Text>
                 </View>
             </SafeAreaView>
 

@@ -1,5 +1,71 @@
 import '@testing-library/jest-native/extend-expect';
 
+jest.mock('expo-crypto', () => {
+    let mockCounter = 0;
+    return {
+        randomUUID: () => {
+            mockCounter += 1;
+            return `test-uuid-${mockCounter}-${Math.random().toString(36).slice(2, 10)}`;
+        },
+    };
+});
+
+jest.mock('expo-apple-authentication', () => ({
+    // Host-component string (not a React component) so NativeWind's babel transform
+    // doesn't inject an out-of-scope variable into this jest.mock factory.
+    AppleAuthenticationButton: 'AppleAuthenticationButton',
+    AppleAuthenticationButtonType: { SIGN_IN: 0, CONTINUE: 1, SIGN_UP: 2 },
+    AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
+    AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+    signInAsync: jest.fn(),
+}));
+
+jest.mock('expo-file-system', () => {
+    class Directory {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        create() {
+            return;
+        }
+        delete() {
+            return;
+        }
+    }
+    class File {
+        public uri: string;
+        constructor(...parts: Array<string | { uri: string }>) {
+            const joined = parts
+                .map((p) => (typeof p === 'string' ? p : p.uri))
+                .join('/')
+                .replace(/\/+/g, '/');
+            this.uri = joined;
+        }
+        static async downloadFileAsync(
+            _url: string,
+            dest: { uri: string },
+        ): Promise<File> {
+            return new File(dest.uri);
+        }
+        delete() {
+            return;
+        }
+    }
+    return {
+        Directory,
+        File,
+        Paths: {
+            document: new Directory('/test/docs/'),
+            cache: new Directory('/test/cache/'),
+        },
+    };
+});
+
 jest.mock('./lib/supabase', () => ({
     supabase: {
         from: jest.fn(() => ({

@@ -1,6 +1,7 @@
 import { Text } from '../../components/AppText';
 import React, { useCallback, useState } from 'react';
 import { View, ScrollView, Linking, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 import * as StoreReview from 'expo-store-review';
@@ -18,7 +19,8 @@ import { ContactSupportRow } from '../../components/settings/ContactSupportRow';
 import { LegalDocumentSheet } from '../../components/settings/LegalDocumentSheet';
 import { LanguageSheet } from '../../components/settings/LanguageSheet';
 import { CurrencyPicker } from '../../components/CurrencyPicker';
-import { showAppToast, showErrorToast, showSuccessMessage } from '../../lib/appToast';
+import { showAppToast, showSuccessMessage } from '../../lib/appToast';
+import { handleError } from '../../lib/handleError';
 import { deleteMyAccount, getMyOpenBalances, type OpenBalancesSummary } from '../../services/account.service';
 import { useNavigation } from '@react-navigation/native';
 import { DeleteAccountWarningSheet } from '../../components/settings/DeleteAccountWarningSheet';
@@ -36,6 +38,7 @@ export function SettingsScreen() {
     const language = useAppLanguage();
     const changeAppLanguage = useChangeAppLanguage();
     const currentUser = useAppStore((s) => s.currentUser);
+    const insets = useSafeAreaInsets();
 
     const [showLogout, setShowLogout] = useState(false);
     const [showLanguage, setShowLanguage] = useState(false);
@@ -75,7 +78,11 @@ export function SettingsScreen() {
                 messageKey: 'profile.profileUpdated',
             });
         } else {
-            showErrorToast('common.error', 'profile.updateError');
+            handleError(new Error('updateUser returned null'), {
+                toast: { titleKey: 'common.error', messageKey: 'profile.updateError' },
+                tags: { service: 'users', op: 'updateUser' },
+                extra: { userId: currentUser.id, flow: 'settingsCurrencyChange', nextCurrency },
+            });
         }
     }, [currentUser, t]);
 
@@ -107,7 +114,10 @@ export function SettingsScreen() {
     }, [t]);
 
     return (
-        <ScrollView className="flex-1 bg-slate-50">
+        <ScrollView
+            className="flex-1 bg-slate-50"
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
+        >
             <View className="pt-4">
                 <View className="px-4 mb-4">
                     <InviteLinkBlock kind="friend" mode="expanded" />
